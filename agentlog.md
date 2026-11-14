@@ -132,3 +132,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Removed the Chinese launch vehicle (Long March 3B/E) and Jiuquan launch site from the dataset, scenery and 3D models per product direction.
 - Moon mission pacing: auto-warp 5x for the last 90 s before the TLI window with autopilot on, and 10x for the ~4.5 min TLI burn (it looked like a stall at 1x).
 - Moon/transfer view: replaced the white cone craft marker with an Apollo-style spacecraft model (CM, SM, engine bell, dish, RCS quads).
+- Menu: astronaut greets on hover/click (speech bubble + browser voice) and offers a 7-step narrated How to play tutorial (src/components/screens/MenuGuide.tsx); also a How to play button under the menu.
