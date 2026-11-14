@@ -323,7 +323,7 @@ export function stepFlight(f: Flight, input: Input, dt = LAUNCH.dt): void {
   if (f.stage === 2 && f.fairing && h > 110_000 && q < 50) { f.fairing = false; mark(f, "fairing", "Payload fairing jettisoned."); }
   if (h >= LAUNCH.karmanM) mark(f, "karman", "Kármán line crossed — you are in space!");
   // trail
-  if (Math.floor(f.t * 2) !== Math.floor((f.t - dt) * 2)) f.trail.push(f.x, f.y);
+  if (Math.floor(f.t * 2) !== Math.floor((f.t - dt) * 2)) f.trail.push(f.x, f.y, f.t); // x, y, time (triplets)
 
   f.tel = telemetry(f, q, aoa, g);
   evaluateOutcome(f);

@@ -10,6 +10,8 @@ import { LAUNCH, RULES, buildRocket, guidancePitch, scoreFlight, type Difficulty
 import { LaunchSession } from "@/game/launch/session";
 import { useLaunchSetup } from "@/game/launch/store";
 import { drawFlight, newView, updateView } from "./launchDraw";
+import { buildEarthDisc } from "./earthDisc";
+import { loadRocketSprite } from "./partThumbs";
 
 const fmt = (n: number, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d });
 const usd = (n: number) => (n >= 1e9 ? `$${fmt(n / 1e9, 2)}B` : `$${fmt(n / 1e6)}M`);
@@ -124,7 +126,7 @@ function Flight({ session, onExit, onAgain }: { session: LaunchSession; onExit: 
   const reduced = useUIStore((s) => s.reducedMotion);
   const rules = session.flight.rules;
   const canvas = useRef<HTMLCanvasElement>(null), wrap = useRef<HTMLDivElement>(null);
-  const [view] = useState(newView);
+  const [view] = useState(() => newView(session.flight.site.id));
   const [s, setS] = useState<Snap>(() => snap(session));
   const [showResult, setShowResult] = useState(false);
 
@@ -134,10 +136,14 @@ function Flight({ session, onExit, onAgain }: { session: LaunchSession; onExit: 
     let raf = 0, last = performance.now(), dead = false, W = 0, H = 0;
     const resize = () => { const r = box.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1); W = r.width; H = r.height; el.width = Math.round(W * dpr); el.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
     resize(); const ro = new ResizeObserver(resize); ro.observe(box);
+    // real Earth texture for the orbit view + the 3-D rocket model as the flight sprite (both load async; the scene works without them)
+    const fl = session.flight;
+    void buildEarthDisc(fl.site.lat, fl.site.lon).then((c) => { if (!dead) view.setEarth(c); });
+    void loadRocketSprite(fl.rocket.vehicle.id).then((sp) => { if (!dead) view.setSprite(sp); });
     const frame = (now: number) => {
       if (dead) return;
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
-      session.tick(dt); updateView(view, session.flight, dt, reduced); drawFlight(ctx, W, H, session.flight, view);
+      session.tick(dt); updateView(view, session.flight, dt, reduced, session.running ? dt * session.warp : 0); drawFlight(ctx, W, H, session.flight, view);
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);

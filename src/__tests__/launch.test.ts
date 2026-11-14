@@ -104,3 +104,20 @@ describe("scoring", () => {
     expect(h.score).toBeGreaterThan(e.score * 1.2);
   });
 });
+
+import { BIOMES, biomeFor, skyAt } from "@/components/game/launchScenery";
+describe("real-environment scenery", () => {
+  it("every dataset spaceport has its own biome (different terrain and light)", () => {
+    const ids = DATASET.launch_sites.map((s) => biomeFor(s.id).id);
+    expect(new Set(ids).size).toBe(DATASET.launch_sites.length);
+    for (const s of DATASET.launch_sites) expect(BIOMES[s.id]).toBeDefined();
+  });
+  it("coastal sites have sea, inland sites do not", () => {
+    expect(biomeFor("ll2_pad_87").sea).toBeDefined(); expect(biomeFor("ll2_pad_32").sea).toBeUndefined();
+  });
+  it("the sky darkens with altitude: pale at the horizon, deep blue aloft, black in space", () => {
+    const b = biomeFor("ll2_pad_87"), sum = (c: number[]) => c[0] + c[1] + c[2];
+    expect(sum(skyAt(0, b))).toBeGreaterThan(sum(skyAt(15000, b))); expect(sum(skyAt(15000, b))).toBeGreaterThan(sum(skyAt(120000, b)));
+    expect(sum(skyAt(150000, b))).toBeLessThan(40);
+  });
+});
