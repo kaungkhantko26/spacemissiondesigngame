@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #050b18;
+  --bg-secondary: #0b1730;
+  --panel: rgba(9, 25, 51, 0.78);
+  --blue-primary: #0b3d91;
+  --blue-electric: #168bff;
+  --cyan: #4fc3f7;
+  --orange: #ff8c42;
+  --gold: #ffc857;
+  --text: #f5f7fa;
+  --text-2: #aabdd3;
+  --text-muted: #7389a5;
+  --success: #36d399;
+  --warning: #fbbf24;
+  --error: #fb7185;
+  --border: rgba(79, 195, 247, 0.28);
+  --radius: 14px;
+}
+
+@theme inline {
+  --color-bg: var(--bg-primary);
+  --color-bg2: var(--bg-secondary);
+  --color-panel: var(--panel);
+  --color-electric: var(--blue-electric);
+  --color-cyan: var(--cyan);
+  --color-orange: var(--orange);
+  --color-gold: var(--gold);
+  --color-ink: var(--text);
+  --color-ink2: var(--text-2);
+  --color-muted: var(--text-muted);
+  --color-ok: var(--success);
+  --color-warn: var(--warning);
+  --color-bad: var(--error);
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-space), var(--font-inter), system-ui, sans-serif;
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--bg-primary);
+  color: var(--text);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+h1, h2, h3, .font-display { font-family: var(--font-display); }
+
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.starfield {
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(22,139,255,.18), transparent 55%),
+    radial-gradient(ellipse at 85% 90%, rgba(255,140,66,.12), transparent 50%),
+    linear-gradient(180deg, #050b18, #0b1730);
+}
+.stars {
+  position: absolute; inset: 0; pointer-events: none; opacity: .8;
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 120px 80px, #bde3ff, transparent),
+    radial-gradient(1px 1px at 220px 160px, #fff, transparent),
+    radial-gradient(1px 1px at 70px 190px, #ffe2c2, transparent);
+  background-size: 260px 220px;
+  animation: drift 120s linear infinite;
+}
+@keyframes drift { to { background-position: -520px 440px; } }
+@keyframes indeterminate { 0% { transform: translateX(-100%);} 100% { transform: translateX(300%);} }
+@keyframes spin { to { transform: rotate(360deg);} }
+
+.reduce-motion *, .reduce-motion *::before, .reduce-motion *::after {
+  animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+  transition-duration: .001ms !important;
+}
+.high-contrast { --border: rgba(255,255,255,.7); --text-2: #dbe7f5; --text-muted: #b4c5d9; }
+@media (prefers-reduced-motion: reduce) {
+  .stars { animation: none; }
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
