@@ -139,3 +139,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - playVoice resolves whether sound started; greeting only counts as played after audio actually starts (autoplay needs a click).
 - Flight callouts: launch director voice (ElevenLabs clips) reports max-Q, separations, ignitions, Karman line, orbit/parking, TLI, loss; muted by the speaker button.
 - Moon coast voice: flight director calls coast start, mid-course, approach, capture/lost contact (MoonLeg), with a mute button.
+- Voice: single shared audio element unlocked by the first user gesture (Safari blocked new Audio().play() outside a click), falls back to browser speech if still locked.

@@ -5,7 +5,7 @@ import { HelpCircle } from "lucide-react";
 import { GameButton } from "@/components/ui";
 import { useUIStore } from "@/stores";
 import { Tour, setPendingTour, type TourStep } from "@/components/game/Tour";
-import { playVoice, stopVoice } from "@/lib/voice";
+import { installVoiceUnlock, playVoice, stopVoice } from "@/lib/voice";
 
 const MENU_TOUR: TourStep[] = [
   { target: "[data-tour=astronaut]", title: "Meet your astronaut", body: "Hover over me any time for a hello. I'll walk you through the game." },
@@ -37,7 +37,7 @@ export function AstronautGuide({ children }: { children: React.ReactNode }) {
     });
   };
   const leave = () => { hide.current = setTimeout(() => setOpen(false), 600); };
-  useEffect(() => () => { if (hide.current) clearTimeout(hide.current); stopVoice(); }, []);
+  useEffect(() => { installVoiceUnlock(); return () => { if (hide.current) clearTimeout(hide.current); stopVoice(); }; }, []);
   return (
     <div data-tour="astronaut" className="relative h-full" onMouseEnter={greet} onMouseLeave={leave} onClick={greet}>
       {children}
