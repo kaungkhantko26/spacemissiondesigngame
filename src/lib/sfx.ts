@@ -125,7 +125,7 @@ function sfxNow(c: AudioContext, kind: SfxKind) {
   else if (kind === "ignite2") { out.gain.value = 0.6; burst("brown", 2.2, [100, 700], 0.8, 0.9, 2.2); tone("sine", 40, 55, 1.8, 0.35); }
   else if (kind === "explosion") { out.gain.value = 0.8; burst("white", 3.6, [5000, 90], 1, 0.003, 3.6); burst("brown", 4.5, [400, 60], 1, 0.01, 4.5); tone("sine", 80, 22, 2.5, 1); }
   else if (kind === "chime") { out.gain.value = 0.5; tone("sine", 880, 880, 0.9, 0.5); tone("sine", 1318, 1318, 1.1, 0.4, 0.18); }
-  else if (kind === "click") { out.gain.value = 0.9; tone("sine", 1500, 700, 0.07, 0.5); burst("white", 0.03, [5000, 1500], 0.15, 0.001, 0.03); }
+  else if (kind === "click") { out.gain.value = 0.22; tone("sine", 820, 620, 0.05, 0.5); }
   else if (kind === "tick") { out.gain.value = 0.35; tone("sine", 2400, 2000, 0.03, 0.4); }
   else if (kind === "confirm") { out.gain.value = 0.45; tone("sine", 660, 660, 0.12, 0.5); tone("sine", 990, 990, 0.2, 0.5, 0.09); }
   else { out.gain.value = 0.5; tone("sine", 1200, 1200, 0.25, 0.5); tone("sine", 1800, 1800, 0.25, 0.3, 0.05); } // blip: sound check
