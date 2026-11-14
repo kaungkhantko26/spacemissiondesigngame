@@ -10,5 +10,15 @@
   "cd-3": "3. Main engine start.",
   "cd-2": "2.",
   "cd-1": "1.",
-  "cd-0": "Liftoff!"
+  "cd-0": "Liftoff!",
+  "maxq": "Max Q. Passing through peak dynamic pressure.",
+  "sep": "Stage separation confirmed.",
+  "ignition2": "Next stage ignition.",
+  "karman": "We have crossed the Karman line. Welcome to space.",
+  "jettison": "Jettison confirmed.",
+  "orbit": "Orbit achieved.",
+  "parking": "Parking orbit achieved. Standing by for the translunar window.",
+  "tliStart": "T L I ignition. Burn under way.",
+  "tli": "Translunar injection complete. We are on our way to the Moon.",
+  "failed": "We have lost the vehicle."
 }

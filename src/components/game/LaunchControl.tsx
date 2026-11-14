@@ -208,6 +208,22 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     if (n > 10 || n < 0) return;
     playVoice(`cd-${Math.max(0, n)}` as VoiceId, !voice);
   }, [s.t, s.running, s.phase, voice]);
+  // flight callouts: the launch director reports each milestone once (the latest new one wins if several land together)
+  const called = useRef(new Set<string>());
+  useEffect(() => {
+    if (!s.running && s.phase !== "failed") return;
+    const moon = f.mission === "moon";
+    const MAP: Record<string, VoiceId> = { maxq: "maxq", sep: "sep", sep2: "sep", ignition2: "ignition2", ignition3: "ignition2", karman: "karman", fairing: "jettison", orbit: moon ? "parking" : "orbit", tliStart: "tliStart", tli: "tli" };
+    let say: VoiceId | null = null, at = -Infinity;
+    for (const [k, id] of Object.entries(MAP)) {
+      const t = s.ms[k];
+      if (t === undefined || called.current.has(k)) continue;
+      called.current.add(k);
+      if (t >= at) { at = t; say = id; }
+    }
+    if (s.phase === "failed" && !called.current.has("failed")) { called.current.add("failed"); say = "failed"; }
+    if (say) playVoice(say, !voice);
+  }, [s.ms, s.phase, s.running, voice, f.mission]);
   useEffect(() => () => stopVoice(), []);
   const start = () => { session.start(); setS(snap(session)); };
   const togglePause = useCallback(() => { if (session.flight.t > -LAUNCH.countdownS + 0.01 || session.running) session.toggleRun(); setS(snap(session)); }, [session]);
