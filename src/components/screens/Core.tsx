@@ -62,7 +62,7 @@ export function SplashScreen() {
 const LIVE = !!process.env.NEXT_PUBLIC_API_URL; // live backend mode → route to /play/*
 const MENU = [
   { href: "/design", label: "Design Mission", icon: Rocket, primary: true },
-  { href: LIVE ? "/play" : "/team", label: "Team Up", icon: Users },
+  { href: "/team", label: "Team Up", icon: Users },
   { href: LIVE ? "/play/profile" : "/profile", label: "Profile", icon: User },
   { href: LIVE ? "/play/cosmetics" : "/cosmetics", label: "Cosmetics", icon: Shirt },
   { href: LIVE ? "/play/stats" : "/stats", label: "Stats", icon: BarChart3 },
