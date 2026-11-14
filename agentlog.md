@@ -148,3 +148,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Moon coast sound: cabin hum throughout, engine during mid-course correction and the LOI burn, chime or explosion at the end; shares the mute button with the voice.
 - App-wide sound: GlobalSound (UI clicks/hover ticks, ambient bed outside /launch), playSfx self-resumes the AudioContext, Test sound in Settings, flight sound follows the global mute. Moon coast engine + hum.
 - Clouds: more layers + soft neutral cloud deck below the rocket while climbing out; guards stop cloud/deck drawing from exploding when zoomed out (was the lag near the top); flight canvas DPR capped 1.5, frame dt cap 0.25. Profile: crew ID badge on a draggable swinging lanyard. Engine sound: slow attack and long outro on cutoff. Sound: recorded samples in public/sfx/<id>.mp3 override synth; hover ticks and loud ambient bed removed.
+- Click sound: clean short sine blip, no noise burst, quieter.
