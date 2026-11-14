@@ -39,7 +39,10 @@ export function Design() {
   const left = secondsLeft(room.challenge, roomAt, tick);
   const approved = room.approvals.includes(me);
   const toggleInst = (id: string) => set({ instruments: d.instruments.includes(id) ? d.instruments.filter((x) => x !== id) : [...d.instruments, id] });
-  const humans = room.members.length;
+  const realIds = room.members.filter((m) => !m.bot).map((m) => m.id);
+  const humans = realIds.length;
+  const approvedCount = room.approvals.filter((x) => realIds.includes(x)).length;
+  const allApproved = approvedCount >= humans;
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
       <div className="space-y-3">
@@ -90,9 +93,9 @@ export function Design() {
         <GlassPanel className="max-h-64 overflow-auto p-4"><h3 className="font-semibold">Checks</h3>
           {pv?.checks.filter((c) => c.status !== "pass").map((c) => <div key={c.id} className={`text-xs ${COLOR[c.status]}`} title={c.why}>● {c.title}: {c.detail}</div>)}</GlassPanel>
         <GlassPanel className="space-y-2 p-4">
-          <div className="text-xs text-ink2">Approved: {room.approvals.length}/{humans}</div>
+          <div className="text-xs text-ink2">Approved: {approvedCount}/{humans}{room.members.some((m) => m.bot) ? " (test bots auto-approve)" : ""}</div>
           <GameButton onClick={() => swallow(g.approve(!approved))}>{approved ? "Withdraw approval" : "Approve design"}</GameButton>
-          {room.hostId === me && <GameButton variant="primary" disabled={!pv?.launchReady} onClick={() => swallow(g.launch())}>🚀 Launch</GameButton>}
+          {room.hostId === me && <GameButton variant="primary" disabled={!pv?.launchReady || !allApproved} title={allApproved ? "" : "Every player must approve first"} onClick={() => swallow(g.launch())}>🚀 Launch</GameButton>}
           {cat.rules.devTools && <GameButton variant="outline" onClick={() => swallow(g.devAutodesign())}>🛠 Auto-design (dev)</GameButton>}
           <GameButton variant="ghost" onClick={() => swallow(g.toLobby())}>Abort</GameButton>
         </GlassPanel>
