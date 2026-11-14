@@ -54,3 +54,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 ## Session 3 (cont.) — Cosmetics beyond colour
 - New categories: pattern, headgear, shoulder, boots (13 new items in mock data). Patterns = glowing emissive decal masks (canvas textures, `three/Gear.tsx`); accessories are procedural meshes that follow GLB bones (head/clavicles/ankles; note three strips dots from bone names). `useLook` passes ids+colours to `Astronaut`. Verified on /cosmetics (patterns, halo, flag, thruster boots); other items not all eyeballed.
 - Menu astronaut: lower-right of the Earth, turned 45° right (`rotationY` prop), wears equipped cosmetics. Antenna lowered onto helmet; pattern decals softened.
+- Menu astronaut: turned 45° to the LEFT (rotationY -PI/4), scale 1.6, bottom-right corner.
