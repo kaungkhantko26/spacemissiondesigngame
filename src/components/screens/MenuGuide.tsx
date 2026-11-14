@@ -21,7 +21,7 @@ const MENU_TOUR: TourStep[] = [
 ];
 
 /** Hover greeting (spoken once per visit) and the guided tour entry point for the menu astronaut. */
-export function AstronautGuide({ children }: { children: React.ReactNode }) {
+export function AstronautGuide({ children, spin }: { children: React.ReactNode; spin?: { down(x: number): void; move(x: number): void; up(): void } }) {
   const muted = useUIStore((s) => s.muted);
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -43,7 +43,9 @@ export function AstronautGuide({ children }: { children: React.ReactNode }) {
   const ready = useAstronautReady((st) => st.ready);
   useEffect(() => { preloadAstronaut(); installVoiceUnlock(); return () => { if (hide.current) clearTimeout(hide.current); stopVoice(); }; }, []);
   return (
-    <div data-tour="astronaut" className="relative h-full" onMouseEnter={greet} onMouseLeave={leave} onClick={greet}>
+    <div data-tour="astronaut" className="relative h-full cursor-grab touch-pan-y select-none active:cursor-grabbing" onMouseEnter={greet} onMouseLeave={leave} onClick={greet}
+      onPointerDown={(e) => { if ((e.target as HTMLElement).closest("button,a")) return; spin?.down(e.clientX); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }}
+      onPointerMove={(e) => spin?.move(e.clientX)} onPointerUp={() => spin?.up()} onPointerCancel={() => spin?.up()}>
       {children}
       {!ready && (
         // eslint-disable-next-line @next/next/no-img-element -- static export, tiny poster shown until the live 3D model has downloaded
