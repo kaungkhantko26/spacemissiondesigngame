@@ -43,11 +43,12 @@ export function SplashScreen() {
 }
 
 /* ---------- Main menu ---------- */
+const LIVE = !!process.env.NEXT_PUBLIC_API_URL; // live backend mode → route to /play/*
 const MENU = [
-  { href: "/team", label: "Team Up", icon: Users, primary: true },
-  { href: "/profile", label: "Profile", icon: User },
-  { href: "/cosmetics", label: "Cosmetics", icon: Shirt },
-  { href: "/stats", label: "Stats", icon: BarChart3 },
+  { href: LIVE ? "/play" : "/team", label: "Team Up", icon: Users, primary: true },
+  { href: LIVE ? "/play/profile" : "/profile", label: "Profile", icon: User },
+  { href: LIVE ? "/play/cosmetics" : "/cosmetics", label: "Cosmetics", icon: Shirt },
+  { href: LIVE ? "/play/stats" : "/stats", label: "Stats", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 export function MenuScreen() {
