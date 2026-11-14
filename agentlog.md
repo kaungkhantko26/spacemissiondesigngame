@@ -55,3 +55,6 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - New categories: pattern, headgear, shoulder, boots (13 new items in mock data). Patterns = glowing emissive decal masks (canvas textures, `three/Gear.tsx`); accessories are procedural meshes that follow GLB bones (head/clavicles/ankles; note three strips dots from bone names). `useLook` passes ids+colours to `Astronaut`. Verified on /cosmetics (patterns, halo, flag, thruster boots); other items not all eyeballed.
 - Menu astronaut: lower-right of the Earth, turned 45° right (`rotationY` prop), wears equipped cosmetics. Antenna lowered onto helmet; pattern decals softened.
 - Menu astronaut: turned 45° to the LEFT (rotationY -PI/4), scale 1.6, bottom-right corner.
+
+## Session 3 (cont.) — GitHub Pages
+- Static export when `GITHUB_PAGES=1` (next.config.ts: output export, basePath from NEXT_PUBLIC_BASE_PATH, trailingSlash). Public files go through `asset()` (src/lib/asset.ts) so the sub-path works. `npm run deploy:pages` builds and force-pushes ./out to the gh-pages branch (no workflow file: the gh token has no `workflow` scope). Pages source = gh-pages /. Live: https://kaungkhantko26.github.io/spacemissiondesigngame/ (static only; /play needs a backend URL at build time).

@@ -6,6 +6,7 @@ import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.j
 import { SRGBColorSpace, Vector3, type Group, type Mesh, type MeshStandardMaterial, type Object3D } from "three";
 import { BootGear, Headgear, ShoulderGear, patternTexture } from "./Gear";
 import { useUIStore } from "@/stores";
+import { asset } from "@/lib/asset";
 
 /** Error boundary: 3D must never block navigation. */
 class Boundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
@@ -67,7 +68,7 @@ export interface AstronautLook {
   shoulder?: string; shoulderColor?: string; boots?: string; bootsColor?: string;
   pose?: "idle" | "wave" | "ready" | "celebrate";
 }
-export const ASTRONAUT_URL = "/models/astronaut.glb";
+export const ASTRONAUT_URL = asset("/models/astronaut.glb");
 const POSE_CLIP = { idle: "idle", wave: "wave", ready: "floating", celebrate: "moon_walk" } as const;
 const MODEL_HEIGHT = 3.1165; // native height of the GLB in its own units
 const TARGET_HEIGHT = 2.4; // world units, feet resting on y=-0.25
@@ -166,7 +167,7 @@ const bodyStyle: Record<BodyKind, { color: string; emissive: string }> = {
 type P3 = [number, number, number];
 /** Real Earth: NASA Blue Marble map + drifting cloud layer + atmosphere rim. */
 function TexturedEarth({ radius }: { radius: number }) {
-  const [map, clouds] = useTexture(["/textures/earth.jpg", "/textures/earth_clouds.png"], (t) => { (Array.isArray(t) ? t[0] : t).colorSpace = SRGBColorSpace; });
+  const [map, clouds] = useTexture([asset("/textures/earth.jpg"), asset("/textures/earth_clouds.png")], (t) => { (Array.isArray(t) ? t[0] : t).colorSpace = SRGBColorSpace; });
   const cl = useRef<Group>(null);
   const reduced = useUIStore((st) => st.reducedMotion);
   useFrame((_, d) => { if (cl.current && !reduced) cl.current.rotation.y += d * 0.02; });
@@ -179,7 +180,7 @@ function TexturedEarth({ radius }: { radius: number }) {
   );
 }
 function TexturedMoon({ radius }: { radius: number }) {
-  const map = useTexture("/textures/moon.jpg", (t) => { (Array.isArray(t) ? t[0] : t).colorSpace = SRGBColorSpace; });
+  const map = useTexture(asset("/textures/moon.jpg"), (t) => { (Array.isArray(t) ? t[0] : t).colorSpace = SRGBColorSpace; });
   return <mesh><sphereGeometry args={[radius, 48, 48]} /><meshStandardMaterial map={map} roughness={1} /></mesh>;
 }
 export function PlanetModel({ kind, radius = 1.5, position = [0, 0, 0] }: { kind: BodyKind; radius?: number; position?: P3 }) {
