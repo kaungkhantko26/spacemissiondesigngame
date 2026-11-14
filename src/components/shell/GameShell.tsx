@@ -7,6 +7,7 @@ import { useUIStore, usePlayerStore } from "@/stores";
 import { GlassPanel, GameButton, IconButton, LevelBadge, PlayerAvatar, XPProgressBar } from "@/components/ui";
 import Link from "next/link";
 import { cn } from "@/lib/mission";
+import { asset } from "@/lib/asset";
 import { GlobalSound } from "./GlobalSound";
 import { useProgress } from "@/game/progress";
 import { useAvatar } from "@/game/avatar";
@@ -42,7 +43,7 @@ export function GameShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="starfield relative flex min-h-screen flex-col">
-      <div className="stars" aria-hidden />
+      <div className="deepspace" aria-hidden style={{ "--deep-img": `url(${asset("/bg/deep-field.jpg")})` } as React.CSSProperties} />
       <GlobalSound />
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-gold focus:p-2 focus:text-black">Skip to content</a>
 
