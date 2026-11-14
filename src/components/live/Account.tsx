@@ -10,9 +10,9 @@ const swallow = (p: Promise<unknown>) => { p.catch(() => {}); };
 
 export function Account({ view }: { view: "profile" | "cosmetics" | "stats" }) {
   const g = useGame(); const { catalog: cat, profile: p, error } = g;
-  const [name, setName] = useState("");
+  const [draft, setName] = useState<string | null>(null);
+  const name = draft ?? p?.name ?? "";
   useEffect(() => { void g.boot(); }, [g]);
-  useEffect(() => { if (p) setName(p.name); }, [p?.name]);
   if (!LIVE_ENABLED) return <main className="p-8 text-ink2">Set NEXT_PUBLIC_API_URL to use live profiles.</main>;
   if (!cat || !p) return <main className="p-8 text-ink2">Loading…</main>;
   const ranks = cat.cosmetics.ranks; const next = ranks.find((r) => r.minXp > p.xp);

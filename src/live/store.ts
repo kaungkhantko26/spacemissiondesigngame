@@ -19,7 +19,7 @@ interface GameState {
 let client: GameClient | null = null;
 let booting = false;
 
-export const useGame = create<GameState>((set, get) => {
+export const useGame = create<GameState>((set) => {
   const run = async (fn: () => Promise<void>) => {
     try { await fn(); set({ error: null }); }
     catch (e) { set({ error: e instanceof GameError ? e.message : "Something went wrong" }); throw e; }
@@ -43,7 +43,7 @@ export const useGame = create<GameState>((set, get) => {
           status: (conn) => set({ conn }),
         });
         client.connect();
-      } catch (e) {
+      } catch {
         set({ error: "Can't reach the game server", conn: "offline" });
       } finally { booting = false; }
     },

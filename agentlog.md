@@ -35,3 +35,9 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - `src/game/trajectory.ts` (pure, tested): Kepler/Hohmann path from dataset μ, radii and semi-major axes. Moon = Earth-centred (ascent → LEO parking → TLI ellipse → 100 km lunar capture; Moon placed so it is at the apoapsis on arrival). Planets = Sun-centred (Earth + target on circular orbits, Hohmann ellipse, capture). Visual timeline is a 3-segment time warp; telemetry shows real mission-elapsed time, altitude, vis-viva speed, range to target. Failures shape the path (launch loss, signal lost in cruise, flyby on missed insertion, loss in ops).
 - `TrajectorySim.tsx`: single R3F canvas (true-scale Moon view, 1 unit = 1000 km; planets: true orbits, enlarged bodies), play/pause/restart/scrub/speed, overview vs follow camera, DOM labels projected from the render loop (drei `<Html>` caused React root warnings). Phase log in FlightView is revealed by playhead position. Reduced motion starts at the end state. Astronaut view now behind a "Meet the commander" toggle (one canvas per view).
 - Tests: 4 new trajectory cases (13 total) pass via the shim; vitest itself still can't run in this sandbox.
+
+## Session 3 — Branch consolidation + demo hub
+- `main` fast-forwarded to `claude/dazzling-hawking-vwq14c`, which already contained `backend-integration` (live client, `/play/*`), the restyle, GLB astronaut, Mission Architect and flight sim.
+- Added `/demo` hub (src/components/screens/Demo.tsx) linking every offline-playable flow; menu has a Demo Hub entry; `/play` without `NEXT_PUBLIC_API_URL` now points to the offline demos. Live cards are disabled until the server URL is set.
+- Lint fixes in live code (impure `Date.now()` initial state, setState-in-effect in Account). Verified: typecheck, lint, 24 tests, production build.
+- No server code exists in this repo; live `/play` still needs the backend.

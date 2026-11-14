@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useGame } from "@/live/store";
 import { LIVE_ENABLED } from "@/live/client";
@@ -11,7 +12,7 @@ export function Play() {
   const { boot, conn, ready, error, room, catalog, profile } = useGame();
   useEffect(() => { void boot(); }, [boot]);
   if (!LIVE_ENABLED)
-    return <Msg>Set <code>NEXT_PUBLIC_API_URL</code> (e.g. https://api.yourdomain.com) and restart to play live.</Msg>;
+    return <Msg>Live play needs a game server. Set <code>NEXT_PUBLIC_API_URL</code> (e.g. https://api.yourdomain.com) and restart, or <Link href="/demo" className="text-orange underline">try the offline demos</Link>.</Msg>;
   if (!ready || !catalog || !profile) return <Msg>{conn === "offline" ? "Can't reach the game server." : "Connecting…"}</Msg>;
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-4">

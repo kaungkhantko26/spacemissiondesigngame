@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Rocket, Users, User, Shirt, BarChart3, Settings, Lock, Check } from "lucide-react";
+import { Rocket, Users, User, Shirt, BarChart3, Settings, FlaskConical, Lock, Check } from "lucide-react";
 import {
   BackButton, GameButton, GlassPanel, LoadingBar, ScreenContainer, StatBar, XPProgressBar, LevelBadge, PlayerAvatar,
 } from "@/components/ui";
@@ -66,6 +66,7 @@ const MENU = [
   { href: LIVE ? "/play/profile" : "/profile", label: "Profile", icon: User },
   { href: LIVE ? "/play/cosmetics" : "/cosmetics", label: "Cosmetics", icon: Shirt },
   { href: LIVE ? "/play/stats" : "/stats", label: "Stats", icon: BarChart3 },
+  { href: "/demo", label: "Demo Hub", icon: FlaskConical },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 type Pose = "idle" | "wave" | "ready" | "celebrate";

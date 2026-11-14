@@ -26,7 +26,7 @@ function Sel({ label, field, value, options, owners, mine, onChange }: {
 
 export function Design() {
   const g = useGame(); const { room, catalog: cat, profile, roomAt } = g;
-  const [tick, setTick] = useState(Date.now());
+  const [tick, setTick] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setTick(Date.now()), 500); return () => clearInterval(t); }, []);
   if (!room || !cat || !profile || !room.design) return null;
   const d = room.design, pv = room.preview, me = profile.id;
