@@ -5,3 +5,9 @@
 **Known issues:** no audio assets (mute toggle is state only); astronaut is procedural; mission-card canvases are several WebGL contexts (consider thumbnails); dev server walkthrough only spot-checked.
 **Pending:** GLB models, audio, thumbnails, component-level tests for full screens, real backend wiring.
 **Integration:** see INTEGRATION_GUIDE.md.
+
+## Backend integration (branch `backend-integration`)
+- Added `src/live/` (types, REST+WebSocket client, Zustand store `useGame`, format helpers) matching the real game server.
+- Added `/play` (src/components/live/*): entry → lobby/mission+difficulty → crew/character pick → design screen → report. Additive; mock screens/tests untouched.
+- Enable with `NEXT_PUBLIC_API_URL` (see `.env.example`). Visual design intentionally minimal (to be restyled).
+- Verified client vs real backend in Node; typecheck of live code done with stubs only — run `npm test && npm run build` locally.
