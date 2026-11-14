@@ -125,3 +125,6 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - **Earth→Moon view** (`TrajectorySim.tsx`): default is now a cinematic chase camera (`CineRig`): starts close to a textured, lit Earth, keeps the craft in the foreground with the Moon growing ahead, then circles the textured Moon during capture; craft marker points along its velocity; the planned (dashed) path stops at arrival; toggle button for the old map view. Used by Launch Control's Moon leg and Mission Architect.
 - **Architect → full Moon mission**: "Launch mission" select (quick ascent, or parking orbit → TLI burn → Moon) in the review panel when the rocket can do it (Saturn V / ≥20 t); the Moon flight then starts at the coast.
 - Verified: typecheck, lint (0 errors), production build, all 6 test suites via the shim, browser checks of the Moon leg (start/coast/capture) and the menu astronaut at 1890×950.
+
+## Session: Team Up gameplay
+- /mission/gameplay now runs the real launch sim (Saturn V + Moon leg for Lunar Landing, Falcon-class orbit otherwise) using the chosen difficulty; results screen shows the real score (src/game/launch/teamResult.ts). Mock telemetry removed.

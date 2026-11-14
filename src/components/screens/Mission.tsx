@@ -13,6 +13,10 @@ import { characters, difficulties, missions, modifiers, players, traits, telemet
 import { lobbyService, missionTelemetryService } from "@/services/mocks";
 import type { Character, DifficultyId, HudState, Mission, MissionModifier, MissionTelemetry, RoleId } from "@/types";
 import { cosmetics } from "@/data/mock";
+import { AscentFlight } from "@/components/game/LaunchControl";
+import { LaunchSession } from "@/game/launch/session";
+import { scoreFlight, type Difficulty as LaunchDifficulty } from "@/game/launch/core";
+import { useTeamResult } from "@/game/launch/teamResult";
 
 /* ---------- shared hooks ---------- */
 function useSetup() {
@@ -316,29 +320,37 @@ function Meter({ label, v, unit }: { label: string; v: { value: number; max: num
       <p className="text-xs text-muted">{Math.round(v.value)} / {v.max} {unit}</p></div>
   );
 }
+const MOON_VEHICLE = "ll2_cfg_93", ORBIT_VEHICLE = "ll2_cfg_164";
 export function GameplayScreen() {
   const router = useRouter();
   const { mission, difficulty } = useSetup();
-  const [t, setT] = useState<MissionTelemetry | null>(null);
-  useEffect(() => { void missionTelemetryService.getInitial().then(setT); return missionTelemetryService.subscribe(setT); }, []);
+  const [attempt, setAttempt] = useState(0);
+  const [started, setStarted] = useState(false);
+  const kind: "orbit" | "moon" = mission?.body === "moon" ? "moon" : "orbit";
+  const [seedBase] = useState(() => Math.floor(Math.random() * 1e9));
+  const seed = seedBase + attempt;
+  const session = useMemo(() => (started ? new LaunchSession(difficulty.id as LaunchDifficulty, "ll2_pad_87", kind === "moon" ? MOON_VEHICLE : ORBIT_VEHICLE, seed, undefined, kind) : null), [started, difficulty.id, kind, seed]);
   if (!mission) return null;
+  const finish = () => {
+    if (session) {
+      const sc = scoreFlight(session.flight);
+      useTeamResult.getState().set({ missionId: mission.id, ok: sc.ok, score: sc.score, max: sc.max, grade: sc.grade, rocket: session.flight.rocket.name, maxQ: session.flight.maxQ, maxG: session.flight.maxG, flightS: session.flight.t, kind });
+    }
+    router.push("/mission/results");
+  };
+  if (session) return <AscentFlight key={attempt} session={session} onExit={finish} onAgain={() => { setAttempt((n) => n + 1); }} exitLabel="Finish mission" />;
+  const crew = Object.values(useCrewSelectionStore.getState().assignments);
   return (
-    <main className="grid min-h-screen grid-rows-[auto_1fr] gap-3 p-3 lg:grid-cols-[280px_1fr_280px] lg:grid-rows-1">
-      <div className="grid h-fit gap-3">
-        <GlassPanel className="p-3 text-sm"><p className="text-xs text-warn">MOCK TELEMETRY — not validated science</p><h1 className="text-lg font-bold">{mission.name}</h1><p className="capitalize text-ink2">{difficulty.label}</p>
-          <ul className="mt-2 list-disc pl-4 text-ink2">{mission.objectives.map((o) => <li key={o}>{o}</li>)}</ul></GlassPanel>
-        <GlassPanel className="p-3 text-sm"><p className="mb-1 font-semibold">Crew</p>{useCrewSelectionStore.getState() && Object.values(useCrewSelectionStore.getState().assignments).map((a) => <p key={a.playerId} className="flex justify-between"><span>{players.find((p) => p.id === a.playerId)?.username}</span><span className="capitalize text-ink2">{a.roleId ?? "—"}</span></p>)}</GlassPanel>
+    <ScreenContainer title={mission.name} subtitle={`${difficulty.label} · real launch simulation${kind === "moon" ? " · Saturn V to the Moon" : ""}`}>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <GlassPanel className="p-5 text-sm"><p className="font-semibold">Objectives</p>
+          <ul className="mt-2 list-disc pl-5 text-ink2">{mission.objectives.map((o) => <li key={o}>{o}</li>)}</ul>
+          <p className="mt-3 text-ink2">{kind === "moon" ? "Fly the real Saturn V from Kennedy: ascent, parking orbit, TLI burn in the window, then coast and lunar-orbit insertion." : `Fly a Falcon-class ascent from Kennedy to orbit. ${difficulty.label} rules decide how much the autopilot helps.`}</p></GlassPanel>
+        <GlassPanel className="p-5 text-sm"><p className="font-semibold">Crew</p>
+          {crew.length ? crew.map((a) => <p key={a.playerId} className="flex justify-between"><span>{players.find((p) => p.id === a.playerId)?.username}</span><span className="capitalize text-ink2">{a.roleId ?? "—"}</span></p>) : <p className="text-ink2">Solo flight</p>}
+          <div className="mt-4"><GameButton variant="primary" onClick={() => setStarted(true)}>Go to the pad</GameButton></div></GlassPanel>
       </div>
-      <div className="grid min-h-[60vh] grid-rows-[1fr_auto] gap-3">
-        <GlassPanel className="min-h-0 overflow-hidden"><Scene3D light="orbit" camera={[0, 1.5, 7]} label="Orbital viewport"><OrbitalVisualization /></Scene3D></GlassPanel>
-        <GlassPanel className="p-3"><p className="mb-2 text-xs font-semibold text-muted">TIMELINE</p><ol className="flex flex-wrap gap-3 text-xs">{(t ?? telemetrySeed).timeline.map((x) => <li key={x.id} className={x.done ? "text-ok" : "text-ink2"}>{x.done ? "✓" : "○"} {x.at} {x.label}</li>)}</ol></GlassPanel>
-      </div>
-      <div className="grid h-fit gap-3">
-        <GlassPanel className="grid gap-3 p-3">{t ? <><Meter label="Mass" v={t.massKg} unit="kg" /><Meter label="Power" v={t.powerW} unit="W" /><Meter label="Budget" v={t.budgetM} unit="M$" /><Meter label="Data storage" v={t.storageGb} unit="GB" /><div className="flex justify-between text-xs"><span>Comms</span><StatusPill state={t.comms.state}>{t.comms.label}</StatusPill></div></> : <p role="status" className="text-sm text-cyan">Loading telemetry…</p>}</GlassPanel>
-        <GlassPanel className="p-3"><p className="mb-1 text-xs font-semibold text-muted">EVENTS</p><ul className="grid gap-1 text-xs">{(t?.events ?? []).map((e) => <li key={e.id}><StatusPill state={e.state}>{e.text}</StatusPill></li>)}</ul></GlassPanel>
-        <GameButton variant="primary" onClick={() => router.push("/mission/results")}>End mission (demo)</GameButton>
-      </div>
-    </main>
+    </ScreenContainer>
   );
 }
 
@@ -347,12 +359,13 @@ import { resultSeed } from "@/data/mock";
 export function ResultsScreen() {
   const router = useRouter();
   const r = resultSeed;
+  const real = useTeamResult((x) => x.result);
   const resetAll = () => { useCrewSelectionStore.getState().reset(); useMissionSetupStore.getState().reset(); };
   return (
-    <ScreenContainer title="Mission Results" subtitle="Illustrative mock data — the backend will provide authoritative results.">
+    <ScreenContainer title="Mission Results" subtitle={real ? `${real.rocket} · flown in the launch simulator` : "Illustrative mock data — the backend will provide authoritative results."}>
       <div className="grid gap-4 lg:grid-cols-3">
-        <GlassPanel className="p-5"><p className="text-xs text-muted">STATUS</p><p className="font-display text-3xl font-bold capitalize text-ok">✓ {r.status}</p>
-          <ul className="mt-3 text-sm text-ink2">{r.objectives.map((o) => <li key={o.label}>{o.done ? "✓" : "✗"} {o.label}</li>)}</ul></GlassPanel>
+        <GlassPanel className="p-5"><p className="text-xs text-muted">STATUS</p>{real ? <><p className={cn("font-display text-3xl font-bold", real.ok ? "text-ok" : "text-bad")}>{real.ok ? (real.kind === "moon" ? "✓ Translunar injection" : "✓ Orbit achieved") : "✗ Mission lost"}</p><p className="mt-2 text-sm text-ink2">Score {real.score} / {real.max} · Grade {real.grade}</p><p className="text-sm text-ink2">Max-Q {(real.maxQ / 1000).toFixed(1)} kPa · Peak {real.maxG.toFixed(1)} g · T+{Math.round(real.flightS)} s</p></> : <p className="font-display text-3xl font-bold capitalize text-ok">✓ {r.status}</p>}
+          {!real && <ul className="mt-3 text-sm text-ink2">{r.objectives.map((o) => <li key={o.label}>{o.done ? "✓" : "✗"} {o.label}</li>)}</ul>}</GlassPanel>
         <GlassPanel className="grid gap-3 p-5"><StatBar label="Science" value={r.science} max={100} /><StatBar label="Engineering" value={r.engineering} max={100} /><StatBar label="Resource efficiency" value={r.efficiency} max={100} tone="orange" /></GlassPanel>
         <GlassPanel className="p-5 text-sm"><p className="font-semibold">Crew contribution</p>{r.crewContribution.map((c) => <p key={c.playerId} className="flex justify-between"><span>{players.find((p) => p.id === c.playerId)?.username}</span><span>{c.percent}%</span></p>)}
           <p className="mt-3 text-gold">+{r.xpEarned} XP (mock)</p><p className="text-ink2">Cosmetics: {r.cosmeticRewards.map((id) => cosmetics.find((c) => c.id === id)?.name).join(", ")}</p></GlassPanel>
