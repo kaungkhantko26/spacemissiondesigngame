@@ -70,3 +70,20 @@ describe("archived NASA field", () => {
     const f = await loadField().catch(() => null); void f; void tilesOf; void observationOf; void buildLearning;
   });
 });
+
+import { VARIANTS, compare, runAssisted } from "@/game/replay";
+describe("same-seed replay comparison", () => {
+  it("the same design and seed replay identically", () => {
+    const d = flownDesign(), t = ["t5_16", "t4_15"];
+    expect(JSON.stringify(runAssisted(d, t, 3))).toBe(JSON.stringify(runAssisted(d, t, 3)));
+  });
+  it("every variant changes the design and gives a written explanation from the two runs", () => {
+    const d = flownDesign();
+    for (const v of VARIANTS) { const c = compare(d, ["t5_16", "t4_15", "t5_15"], 2, v.id); expect(JSON.stringify(v.apply(d))).not.toBe(JSON.stringify(d)); expect(c.explanation.length).toBeGreaterThan(20); }
+  });
+  it("a much smaller antenna returns a smaller share of the data than the base design", () => {
+    const d = { ...flownDesign(), antennaId: "large" }, c = compare(d, ["t5_16", "t4_15", "t5_15"], 1, "antenna-down");
+    console.log("base", c.base.antenna, c.base.returnedShare.toFixed(2), "changed", c.changed.antenna, c.changed.returnedShare.toFixed(2));
+    expect(c.changed.returnedShare).toBeLessThanOrEqual(c.base.returnedShare + 1e-9);
+  });
+});

@@ -188,3 +188,7 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Report: survey map showing returned/observed/unobserved cells plus "What we can learn from this" (src/game/learn.ts: data findings vs the archive, design cause-and-effect, key ideas, caveat). Landmarks (Mare Ingenii, Reiner Gamma) are approximate general knowledge, labelled as such.
 - Mission Control orbit view: one 3-D canvas with the real textured Moon/Earth and the spacecraft model instead of SVG circles.
 - Still open from the review: same-seed replay comparison, chemical demo design as quick start, learner testing, recording.
+- Same-seed replay comparison (src/game/replay.ts, ReplayCompare in the report): same scenario flown twice with one change, assisted controller, written explanation incl. trade-offs the grade can hide.
+- Quick start for the Moon now builds the chemical demo design (Falcon 9, 30 m2, 2.5 m dish, MAG+ER) when it is GO and meets the goal.
+- Captions for voice lines (Settings switch), About and glossary page, validation tests + docs/validation.md.
+- Removed the "Your mission" card from the menu (user request); menu back to two columns.

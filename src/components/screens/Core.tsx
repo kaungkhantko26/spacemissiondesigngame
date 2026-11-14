@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { Group } from "three";
-import { ChevronDown, Rocket, Satellite, Users, User, Shirt, BarChart3, Settings, FlaskConical, Radar, Lock, Check } from "lucide-react";
+import { BookOpen, ChevronDown, Rocket, Satellite, Users, User, Shirt, BarChart3, Settings, FlaskConical, Radar, Lock, Check } from "lucide-react";
 import {
   BackButton, GameButton, GlassPanel, LoadingBar, ScreenContainer, StatBar, XPProgressBar, LevelBadge, PlayerAvatar,
 } from "@/components/ui";
 import { Astronaut, Scene3D, PlanetModel } from "@/components/three/lazy";
 import { IdBadge } from "./IdBadge";
-import { MenuMission } from "./MenuMission";
+import { useCaptions } from "@/lib/captions";
 import { AvatarEditor } from "./AvatarEditor";
 import { FlagEditor } from "./FlagEditor";
 import { MAX_NAME, useIdentity } from "@/game/identity";
@@ -103,6 +103,7 @@ const MENU = [
   { href: LIVE ? "/play/cosmetics" : "/cosmetics", label: "Cosmetics", icon: Shirt },
   { href: LIVE ? "/play/stats" : "/stats", label: "Stats", icon: BarChart3 },
   { href: "/demo", label: "Demo Hub", icon: FlaskConical },
+  { href: "/about", label: "About and glossary", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 const TOUR_KEY: Record<string, string> = { "Launch Control": "menu-launch", "Design Mission": "menu-design", "Team Up": "menu-team", Cosmetics: "menu-cosmetics" };
@@ -172,10 +173,10 @@ export function MenuScreen() {
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-bg/60 px-4 py-3 md:px-8">
         <MissionClock /><div data-tour="profile"><ProfileWidget profile={profile} /></div>
       </div>
-      <div className="relative z-10 mx-auto grid w-full max-w-[1320px] flex-1 items-center gap-6 px-6 pb-8 md:grid-cols-2 md:px-10 xl:grid-cols-[minmax(0,30rem)_minmax(0,22rem)_minmax(0,1fr)] xl:gap-6">
+      <div className="relative z-10 mx-auto grid w-full max-w-[1320px] flex-1 items-center gap-6 px-6 pb-8 md:grid-cols-2 md:px-10">
         <div>
           <p className="hud-label !text-orange !tracking-[.3em]">NASA SPACE APPS CHALLENGE 2026</p>
-          <h1 className="mt-2 text-5xl font-bold leading-tight md:text-7xl xl:text-6xl"><span className="text-orange">Space Mission</span><br />Design Game</h1>
+          <h1 className="mt-2 text-5xl font-bold leading-tight md:text-7xl"><span className="text-orange">Space Mission</span><br />Design Game</h1>
           <nav aria-label="Main menu" className="mt-8 flex max-w-sm flex-col gap-3">
             {MENU.slice(0, MAIN_COUNT).map((m, i) => <MenuLink key={m.href} m={m} i={i} setPose={setPose} />)}
             <button type="button" data-tour="menu-more" aria-expanded={more} onClick={() => setMore((v) => !v)}
@@ -184,10 +185,8 @@ export function MenuScreen() {
             </button>
             {more && <div className="grid grid-cols-2 gap-2">{MENU.slice(MAIN_COUNT).map((m, i) => <MenuLink key={m.href} m={m} i={i + MAIN_COUNT} setPose={setPose} compact />)}</div>}
           </nav>
-          <div className="mt-4 flex items-center gap-4"><TutorialButton /><p className="hud-label">Keys 1–{MENU.length} jump to a screen</p></div>
-          <MenuMission className="mt-5 xl:hidden" />
+          <div className="mt-4 flex items-center gap-4"><TutorialButton /><p className="hud-label">Keys 1–{Math.min(9, MENU.length)} jump to a screen</p></div>
         </div>
-        <div className="hidden justify-self-center xl:block"><MenuMission /></div>
         <div className="h-[460px] md:h-[min(80vh,860px)]">
           <AstronautGuide spin={spin}><Scene3D camera={[0, 0, 7]} label="Your astronaut"><MenuAstronaut look={look} pose={pose} spin={spin} /></Scene3D></AstronautGuide>
         </div>
@@ -423,11 +422,13 @@ const Row = ({ label, on, onClick }: { label: string; on: boolean; onClick: () =
 
 export function SettingsScreen() {
   const ui = useUIStore();
+  const captions = useCaptions();
   return (
     <ScreenContainer title="Settings" actions={<BackButton href="/menu" label="Main menu" />}>
       <GlassPanel className="grid max-w-xl gap-3 p-5">
         <Row label="Mute audio" on={ui.muted} onClick={() => ui.set({ muted: !ui.muted })} />
         <div className="flex items-center justify-between rounded-lg bg-white/5 p-3">Sound check<TestVoiceButton /></div>
+        <Row label="Captions for voice lines" on={captions.on} onClick={() => captions.setOn(!captions.on)} />
         <Row label="Reduce motion" on={ui.reducedMotion} onClick={() => ui.set({ reducedMotion: !ui.reducedMotion })} />
         <Row label="High contrast" on={ui.highContrast} onClick={() => ui.set({ highContrast: !ui.highContrast })} />
         <div role="radiogroup" aria-label="3D quality" className="flex items-center justify-between rounded-lg bg-white/5 p-3">

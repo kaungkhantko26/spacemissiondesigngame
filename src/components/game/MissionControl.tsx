@@ -13,6 +13,7 @@ import { useMission, stageLabel, type MissionRecord } from "@/game/mission";
 import { observationOf } from "@/game/lunarField";
 import { buildLearning } from "@/game/learn";
 import { SurveyMap, useLunarField } from "./SurveyMap";
+import { ReplayCompare } from "./ReplayCompare";
 import { Line } from "@react-three/drei";
 import { Scene3D, PlanetModel } from "@/components/three/lazy";
 import { SpacecraftModel } from "./TrajectorySim";
@@ -470,6 +471,7 @@ function ReportView() {
             <dl className="mt-1 space-y-2 text-sm">{learn.ideas.map((i) => <div key={i.term}><dt className="font-semibold text-ink">{i.term}</dt><dd className="text-ink2">{i.text}</dd></div>)}</dl>
             <p className="mt-3 text-[11px] text-muted">{learn.caveat}</p>
           </GlassPanel>
+          {s.phase !== "lost" && <ReplayCompare design={ev.design} targets={s.targets} attempt={record?.attempt ?? attempt} />}
           <GlassPanel className="p-5"><p className="hud-label mb-2">What to try next</p><ul className="list-disc space-y-1 pl-5 text-sm text-ink2">{report.lessons.map((l) => <li key={l}>{l}</li>)}</ul></GlassPanel>
           <div className="flex flex-wrap gap-2">
             <GameButton variant="primary" onClick={() => (record?.ascent ? beginMission(record, true) : begin(ev, attempt + 1))}>{record?.ascent ? "Fly operations again (new dice)" : "Fly again (new dice)"}</GameButton>

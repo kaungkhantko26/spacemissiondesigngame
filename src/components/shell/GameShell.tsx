@@ -14,9 +14,14 @@ import { useFlag } from "@/game/flags";
 import { useIdentity } from "@/game/identity";
 import { useMission } from "@/game/mission";
 import { useTargets } from "@/game/lunarField";
+import { useCaptions } from "@/lib/captions";
 
 const BARE = ["/", "/splash", "/menu", "/mission/gameplay", "/mission/loading"];
 
+function CaptionBar() {
+  const text = useCaptions((c) => c.text);
+  return text ? <p role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-24 z-[80] mx-auto w-fit max-w-[min(42rem,92vw)] rounded-lg bg-black/80 px-4 py-2 text-center text-sm text-white shadow-lg sm:bottom-28">{text}</p> : null;
+}
 export function GameShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const { toasts, dismissToast, confirm, closeConfirm, reducedMotion, highContrast, muted, set } = useUIStore();
@@ -33,7 +38,7 @@ export function GameShell({ children }: { children: React.ReactNode }) {
     return () => { window.removeEventListener("error", onError, true); window.removeEventListener("unhandledrejection", onRejection); };
   }, []);
   useEffect(() => { // restore saved cosmetics, progress and profile picture from this browser
-    void useAvatar.persist.rehydrate(); void useFlag.persist.rehydrate(); void useMission.persist.rehydrate(); void useTargets.persist.rehydrate();
+    void useAvatar.persist.rehydrate(); void useFlag.persist.rehydrate(); void useMission.persist.rehydrate(); void useTargets.persist.rehydrate(); void useCaptions.persist.rehydrate();
     void Promise.resolve(useIdentity.persist.rehydrate()).then(() => { const n = useIdentity.getState().name; if (n) usePlayerStore.setState((st) => ({ profile: { ...st.profile, username: n } })); });
     void Promise.resolve(useProgress.persist.rehydrate()).then(() => {
       const saved = useProgress.getState().equipped;
@@ -89,6 +94,7 @@ export function GameShell({ children }: { children: React.ReactNode }) {
         </AnimatePresence>
       </div>
 
+      <CaptionBar />
       {/* Toasts: top-centre, above every overlay (flight HUD, tour, dialogs) */}
       <div className="pointer-events-none fixed inset-x-0 top-3 z-[90] flex flex-col items-center gap-2 px-3" role="status" aria-live="polite">
         <AnimatePresence initial={false}>
