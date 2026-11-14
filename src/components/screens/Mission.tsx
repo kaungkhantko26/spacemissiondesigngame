@@ -84,6 +84,7 @@ export function MissionSelectScreen() {
                       <div className="flex flex-1 flex-col gap-1 p-3">
                         <p className="font-display font-bold">{m.name} {!a.available && <Lock className="inline size-4" aria-label="Unavailable" />}</p>
                         <p className="text-xs text-ink2">{m.summary}</p>
+                        {m.playable && <p className="mt-1 text-[11px] text-warn">{m.playable}</p>}
                         <p className="text-xs text-muted">{m.category} · {m.minPlayers}–{m.maxPlayers} players · {m.durationMinutes[0]}–{m.durationMinutes[1]} min</p>
                         <p className="text-xs text-muted">Difficulties: {m.supportedDifficulties.join(", ") || "TBD"}</p>
                         {!a.available && <p className="mt-auto text-xs text-warn">⚠ {a.reason}</p>}
@@ -97,7 +98,7 @@ export function MissionSelectScreen() {
           <GlassPanel className="p-4">
             {sel ? (
               <div className="grid gap-3 md:grid-cols-3">
-                <div><h2 className="text-xl font-bold">{sel.name}</h2><p className="text-sm text-ink2">{sel.summary}</p></div>
+                <div><h2 className="text-xl font-bold">{sel.name}</h2><p className="text-sm text-ink2">{sel.summary}</p>{sel.playable && <p className="mt-1 text-xs text-warn">{sel.playable}</p>}</div>
                 <div><p className="text-sm font-semibold">Goals</p><ul className="list-disc pl-5 text-sm text-ink2">{sel.objectives.map((o) => <li key={o}>{o}</li>)}</ul></div>
                 <div className="text-sm text-ink2"><p className="font-semibold text-ink">Crew & rewards</p><p>{sel.roleTemplate.map((r) => `${r.required}× ${r.name}`).join(", ")}</p><p>Rewards: {sel.rewards.map((r) => r.label).join(", ")} ({d.xpMultiplier}× XP)</p></div>
               </div>
@@ -332,6 +333,7 @@ export function GameplayScreen() {
   const { mission, difficulty } = useSetup();
   const [attempt, setAttempt] = useState(0);
   const [started, setStarted] = useState(false);
+  const [lunar, setLunar] = useState<"captured" | "lost" | null>(null);
   const kind: "orbit" | "moon" = mission?.body === "moon" ? "moon" : "orbit";
   const [seedBase] = useState(() => Math.floor(Math.random() * 1e9));
   const seed = seedBase + attempt;
@@ -342,11 +344,12 @@ export function GameplayScreen() {
     if (names.length) useUIStore.getState().toast(`Cosmetic unlocked: ${names.join(", ")}`, "success");
     if (session) {
       const sc = scoreFlight(session.flight);
-      useTeamResult.getState().set({ missionId: mission.id, ok: sc.ok, score: sc.score, max: sc.max, grade: sc.grade, rocket: session.flight.rocket.name, maxQ: session.flight.maxQ, maxG: session.flight.maxG, flightS: session.flight.t, kind });
+      const lunarState = kind === "moon" ? (lunar ?? "not-flown") : undefined;
+      useTeamResult.getState().set({ missionId: mission.id, ok: kind === "moon" ? sc.ok && lunar === "captured" : sc.ok, lunar: lunarState, ascentOk: sc.ok, score: sc.score, max: sc.max, grade: sc.grade, rocket: session.flight.rocket.name, maxQ: session.flight.maxQ, maxG: session.flight.maxG, flightS: session.flight.t, kind });
     }
     router.push("/mission/results");
   };
-  if (session) return <AscentFlight key={attempt} session={session} onExit={finish} onAgain={() => { setAttempt((n) => n + 1); }} exitLabel="Finish mission" />;
+  if (session) return <AscentFlight key={attempt} session={session} onExit={finish} onAgain={() => { setAttempt((n) => n + 1); setLunar(null); }} onLunarResult={(r) => setLunar(r.captured ? "captured" : "lost")} exitLabel="Finish mission" />;
   const crew = Object.values(useCrewSelectionStore.getState().assignments);
   return (
     <ScreenContainer title={mission.name} subtitle={`${difficulty.label} · real launch simulation${kind === "moon" ? " · Saturn V to the Moon" : ""}`}>
@@ -372,7 +375,7 @@ export function ResultsScreen() {
   return (
     <ScreenContainer title="Mission Results" subtitle={real ? `${real.rocket} · flown in the launch simulator` : "Illustrative mock data — the backend will provide authoritative results."}>
       <div className="grid gap-4 lg:grid-cols-3">
-        <GlassPanel className="p-5"><p className="text-xs text-muted">STATUS</p>{real ? <><p className={cn("font-display text-3xl font-bold", real.ok ? "text-ok" : "text-bad")}>{real.ok ? (real.kind === "moon" ? "✓ Translunar injection" : "✓ Orbit achieved") : "✗ Mission lost"}</p><p className="mt-2 text-sm text-ink2">Score {real.score} / {real.max} · Grade {real.grade}</p><p className="text-sm text-ink2">Max-Q {(real.maxQ / 1000).toFixed(1)} kPa · Peak {real.maxG.toFixed(1)} g · T+{Math.round(real.flightS)} s</p></> : <p className="font-display text-3xl font-bold capitalize text-ok">✓ {r.status}</p>}
+        <GlassPanel className="p-5"><p className="text-xs text-muted">STATUS</p>{real ? <><p className={cn("font-display text-3xl font-bold", real.ok ? "text-ok" : "text-bad")}>{real.kind === "moon" ? (real.lunar === "captured" ? "✓ Lunar orbit captured" : real.lunar === "lost" ? "✗ Lost on the way to the Moon" : real.ascentOk ? "Translunar injection reached, lunar leg not flown" : "✗ Mission lost") : real.ok ? "✓ Orbit achieved" : "✗ Mission lost"}</p><p className="mt-2 text-sm text-ink2">Score {real.score} / {real.max} · Grade {real.grade}</p><p className="text-sm text-ink2">Max-Q {(real.maxQ / 1000).toFixed(1)} kPa · Peak {real.maxG.toFixed(1)} g · T+{Math.round(real.flightS)} s</p></> : <p className="font-display text-3xl font-bold capitalize text-ok">✓ {r.status}</p>}
           {!real && <ul className="mt-3 text-sm text-ink2">{r.objectives.map((o) => <li key={o.label}>{o.done ? "✓" : "✗"} {o.label}</li>)}</ul>}</GlassPanel>
         <GlassPanel className="grid gap-3 p-5"><StatBar label="Science" value={r.science} max={100} /><StatBar label="Engineering" value={r.engineering} max={100} /><StatBar label="Resource efficiency" value={r.efficiency} max={100} tone="orange" /></GlassPanel>
         <GlassPanel className="p-5 text-sm"><p className="font-semibold">Crew contribution</p>{r.crewContribution.map((c) => <p key={c.playerId} className="flex justify-between"><span>{players.find((p) => p.id === c.playerId)?.username}</span><span>{c.percent}%</span></p>)}

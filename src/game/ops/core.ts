@@ -1,4 +1,5 @@
 import type { Evaluation } from "../engine";
+import { hardware, measuresOf } from "../instruments";
 
 /**
  * Mission-operations simulation core: types, balance constants and pure helpers.
@@ -81,10 +82,10 @@ export const contactAt = (n: Pick<OpsState, "phase" | "flags">, t: number) =>
   t >= n.flags.contactBlockedUntil && stationUp(t) && (n.phase !== "science" || earthVisible(t));
 
 /* ---- derived design numbers ---- */
-export const instrumentPowerW = (ev: Evaluation) => ev.instruments.reduce((a, i) => a + (i.power_w ?? 5), 0) * OPS.loadScale;
-export const dataRateMbps = (ev: Evaluation) => ev.instruments.reduce((a, i) => a + (2 + 4 * Math.sqrt(i.mass_kg)) * OPS.dataScale / 1000, 0);
+export const instrumentPowerW = (ev: Evaluation) => hardware(ev.instruments).powerW * OPS.loadScale; // shared packages count once
+export const dataRateMbps = (ev: Evaluation) => hardware(ev.instruments).kbps * OPS.dataScale / 1000;
 export const downlinkMbps = (ev: Evaluation) => (ev.linkBps / 1e6) * OPS.linkScale;
-export const hasFields = (ev: Evaluation) => ev.instruments.some((i) => i.tag === "fields");
+export const hasFields = (ev: Evaluation) => ev.instruments.some((i) => measuresOf(i).includes("magnetic-vector")); // an actual magnetometer, not any "fields" tag
 export const cruiseSeconds = (ev: Evaluation) => ev.cruiseDays * 86400;
 
 export const fmtMet = (s: number) => {

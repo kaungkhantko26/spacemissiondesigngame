@@ -6,6 +6,7 @@ import { LaunchSession } from "@/game/launch/session";
 import { buildReport, createOps, startLaunch, step, OPS } from "@/game/ops/sim";
 
 const ins = (name: string) => DATASET.instruments.find((i) => i.name.includes(name))!.id;
+const LP_MAG = ins("Lunar Prospector Magnetometer"), LP_ER = ins("Lunar Prospector Electron Reflectometer");
 const MAG = ins("Magnetometer (OMAG)"), REFL = ins("Electron Reflectometer"), CAM = ins("Imaging and Navigation Camera");
 const moon = (o: Partial<Design>): Design => ({ ...DEFAULT_DESIGN, propellantKg: 1000, antennaId: "medium", marginPct: 10, ...o });
 const state = (ev: ReturnType<typeof evaluate>, over: object) => { const s = startLaunch(createOps(ev, 1)); return { ...s, ...over } as typeof s; };
@@ -57,13 +58,14 @@ describe("review #3 — readiness uses the operations power and data model", () 
 });
 
 describe("review #4 — the contract's mandatory payload blocks launch", () => {
-  it("Moon without a fields instrument is No-go and says why", () => {
+  it("Moon without the contract measurements is No-go and says why", () => {
     const ev = evaluate(moon({ solarAreaM2: 30, instrumentIds: [CAM] }));
     const c = ev.checks.find((x) => x.id === "contract")!;
-    expect(c.state).toBe("bad"); expect(c.detail).toMatch(/fields/); expect(ev.goNoGo).toBe(false);
+    expect(c.state).toBe("bad"); expect(c.detail).toMatch(/magnetic/); expect(ev.goNoGo).toBe(false);
   });
-  it("with a magnetometer the contract check passes", () => {
-    expect(evaluate(moon({ solarAreaM2: 30, instrumentIds: [MAG] })).checks.find((x) => x.id === "contract")!.state).toBe("ok");
+  it("a magnetometer alone is not enough: the contract also needs an electron measurement", () => {
+    expect(evaluate(moon({ solarAreaM2: 30, instrumentIds: [MAG] })).checks.find((x) => x.id === "contract")!.state).toBe("bad");
+    expect(evaluate(moon({ solarAreaM2: 30, instrumentIds: [LP_MAG, LP_ER] })).checks.find((x) => x.id === "contract")!.state).toBe("ok");
   });
 });
 
@@ -90,7 +92,7 @@ describe("review #7/#9 — quick start meets the science goal; ion thrust is pow
   it("Moon quick start is GO, carries the required payload and meets the contract science target", () => {
     expect(useDesignStore.getState().quickStart("moon")).toBe(true);
     const ev = evaluate(useDesignStore.getState().design);
-    expect(ev.goNoGo).toBe(true); expect(ev.instruments.some((i) => i.tag === "fields")).toBe(true);
+    expect(ev.goNoGo).toBe(true); expect(ev.instruments.some((i) => i.tag === "fields")).toBe(true); expect(ev.instruments.some((i) => i.name.includes("Electron Reflectometer"))).toBe(true);
     expect(ev.science).toBeGreaterThanOrEqual(ev.destination.scienceGoal);
   });
   it("a small array at Mars throttles the ion thrusters and lengthens the cruise", () => {

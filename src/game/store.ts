@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { create } from "zustand";
 import { DEFAULT_DESIGN, evaluate, seedFromDesign, simulate, solvePropellant, type Design, type Evaluation, type MissionResult } from "./engine";
 import { DATASET, GAME, ANTENNAS, destinationById } from "./data";
+import { curationOf, measuresOf, requiredMeasures } from "./instruments";
 
 interface GameState {
   design: Design; attempt: number; result: MissionResult | null;
@@ -32,7 +33,7 @@ export const useDesignStore = create<GameState>((set, get) => ({
     if (!dest) return false;
     // Prefer the destination's primary tag first (Moon: a magnetometer-class "fields" instrument), then lighter instruments.
     const rank = (t: string) => dest.wants.indexOf(t as (typeof dest.wants)[number]);
-    const wanted = DATASET.instruments.filter((i) => dest.wants.includes(i.tag)).sort((a, b) => rank(a.tag) - rank(b.tag) || a.mass_kg - b.mass_kg);
+    const wanted = DATASET.instruments.filter((i) => dest.wants.includes(i.tag) && curationOf(i).deployment === "orbiter").sort((a, b) => rank(a.tag) - rank(b.tag) || a.mass_kg - b.mass_kg);
     const props = ["chem", ...DATASET.electric_propulsion.map((e) => e.id)];
     const build = (vehicleId: string, pr: string, th: number, solar: number, antennaId: string, ins: string[]) => {
       const base: Design = { destinationId, vehicleId, propulsionId: pr, thrusters: th, propellantKg: 0, solarAreaM2: solar, rtgUnits: 0, antennaId, instrumentIds: ins, marginPct: 15 };
@@ -43,7 +44,9 @@ export const useDesignStore = create<GameState>((set, get) => ({
       return { d, ev: evaluate(d) };
     };
     // Candidate payloads: the destination's wanted tags first (diverse = one per wanted tag), then lighter/heavier mixes.
-    const diverse = dest.wants.map((t) => wanted.find((i) => i.tag === t)).filter((i): i is (typeof wanted)[number] => !!i).map((i) => i.id);
+    // Contract measurements first (Moon: a magnetometer AND an electron reflectometer; they share one package), else one instrument per wanted tag.
+    const byMeasure = requiredMeasures(dest).map((m) => DATASET.instruments.filter((i) => measuresOf(i).includes(m) && curationOf(i).deployment === "orbiter").sort((a, b) => a.mass_kg - b.mass_kg)[0]).filter((i): i is (typeof wanted)[number] => !!i).map((i) => i.id);
+    const diverse = byMeasure.length ? byMeasure : dest.wants.map((t) => wanted.find((i) => i.tag === t)).filter((i): i is (typeof wanted)[number] => !!i).map((i) => i.id);
     const sets: string[][] = [diverse.slice(0, 2), diverse.slice(0, 3), wanted.slice(0, 2).map((i) => i.id), wanted.slice(0, 3).map((i) => i.id)]
       .filter((x, i, a) => x.length > 0 && a.findIndex((y) => y.join() === x.join()) === i);
     // Phase 1: coarse sweep over vehicle × propulsion (strong power/antenna, two instruments), keep the best few.

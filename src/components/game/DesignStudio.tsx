@@ -15,6 +15,7 @@ import { LaunchSession } from "@/game/launch/session";
 import { RULES, type Difficulty } from "@/game/launch/core";
 import { useLaunchSetup } from "@/game/launch/store";
 import { CraftPreview } from "./CraftPreview";
+import { catalogUrl, curationOf, requiredMeasures, suitability } from "@/game/instruments";
 import { usePartThumbs } from "./partThumbs";
 
 const fmt = (n: number, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d });
@@ -172,14 +173,17 @@ export function DesignStudio() {
           <Section n={6} title="Science instruments" hint="Real instruments from NASA's NSSDC catalog, with the mass (and power, where stated) quoted from NASA's descriptions.">
             <ul className="grid gap-2 sm:grid-cols-2">
               {DATASET.instruments.map((i) => {
-                const wanted = dest.wants.includes(i.tag);
+                const su = suitability(i, dest), cu = curationOf(i), url = catalogUrl(i);
+                const tone = su.kind === "suited" ? "text-ok" : su.kind === "unsuitable" ? "text-bad" : su.kind === "supporting" ? "text-warn" : "text-muted";
                 return (
                   <li key={i.id}><Pick on={design.instrumentIds.includes(i.id)} onClick={() => toggleInstrument(i.id)} className="w-full">
                     <div className="flex gap-3"><PartImg k={`ins:${i.id}`} thumbs={thumbs} w={60} h={60} /><div className="min-w-0 flex-1">
-                    <div className="flex justify-between gap-2"><span className="text-sm font-semibold">{i.name}</span>{wanted && <span className="hud-label !text-ok">wanted ×{GAME.wantedBonus}</span>}</div>
-                    <p className="text-xs text-ink2">{i.mission} · {i.mass_kg} kg · {i.power_w ?? GAME.defaultInstrumentPowerW} W{i.power_w === null && <GameChip />}</p>
-                    <p className="text-xs capitalize text-muted">{i.tag}</p></div></div>
-                  </Pick></li>
+                    <div className="flex justify-between gap-2"><span className="text-sm font-semibold">{i.name}</span>{su.kind === "suited" && <span className="hud-label !text-ok">fits contract</span>}</div>
+                    <p className="text-xs text-ink2">{i.mission} · {cu.packageId ? `${i.mass_kg} kg · ${i.power_w} W (shared package)` : `${cu.massKg ?? i.mass_kg} kg · ${i.power_w ?? GAME.defaultInstrumentPowerW} W`}{i.power_w === null && <GameChip />}</p>
+                    <p className="text-xs capitalize text-muted">{cu.measures.map((m) => m.replace(/-/g, " ")).join(" · ") || i.tag}</p>
+                    <p className={cn("text-xs", tone)}>{su.label}</p></div></div>
+                  </Pick>
+                  <p className="mt-1 px-1 text-[11px] leading-snug text-muted">{MASS_LABEL[cu.massScope]}{cu.note ? ` · ${cu.note}` : ""}{cu.basis === "name" ? " · measurement type inferred from the name." : ""}{url && <> <a className="underline hover:text-ink" href={url} target="_blank" rel="noreferrer">NASA catalog entry</a></>}</p></li>
                 );
               })}
             </ul>
@@ -223,6 +227,7 @@ function LaunchSetupFields({ ev }: { ev: Evaluation }) {
 }
 const stateText: Record<Check["state"], string> = { ok: "OK", warn: "Tight", bad: "Fail" };
 const stateColor = { ok: "text-ok", warn: "text-warn", bad: "text-bad" } as const;
+const MASS_LABEL = { full: "Mass: whole instrument", "shared-package": "Mass: shared electronics package, counted once", "sensor-only": "Mass: sensor only, electronics not included", "electronics-only": "Mass: electronics board only (estimate)", derived: "Mass: derived from the source's parts" } as const;
 function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void }) {
   const p = ev.probabilities;
   return (
@@ -253,6 +258,14 @@ function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void })
           <tr><td>Orbit average (60/40 mix)</td><td className="text-right">{fmt(ev.ops.avgGen)} W</td><td className="text-right">{fmt(ev.ops.avgLoad)} W</td></tr>
         </tbody></table>
         <p className="mt-1 text-muted">Same model Mission Control uses: arrays derated for pointing and off in eclipse; RTGs constant. Architect&apos;s headline power figure is the nominal full-Sun output.</p></details>
+      <details className="mt-3 text-xs text-ink2"><summary className="cursor-pointer">Assumptions and sources</summary>
+        <ul className="mt-1 space-y-1">
+          <li><b className="text-ink">Real, from NASA or Launch Library 2:</b> instrument masses and powers as quoted, planetary constants, launch vehicle data. Launch Library 2 is not a NASA source.</li>
+          <li><b className="text-ink">Game values:</b> prices other than launch, array and battery masses, reliability model, science points and the {ev.destination.id === "moon" ? "survey goals" : "mission goals"}. Where a source gives no power, a default is used (marked GAME).</li>
+          <li><b className="text-ink">Simplifications:</b> {ev.electric ? "low-thrust transfer uses an approximate model; " : ""}coverage is a scalar progress counter, not a mapped survey; the survey does not use real NASA measurements yet.</li>
+          {requiredMeasures(ev.destination).length > 0 && <li><b className="text-ink">Contract needs:</b> {requiredMeasures(ev.destination).map((m) => m.replace("-", " ")).join(" + ")}.</li>}
+          {ev.instruments.map((i) => <li key={i.id}><b className="text-ink">{i.name}:</b> {MASS_LABEL[curationOf(i).massScope]}{curationOf(i).note ? `. ${curationOf(i).note}` : ""}</li>)}
+        </ul></details>
       <details className="mt-3 text-xs text-ink2"><summary className="cursor-pointer">Cost breakdown</summary>
         <ul className="mt-1 space-y-0.5">{Object.entries(ev.costBreakdown).map(([k, v]) => <li key={k} className="flex justify-between"><span>{k}</span><span className="tabular-nums">{usd(v)}</span></li>)}</ul></details>
       <LaunchSetupFields ev={ev} />

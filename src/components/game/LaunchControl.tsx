@@ -157,7 +157,7 @@ const B = ({ label, onClick, disabled, children, on, ...rest }: { label: string;
     className={cn("inline-flex h-10 items-center gap-1.5 rounded-md border px-3 font-display text-sm uppercase tracking-wider transition disabled:opacity-35", on ? "border-orange bg-orange/15 text-orange" : "border-[var(--border)] bg-panel text-ink2 hover:text-ink")}>{children}</button>
 );
 
-export function AscentFlight({ session, onExit, onAgain, onContinue, continueLabel, exitLabel }: { session: LaunchSession; onExit: () => void; onAgain: () => void; onContinue?: () => void; continueLabel?: string; exitLabel?: string }) {
+export function AscentFlight({ session, onExit, onAgain, onContinue, continueLabel, exitLabel, onLunarResult }: { session: LaunchSession; onExit: () => void; onAgain: () => void; onContinue?: () => void; onLunarResult?: (r: { captured: boolean }) => void; continueLabel?: string; exitLabel?: string }) {
   const reduced = useUIStore((s) => s.reducedMotion);
   const rules = session.flight.rules;
   const canvas = useRef<HTMLCanvasElement>(null), wrap = useRef<HTMLDivElement>(null);
@@ -297,7 +297,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   const pitchErr = s.cue - s.pitch;
   const result = showResult ? scoreFlight(f) : null;
   const held = (key: "up" | "down") => ({ onPointerDown: () => session.hold(key, true), onPointerUp: () => session.hold(key, false), onPointerLeave: () => session.hold(key, false), onPointerCancel: () => session.hold(key, false) });
-  if (leg) return <MoonLeg flight={f} onAgain={onAgain} onExit={onExit} />;
+  if (leg) return <MoonLeg flight={f} onAgain={onAgain} onExit={onExit} onResult={onLunarResult} />;
   return (
     <main className="relative flex min-h-[calc(100vh-70px)] flex-1 flex-col">
       {school && <Tour steps={MANUAL_TOUR.filter((st) => st.target !== "[data-tour=cue]" || rules.guideCue)} doneLabel="Start flying" onDone={() => { setSchool(false); try { window.localStorage.setItem("smd-manual-school", "1"); } catch { /* ignore */ } }} onSkip={() => { setSchool(false); try { window.localStorage.setItem("smd-manual-school", "1"); } catch { /* ignore */ } }} />}

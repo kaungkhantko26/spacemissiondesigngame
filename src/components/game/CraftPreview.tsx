@@ -7,6 +7,7 @@ import { useUIStore } from "@/stores";
 import { cn } from "@/lib/mission";
 import type { Evaluation } from "@/game/engine";
 import { disposeModel, makeRocket, makeSpacecraft } from "@/game/parts3d";
+import { effectiveMassKg } from "@/game/instruments";
 
 type Mode = "craft" | "rocket";
 
@@ -21,7 +22,7 @@ function Model({ ev, mode, fit }: { ev: Evaluation; mode: Mode; fit: number }) {
       : makeSpacecraft({
           solarAreaM2: ev.design.solarAreaM2, rtgUnits: ev.design.rtgUnits, antennaId: ev.antenna.id, dishM: ev.antenna.dishM,
           thruster: ev.design.propulsionId, thrusters: ev.electric ? ev.design.thrusters : 1,
-          instruments: ev.instruments.map((i) => ({ tag: i.tag, massKg: i.mass_kg })),
+          instruments: ev.instruments.map((i) => ({ tag: i.tag, massKg: effectiveMassKg(i) })),
         });
     const box = new Box3().setFromObject(inner), size = box.getSize(new Vector3()), c = box.getCenter(new Vector3());
     const k = fit / Math.max(size.x, size.y, size.z, 0.01);

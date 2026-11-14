@@ -19,7 +19,7 @@ import { TrajectorySim } from "./TrajectorySim";
 const fmt = (n: number, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d });
 
 /** After translunar injection: coast to the Moon and capture into lunar orbit (Earth→Moon trajectory view, dice on the remaining phases). */
-export function MoonLeg({ flight, onAgain, onExit }: { flight: Flight; onAgain: () => void; onExit: () => void }) {
+export function MoonLeg({ flight, onAgain, onExit, onResult }: { flight: Flight; onAgain: () => void; onExit: () => void; onResult?: (r: { captured: boolean }) => void }) {
   const moon = destinationById("moon")!;
   const plan = useMemo(() => {
     const rnd = mulberry32((flight.seed ^ 0x9e3779b9) >>> 0);
@@ -55,6 +55,8 @@ export function MoonLeg({ flight, onAgain, onExit }: { flight: Flight; onAgain: 
     hum.current.set(true);
     if (seenEnd && !fx.current.has("end")) { fx.current.add("end"); engine.current.silence(); playSfx(plan.loiOk ? "chime" : "explosion"); }
   }, [u, seenEnd, traj, plan.loiOk, voice]);
+  const reported = useRef(false);
+  useEffect(() => { if (seenEnd && !reported.current) { reported.current = true; onResult?.({ captured: plan.loiOk }); } }, [seenEnd, plan.loiOk, onResult]);
   const counted = useRef(false);
   useEffect(() => { // a captured Moon mission counts toward cosmetic unlocks, once
     if (!seenEnd || !plan.loiOk || counted.current) return;
