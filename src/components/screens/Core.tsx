@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useThree } from "@react-three/fiber";
-import { Rocket, Satellite, Users, User, Shirt, BarChart3, Settings, FlaskConical, Radar, Lock, Check } from "lucide-react";
+import { ChevronDown, Rocket, Satellite, Users, User, Shirt, BarChart3, Settings, FlaskConical, Radar, Lock, Check } from "lucide-react";
 import {
   BackButton, GameButton, GlassPanel, LoadingBar, ScreenContainer, StatBar, XPProgressBar, LevelBadge, PlayerAvatar,
 } from "@/components/ui";
@@ -102,11 +102,28 @@ function MissionClock() {
   );
 }
 
+const MAIN_COUNT = 4; // Launch Control, Design Mission, Mission Control and Team Up; the rest sit under "More options"
+type MenuItem = (typeof MENU)[number];
+function MenuLink({ m, i, setPose, compact }: { m: MenuItem; i: number; setPose: (p: Pose) => void; compact?: boolean }) {
+  return (
+    <Link href={m.href} data-tour={TOUR_KEY[m.label]} style={{ animationDelay: `${i * 70}ms` }}
+      onMouseEnter={() => setPose(HOVER_POSE[m.label] ?? "wave")} onFocus={() => setPose(HOVER_POSE[m.label] ?? "wave")}
+      onMouseLeave={() => setPose("wave")} onBlur={() => setPose("wave")}
+      className={cn("enter group flex items-center gap-3 rounded-lg border font-display tracking-wide transition duration-150 hover:translate-x-1",
+        compact ? "px-3 py-2 text-sm" : "px-5 py-3",
+        m.primary ? "border-orange bg-orange py-4 text-lg font-bold text-[#1a0b00] shadow-[0_4px_0_#b4501a]" : "border-[var(--border)] bg-panel hover:border-[var(--border-strong)]")}>
+      <m.icon className="size-5" aria-hidden />{m.label.toUpperCase()}
+      {!compact && <kbd aria-label={`Shortcut ${i + 1}`} className={cn("ml-auto rounded-sm border px-1.5 text-xs", m.primary ? "border-black/30" : "border-white/20 text-muted")}>{i + 1}</kbd>}
+    </Link>
+  );
+}
+
 export function MenuScreen() {
   const profile = usePlayerStore((s) => s.profile);
   const router = useRouter();
   const look = useLook();
   const [pose, setPose] = useState<Pose>("wave");
+  const [more, setMore] = useState(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -132,19 +149,15 @@ export function MenuScreen() {
           <p className="hud-label !text-orange !tracking-[.3em]">NASA SPACE APPS CHALLENGE 2026</p>
           <h1 className="mt-2 text-5xl font-bold leading-tight md:text-7xl"><span className="text-orange">Space Mission</span><br />Design Game</h1>
           <nav aria-label="Main menu" className="mt-8 flex max-w-sm flex-col gap-3">
-            {MENU.map((m, i) => (
-              <Link key={m.href} href={m.href} data-tour={TOUR_KEY[m.label]} style={{ animationDelay: `${i * 70}ms` }}
-                onMouseEnter={() => setPose(HOVER_POSE[m.label] ?? "wave")} onFocus={() => setPose(HOVER_POSE[m.label] ?? "wave")}
-                onMouseLeave={() => setPose("wave")} onBlur={() => setPose("wave")}
-                className={cn("enter group flex items-center gap-3 rounded-lg border px-5 py-3 font-display tracking-wide transition duration-150 hover:translate-x-1",
-                  m.primary ? "border-orange bg-orange shadow-[0_4px_0_#b4501a] py-4 text-lg font-bold text-[#1a0b00]"
-                    : "border-[var(--border)] bg-panel hover:border-[var(--border-strong)]")}>
-                <m.icon className="size-5" aria-hidden />{m.label.toUpperCase()}
-                <kbd aria-label={`Shortcut ${i + 1}`} className={cn("ml-auto rounded-sm border px-1.5 text-xs", m.primary ? "border-black/30" : "border-white/20 text-muted")}>{i + 1}</kbd>
-              </Link>
-            ))}
+            {MENU.slice(0, MAIN_COUNT).map((m, i) => <MenuLink key={m.href} m={m} i={i} setPose={setPose} />)}
+            <button type="button" data-tour="menu-more" aria-expanded={more} onClick={() => setMore((v) => !v)}
+              className="flex items-center justify-between rounded-lg border border-dashed border-[var(--border)] px-5 py-2.5 text-sm text-ink2 transition hover:border-[var(--border-strong)] hover:text-ink">
+              <span>{more ? "Fewer options" : "More options"}</span><ChevronDown aria-hidden className={cn("size-4 transition", more && "rotate-180")} />
+            </button>
+            {more && <div className="grid grid-cols-2 gap-2">{MENU.slice(MAIN_COUNT).map((m, i) => <MenuLink key={m.href} m={m} i={i + MAIN_COUNT} setPose={setPose} compact />)}</div>}
           </nav>
-          <div className="mt-4 flex items-center gap-4"><TutorialButton /><TestVoiceButton /><p className="hud-label">Press 1–{MENU.length} to jump</p></div>
+          <div className="mt-4 flex items-center gap-4"><TutorialButton /><p className="hud-label">Keys 1–{MENU.length} jump to a screen</p></div>
+
         </div>
         <div className="h-[460px] md:h-[min(80vh,860px)]">
           <AstronautGuide><Scene3D camera={[0, 0, 7]} label="Your astronaut"><MenuAstronaut look={look} pose={pose} /></Scene3D></AstronautGuide>
@@ -342,7 +355,8 @@ export function SettingsScreen() {
   return (
     <ScreenContainer title="Settings" actions={<BackButton href="/menu" label="Main menu" />}>
       <GlassPanel className="grid max-w-xl gap-3 p-5">
-        <Row label="Mute audio (no audio assets yet)" on={ui.muted} onClick={() => ui.set({ muted: !ui.muted })} />
+        <Row label="Mute audio" on={ui.muted} onClick={() => ui.set({ muted: !ui.muted })} />
+        <div className="flex items-center justify-between rounded-lg bg-white/5 p-3">Voice check<TestVoiceButton /></div>
         <Row label="Reduce motion" on={ui.reducedMotion} onClick={() => ui.set({ reducedMotion: !ui.reducedMotion })} />
         <Row label="High contrast" on={ui.highContrast} onClick={() => ui.set({ highContrast: !ui.highContrast })} />
         <div role="radiogroup" aria-label="3D quality" className="flex items-center justify-between rounded-lg bg-white/5 p-3">
