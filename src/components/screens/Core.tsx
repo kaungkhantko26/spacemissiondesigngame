@@ -417,7 +417,7 @@ export function StatsScreen() {
 /* ---------- Settings ---------- */
 const Row = ({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) => (
   <button role="switch" aria-checked={on} onClick={onClick} className="flex w-full items-center justify-between rounded-lg bg-white/5 p-3 text-left">
-    {label}<span className={cn("rounded-sm px-3 py-0.5 font-display text-xs uppercase tracking-wider", on ? "bg-ok/20 text-ok" : "bg-white/10 text-muted")}>{on ? "On" : "Off"}</span>
+    <span className="text-ink">{label}</span><span className={cn("inline-flex min-w-16 items-center justify-center gap-1.5 rounded-full border px-3 py-1 font-display text-sm font-semibold uppercase tracking-wider", on ? "border-ok bg-ok/20 text-ok" : "border-white/40 bg-white/10 text-ink")}><span aria-hidden className={cn("size-2 rounded-full", on ? "bg-ok" : "bg-white/50")} />{on ? "On" : "Off"}</span>
   </button>
 );
 
