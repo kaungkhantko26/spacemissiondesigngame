@@ -10,6 +10,7 @@ import {
 } from "@/components/ui";
 import { Astronaut, Scene3D, PlanetModel } from "@/components/three/lazy";
 import { IdBadge } from "./IdBadge";
+import { MenuMission } from "./MenuMission";
 import { AvatarEditor } from "./AvatarEditor";
 import { FlagEditor } from "./FlagEditor";
 import { MAX_NAME, useIdentity } from "@/game/identity";
@@ -84,7 +85,7 @@ export class Spin {
 }
 function MenuAstronaut({ look, pose, spin }: { look: ReturnType<typeof useLook>; pose: "idle" | "wave" | "ready" | "celebrate"; spin: Spin }) {
   const { width, height } = useThree((st) => st.viewport);
-  const scale = Math.min(0.34 * height, width * 0.3, 3); // leaves headroom: some clips (moon walk) lift the model
+  const scale = Math.min(0.34 * height, width * 0.42, 3); // leaves headroom: some clips (moon walk) lift the model
   const y = -height / 2 + 0.25 * scale + 0.03 * height; // the model's feet sit 0.25·scale below its origin
   const g = useRef<Group>(null);
   useFrame((_, dt) => { spin.step(Math.min(dt, 0.1)); g.current?.rotation.set(0, spin.offset, 0); });
@@ -94,10 +95,10 @@ function MenuAstronaut({ look, pose, spin }: { look: ReturnType<typeof useLook>;
 /* ---------- Main menu ---------- */
 const LIVE = !!process.env.NEXT_PUBLIC_API_URL; // live backend mode → route to /play/*
 const MENU = [
-  { href: "/launch", label: "Launch Control", icon: Rocket, primary: true },
-  { href: "/design", label: "Design Mission", icon: Satellite },
-  { href: "/mission-control", label: "Mission Control", icon: Radar },
-  { href: LIVE ? "/play" : "/team", label: "Team Up", icon: Users },
+  { href: "/launch", label: "Launch Control", icon: Rocket, desc: "Practice: fly a rocket to orbit or the Moon" },
+  { href: "/design", label: "Design Mission", icon: Satellite, desc: "Step 1 of your mission: build the spacecraft" },
+  { href: "/mission-control", label: "Mission Control", icon: Radar, desc: "Step 3: run operations in lunar orbit" },
+  { href: LIVE ? "/play" : "/team", label: "Team Up", icon: Users, desc: "Fly a mission together with a crew" },
   { href: LIVE ? "/play/profile" : "/profile", label: "Profile", icon: User },
   { href: LIVE ? "/play/cosmetics" : "/cosmetics", label: "Cosmetics", icon: Shirt },
   { href: LIVE ? "/play/stats" : "/stats", label: "Stats", icon: BarChart3 },
@@ -126,7 +127,7 @@ function MissionClock() {
 }
 
 const MAIN_COUNT = 4; // Launch Control, Design Mission, Mission Control and Team Up; the rest sit under "More options"
-type MenuItem = (typeof MENU)[number];
+type MenuItem = (typeof MENU)[number] & { desc?: string; primary?: boolean };
 function MenuLink({ m, i, setPose, compact }: { m: MenuItem; i: number; setPose: (p: Pose | null) => void; compact?: boolean }) {
   return (
     <Link href={m.href} data-tour={TOUR_KEY[m.label]} style={{ animationDelay: `${i * 70}ms` }}
@@ -135,7 +136,7 @@ function MenuLink({ m, i, setPose, compact }: { m: MenuItem; i: number; setPose:
       className={cn("enter group flex items-center gap-3 rounded-lg border font-display tracking-wide transition duration-150 hover:translate-x-1",
         compact ? "px-3 py-2 text-sm" : "px-5 py-3",
         m.primary ? "border-orange bg-orange py-4 text-lg font-bold text-[#1a0b00] shadow-[0_4px_0_#b4501a]" : "border-[var(--border)] bg-panel hover:border-[var(--border-strong)]")}>
-      <m.icon className="size-5" aria-hidden />{m.label.toUpperCase()}
+      <m.icon className="size-5 shrink-0" aria-hidden />{compact || !m.desc ? m.label.toUpperCase() : <span className="min-w-0"><span className="block">{m.label.toUpperCase()}</span><span className="block font-sans text-xs font-normal normal-case tracking-normal text-muted">{m.desc}</span></span>}
       {!compact && <kbd aria-label={`Shortcut ${i + 1}`} className={cn("ml-auto rounded-sm border px-1.5 text-xs", m.primary ? "border-black/30" : "border-white/20 text-muted")}>{i + 1}</kbd>}
     </Link>
   );
@@ -171,10 +172,10 @@ export function MenuScreen() {
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-bg/60 px-4 py-3 md:px-8">
         <MissionClock /><div data-tour="profile"><ProfileWidget profile={profile} /></div>
       </div>
-      <div className="relative z-10 grid flex-1 items-center gap-6 px-6 pb-10 md:grid-cols-2 md:px-16">
+      <div className="relative z-10 mx-auto grid w-full max-w-[1320px] flex-1 items-center gap-6 px-6 pb-8 md:grid-cols-2 md:px-10 xl:grid-cols-[minmax(0,30rem)_minmax(0,22rem)_minmax(0,1fr)] xl:gap-6">
         <div>
           <p className="hud-label !text-orange !tracking-[.3em]">NASA SPACE APPS CHALLENGE 2026</p>
-          <h1 className="mt-2 text-5xl font-bold leading-tight md:text-7xl"><span className="text-orange">Space Mission</span><br />Design Game</h1>
+          <h1 className="mt-2 text-5xl font-bold leading-tight md:text-7xl xl:text-6xl"><span className="text-orange">Space Mission</span><br />Design Game</h1>
           <nav aria-label="Main menu" className="mt-8 flex max-w-sm flex-col gap-3">
             {MENU.slice(0, MAIN_COUNT).map((m, i) => <MenuLink key={m.href} m={m} i={i} setPose={setPose} />)}
             <button type="button" data-tour="menu-more" aria-expanded={more} onClick={() => setMore((v) => !v)}
@@ -184,8 +185,9 @@ export function MenuScreen() {
             {more && <div className="grid grid-cols-2 gap-2">{MENU.slice(MAIN_COUNT).map((m, i) => <MenuLink key={m.href} m={m} i={i + MAIN_COUNT} setPose={setPose} compact />)}</div>}
           </nav>
           <div className="mt-4 flex items-center gap-4"><TutorialButton /><p className="hud-label">Keys 1–{MENU.length} jump to a screen</p></div>
-
+          <MenuMission className="mt-5 xl:hidden" />
         </div>
+        <div className="hidden justify-self-center xl:block"><MenuMission /></div>
         <div className="h-[460px] md:h-[min(80vh,860px)]">
           <AstronautGuide spin={spin}><Scene3D camera={[0, 0, 7]} label="Your astronaut"><MenuAstronaut look={look} pose={pose} spin={spin} /></Scene3D></AstronautGuide>
         </div>

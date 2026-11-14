@@ -1,5 +1,5 @@
 import { GAME } from "../data";
-import type { Evaluation } from "../engine";
+import { seedFromDesign, type Evaluation } from "../engine";
 import {
   OPS, addLog, clamp, contactAt, cruiseSeconds, dataRateMbps, downlinkMbps, fmtMet, hasFields, instrumentPowerW, isSunlit, rand,
   type Command, type OpsState, type Phase,
@@ -29,6 +29,17 @@ export function createOps(ev: Evaluation, seed: number): OpsState {
   n.flags.propRoll = rand(n) < 0.3 + (ev.electric ? 0 : 0.05);
   n.flags.targetRoll = rand(n) < 0.85;
   addLog(n, "info", "Mission Control online. All systems nominal for launch.");
+  return n;
+}
+
+/** Operations that start where the flown mission ended: in lunar orbit, with the propellant the spacecraft really has left. */
+export function createOpsFromMission(ev: Evaluation, m: { attempt: number; transit: { departureBy: "launcher" | "spacecraft"; transferDays: number } | null }, attempt = 0): OpsState {
+  const n = createOps(ev, seedFromDesign(ev.design, m.attempt * 31 + attempt));
+  const departure = m.transit?.departureBy === "spacecraft" ? ev.plan.departureDv : 0; // a launcher that flew TLI already spent that burn
+  n.dvLeft = Math.max(0, ev.dvAvailable - departure - ev.plan.captureDv);
+  n.phase = "science"; n.phaseT = 0; n.t = 0; n.sciT0 = 0; n.pointing = "sun"; n.scienceOn = false;
+  n.log = [];
+  addLog(n, "good", `Lunar orbit achieved after a ${m.transit ? Math.round(m.transit.transferDays * 10) / 10 : "?"}-day transfer. ${Math.round(n.dvLeft)} m/s of spacecraft propellant remain. Point at the Moon, switch instruments on and plan your downlinks.`);
   return n;
 }
 

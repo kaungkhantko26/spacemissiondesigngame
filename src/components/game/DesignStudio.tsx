@@ -12,7 +12,8 @@ import { buildTrajectory } from "@/game/trajectory";
 import { TrajectorySim } from "./TrajectorySim";
 import { AscentFlight } from "./LaunchControl";
 import { LaunchSession } from "@/game/launch/session";
-import { RULES, type Difficulty } from "@/game/launch/core";
+import { RULES, scoreFlight, type Difficulty } from "@/game/launch/core";
+import { useMission } from "@/game/mission";
 import { useLaunchSetup } from "@/game/launch/store";
 import { CraftPreview } from "./CraftPreview";
 import { catalogUrl, curationOf, requiredMeasures, suitability } from "@/game/instruments";
@@ -70,6 +71,7 @@ export function DesignStudio() {
     // Full Moon mission (parking orbit → TLI burn) when asked for, the target is the Moon and the rocket has the performance.
     const mission = setup.mission === "moon" && canFlyMoon(ev) ? "moon" : "orbit";
     setAttempt(n);
+    useMission.getState().start(design, n); // one saved mission from here to the final report
     setAscent({ n, session: new LaunchSession(setup.difficulty, setup.siteId, ev.vehicle.id, 1000 + n * 7919, Math.min(ev.wetKg, ev.vehicle.leo_capacity_kg), mission) });
   };
   const onLaunch = () => startAscent(attempt + 1);
@@ -82,12 +84,20 @@ export function DesignStudio() {
     r.phases[0] = { ...r.phases[0], probability: 1, story: tli
       ? `${f.rocket.name} reached a ${(f.park?.periKm ?? 0).toFixed(0)} × ${(f.park?.apoKm ?? 0).toFixed(0)} km parking orbit and the upper stage completed translunar injection (apogee ${f.tel.apoKm.toFixed(0)} km) — ${f.rules.name} launch from ${site}.`
       : `Reached a ${f.tel.periKm.toFixed(0)} × ${f.tel.apoKm.toFixed(0)} km orbit — ${f.rules.name} launch from ${site}.` };
+    // Record what really happened so Mission Control can take over from lunar orbit instead of starting a second launch.
+    const sc = scoreFlight(f);
+    useMission.getState().setAscent({ ok: sc.ok, mission: f.mission, difficulty: ascent.session.difficulty, siteId: f.site.id, rocket: f.rocket.name, score: sc.score, grade: sc.grade, flightS: f.t, failure: f.failure, apoKm: f.tel.apoKm, tliErrDeg: f.tliErr === null ? null : (f.tliErr * 180) / Math.PI });
+    if (ev.destination.kind === "moon") {
+      useMission.getState().setTransit({ cruiseOk: !!r.phases[1]?.passed, insertionOk: !!r.phases[2]?.passed, transferDays: ev.cruiseDays, departureBy: f.mission === "moon" ? "launcher" : "spacecraft" });
+    }
     setFromTli(tli); setFlight(r); setAscent(null);
   };
+  /** A failed ascent ends the saved mission; leaving or retrying must say so. */
+  const loseIfFailed = () => { const f = ascent?.session.flight; if (f && f.phase === "failed") useMission.getState().lose(f.failure ?? "Launch failure."); };
   if (ascent && !flight) {
-    return <AscentFlight key={ascent.n} session={ascent.session} onExit={() => setAscent(null)} onAgain={() => startAscent(ascent.n + 1)} onContinue={finishAscent} continueLabel={`fly to the ${ev.destination.name}`} exitLabel="Back to design" />;
+    return <AscentFlight key={ascent.n} session={ascent.session} onExit={() => { loseIfFailed(); setAscent(null); }} onAgain={() => { loseIfFailed(); startAscent(ascent.n + 1); }} onContinue={finishAscent} continueLabel={`fly to the ${ev.destination.name}`} exitLabel="Back to design" />;
   }
-  if (flight) return <FlightView ev={ev} result={flight} fromTli={fromTli} onAgain={() => { setFlight(null); redesign(); }} onRetry={() => { setFlight(null); startAscent(attempt + 1); }} />;
+  if (flight) return <FlightView ev={ev} result={flight} fromTli={fromTli} handoff={ev.destination.kind === "moon"} onAgain={() => { setFlight(null); redesign(); }} onRetry={() => { setFlight(null); startAscent(attempt + 1); }} />;
 
   return (
     <ScreenContainer title="Mission Architect" subtitle="Real orbital physics, real launch records, real NASA instruments — balance them all." actions={<div className="flex gap-2"><GameButton variant="ghost" icon={<RotateCcw className="size-4" />} onClick={reset}>Reset</GameButton><BackButton href="/menu" label="Main menu" /></div>}>
@@ -276,17 +286,20 @@ function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void })
   );
 }
 
-function FlightView({ ev, result, fromTli, onAgain, onRetry }: { ev: Evaluation; result: MissionResult; fromTli: boolean; onAgain: () => void; onRetry: () => void }) {
-  const failIndex = (() => { const i = result.phases.findIndex((p) => !p.passed); return i === -1 ? null : (i as 0 | 1 | 2 | 3); })();
+function FlightView({ ev, result, fromTli, handoff, onAgain, onRetry }: { ev: Evaluation; result: MissionResult; fromTli: boolean; handoff: boolean; onAgain: () => void; onRetry: () => void }) {
+  // Moon missions hand over to Mission Control at lunar orbit: the "science ops" dice are not rolled here any more, operations are flown for real.
+  const phases = handoff ? result.phases.slice(0, 3) : result.phases;
+  const captured = handoff && phases.length === 3 && phases.every((p) => p.passed);
+  const failIndex = (() => { const i = phases.findIndex((p) => !p.passed); return i === -1 ? null : (i as 0 | 1 | 2 | 3); })();
   const traj = useMemo(() => buildTrajectory(ev.destination, failIndex), [ev.destination, failIndex]);
   const [u, setU] = useState(0);
   const [seenEnd, setSeenEnd] = useState(false);
   const [crew, setCrew] = useState(false);
   const onUpdate = useCallback((nu: number, d: boolean) => { setU(nu); if (d) setSeenEnd(true); }, []);
-  const revealed = result.phases.filter((_, i) => seenEnd || u >= traj.reveal[i] - 1e-6);
+  const revealed = phases.filter((_, i) => seenEnd || u >= traj.reveal[i] - 1e-6);
   const finished = seenEnd;
   return (
-    <ScreenContainer title={finished ? (result.success ? "Mission success" : "Mission lost") : "Mission in progress"} subtitle={`${ev.destination.name} · ${ev.vehicle.name} · ${ev.design.propulsionId === "chem" ? "chemical" : ev.electric?.name}`}>
+    <ScreenContainer title={finished ? (handoff ? (captured ? "Lunar orbit achieved" : "Mission lost") : result.success ? "Mission success" : "Mission lost") : "Mission in progress"} subtitle={`${ev.destination.name} · ${ev.vehicle.name} · ${ev.design.propulsionId === "chem" ? "chemical" : ev.electric?.name}`}>
       <div className="grid gap-4 xl:grid-cols-[minmax(320px,430px)_1fr]">
         <GlassPanel className="p-5">
           <ol className="space-y-3" aria-live="polite">
@@ -298,7 +311,24 @@ function FlightView({ ev, result, fromTli, onAgain, onRetry }: { ev: Evaluation;
             ))}
             {!finished && <li className="text-sm text-muted">Tracking spacecraft…</li>}
           </ol>
-          {finished && (
+          {finished && handoff && (
+            <div className="enter mt-6 border-t border-[var(--border)] pt-4">
+              <p className="text-lg">{captured ? "Lunar orbit achieved. Mission Control takes over from here: no second launch." : `Mission lost during ${phases[phases.length - 1].label.split(" · ")[0].toLowerCase()}.`}</p>
+              <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Launch</dt><dd className="text-base">{useMission.getState().record?.ascent?.grade ?? "-"} · {useMission.getState().record?.ascent?.score ?? 0}</dd></div>
+                <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Transfer</dt><dd className="text-base">{fmt(ev.cruiseDays, 1)} days</dd></div>
+                <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Cost</dt><dd className="text-base">{usd(ev.costUsd)}</dd></div>
+              </dl>
+              {captured && <p className="mt-2 text-xs text-ink2">Saved as mission {useMission.getState().record?.id}. Your propellant, payload and design carry over; the operations phase is flown, not rolled.</p>}
+              <div className="mt-5 flex flex-wrap gap-2">
+                {captured && <Link href="/mission-control" className="inline-flex items-center rounded-lg border border-orange bg-orange px-4 py-2 font-display font-bold text-[#1a0b00] shadow-[0_3px_0_#b4501a]">Take over in Mission Control</Link>}
+                <GameButton variant={captured ? "outline" : "primary"} icon={<Pencil className="size-4" />} onClick={onAgain}>Redesign</GameButton>
+                <GameButton variant="outline" icon={<RotateCcw className="size-4" />} onClick={onRetry}>Fly again (new dice)</GameButton>
+                <GameButton variant="ghost" onClick={() => setCrew((c) => !c)}>{crew ? "Back to trajectory" : "Meet the commander"}</GameButton>
+              </div>
+            </div>
+          )}
+          {finished && !handoff && (
             <div className="enter mt-6 border-t border-[var(--border)] pt-4">
               <p className="text-lg">{result.headline}</p>
               <div className="mt-3 flex items-end gap-6">
@@ -310,6 +340,7 @@ function FlightView({ ev, result, fromTli, onAgain, onRetry }: { ev: Evaluation;
                 <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Science goal</dt><dd className="text-base">{fmt(result.scienceFraction * 100)} %</dd></div>
                 <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Cost</dt><dd className="text-base">{usd(ev.costUsd)}</dd></div>
               </dl>
+              <p className="mt-2 text-xs text-muted">Simplified odds-based result: operations for this destination are rolled with dice, not flown.</p>
               <div className="mt-5 flex flex-wrap gap-2">
                 <GameButton variant="primary" icon={<Pencil className="size-4" />} onClick={onAgain}>Redesign</GameButton>
                 <GameButton variant="outline" icon={<RotateCcw className="size-4" />} onClick={onRetry}>Fly again (new dice)</GameButton>

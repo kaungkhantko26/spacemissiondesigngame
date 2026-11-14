@@ -9,6 +9,7 @@ import { cn } from "@/lib/mission";
 import { useDesignStore, useEvaluation } from "@/game/store";
 import { eventById } from "@/game/ops/events";
 import { useOps, type ResourceId, type Speed } from "@/game/ops/store";
+import { useMission, stageLabel, type MissionRecord } from "@/game/mission";
 import {
   CMD_LABEL, OPS, dataRateMbps, downlinkMbps, fmtMet, instrumentPowerW, orbitPhase, type Command, type OpsState, type Phase,
 } from "@/game/ops/sim";
@@ -142,6 +143,8 @@ function Briefing() {
   const ev = useEvaluation();
   const { patch, quickStart } = useDesignStore();
   const begin = useOps((o) => o.begin);
+  const { beginMission, resumeMission } = useOps();
+  const record = useMission((m) => m.record), clearMission = useMission((m) => m.clear);
   const isMoon = ev.design.destinationId === "moon";
   const bad = ev.checks.filter((c) => c.state === "bad");
   return (
@@ -165,8 +168,9 @@ function Briefing() {
           <p className="text-xs text-muted">Budget ${fmt(ev.destination.budgetUsd / 1e6)}M · Simplified, game-balanced operations model (not NASA-certified). Launch price, Δv and instruments come from the dataset.</p>
         </GlassPanel>
         <div className="space-y-4">
+          {record && <SavedMission record={record} onTakeOver={() => beginMission(record)} onResume={() => resumeMission(record)} onClear={clearMission} />}
           <GlassPanel className="p-5">
-            <p className="hud-label">Your spacecraft</p>
+            <p className="hud-label">{record ? "Design in the Architect (not the saved mission)" : "Your spacecraft"}</p>
             {!isMoon && <p className="mt-2 text-sm text-warn">This slice flies the Moon orbiter. Mars arrives next.</p>}
             <p className="mt-2 text-sm text-ink2">{ev.vehicle.name} · {ev.design.propulsionId === "chem" ? "chemical" : ev.electric?.name} · {ev.antenna.name} · {ev.instruments.length} instrument{ev.instruments.length === 1 ? "" : "s"}{ev.instruments.length ? `: ${ev.instruments.map((i) => i.name).join(", ")}` : ""}</p>
             <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
@@ -183,12 +187,34 @@ function Briefing() {
               <Link href="/design" className="inline-flex items-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-ink2 hover:text-ink">Edit in Mission Architect</Link>
             </div>
           </GlassPanel>
-          <GameButton variant="primary" className="w-full py-4 text-lg" icon={<Rocket className="size-5" />} disabled={!ev.goNoGo || !isMoon} onClick={() => begin(ev)}>
-            {ev.goNoGo && isMoon ? "Begin launch sequence" : "Fix the design to launch"}
+          <GameButton variant={record?.stage === "operating" ? "outline" : "primary"} className="w-full py-4 text-lg" icon={<Rocket className="size-5" />} disabled={!ev.goNoGo || !isMoon} onClick={() => begin(ev)}>
+            {ev.goNoGo && isMoon ? "Practice run (simulated launch)" : "Fix the design to launch"}
           </GameButton>
+          <p className="text-xs text-muted">A practice run rolls the launch and transfer with dice. For the real thing, fly the ascent and lunar capture in the Mission Architect: operations then start from the lunar orbit you reached.</p>
         </div>
       </div>
     </ScreenContainer>
+  );
+}
+
+const STAGES: ["ascent" | "transit" | "operating" | "complete", string][] = [["ascent", "Launch"], ["transit", "Transfer"], ["operating", "Operations"], ["complete", "Report"]];
+function SavedMission({ record, onTakeOver, onResume, onClear }: { record: MissionRecord; onTakeOver: () => void; onResume: () => void; onClear: () => void }) {
+  const idx = STAGES.findIndex(([k]) => k === record.stage), lost = record.stage === "lost";
+  return (
+    <GlassPanel active className="p-5" aria-label="Saved mission">
+      <p className="hud-label !text-orange">Saved mission {record.id}</p>
+      <p className="mt-1 font-display text-xl font-bold">{stageLabel[record.stage]}</p>
+      <ol className="mt-3 flex gap-1" aria-label="Mission progress">{STAGES.map(([k, label], i) => <li key={k} className={cn("flex-1 rounded-md px-2 py-1 text-center text-[11px]", lost ? "bg-white/5 text-muted" : i < idx || record.stage === "complete" ? "bg-ok/15 text-ok" : i === idx ? "bg-orange/20 text-orange" : "bg-white/5 text-muted")}>{label}</li>)}</ol>
+      {record.ascent && <p className="mt-2 text-xs text-ink2">Launch: {record.ascent.rocket}, {record.ascent.difficulty}, grade {record.ascent.grade} ({record.ascent.score}). {record.transit ? `Transfer ${fmt(record.transit.transferDays, 1)} days; departure burn by the ${record.transit.departureBy}.` : ""}</p>}
+      {lost && <p className="mt-2 text-sm text-bad">{record.lostReason}</p>}
+      {record.stage === "complete" && record.summary && <p className="mt-2 text-sm text-ink2">Final: {record.summary.headline} Grade {record.summary.grade}, score {record.summary.total}.</p>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {record.stage === "operating" && (record.ops ? <><GameButton variant="primary" onClick={onResume}>Resume operations</GameButton><GameButton variant="outline" onClick={onTakeOver}>Restart from lunar orbit</GameButton></> : <GameButton variant="primary" onClick={onTakeOver}>Take over operations</GameButton>)}
+        {record.stage === "complete" && record.ops && <GameButton variant="primary" onClick={onResume}>View the report</GameButton>}
+        {(lost || record.stage === "complete") && <Link href="/design" onClick={onClear} className="inline-flex items-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-ink2 hover:text-ink">Start a new mission</Link>}
+        {record.stage === "ascent" && <Link href="/design" className="inline-flex items-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-ink2 hover:text-ink">Back to the Architect</Link>}
+      </div>
+    </GlassPanel>
   );
 }
 
@@ -377,13 +403,25 @@ function EventDialog() {
 }
 
 function ReportView() {
-  const { report, s, ev, reset, begin, attempt } = useOps();
+  const { report, s, ev, reset, begin, beginMission, attempt } = useOps();
+  const record = useMission((m) => m.record), clearMission = useMission((m) => m.clear);
   if (!report || !s || !ev) return null;
   const color = report.outcome === "success" ? "text-ok" : report.outcome === "partial" ? "text-warn" : "text-bad";
   return (
     <ScreenContainer title="Mission report" subtitle={`${CONTRACT.name} · ${fmtMet(s.t)}`} actions={<BackButton href="/menu" label="Main menu" />}>
       <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
         <div className="space-y-4">
+          {record?.ascent && (
+            <GlassPanel className="p-5" aria-label="Mission record">
+              <p className="hud-label">Mission record {record.id}</p>
+              <ol className="mt-2 space-y-1 text-sm text-ink2">
+                <li>✓ Design: {record.design.destinationId}, {ev.vehicle.name}, {ev.instruments.length} instrument{ev.instruments.length === 1 ? "" : "s"}</li>
+                <li>{record.ascent.ok ? "✓" : "✕"} Launch: {record.ascent.rocket}, {record.ascent.difficulty}, grade {record.ascent.grade} ({record.ascent.score})</li>
+                {record.transit && <li>{record.transit.cruiseOk && record.transit.insertionOk ? "✓" : "✕"} Transfer and lunar capture: {fmt(record.transit.transferDays, 1)} days, departure burn by the {record.transit.departureBy}</li>}
+                <li>{report.outcome === "failure" ? "✕" : "✓"} Operations: {fmtMet(s.t)} flown. {report.headline}</li>
+              </ol>
+            </GlassPanel>
+          )}
           <GlassPanel active className="p-5">
             <p className={cn("font-display text-3xl font-bold uppercase", color)}>{report.outcome === "success" ? "Success" : report.outcome === "partial" ? "Partial success" : "Mission failed"}</p>
             <p className="mt-2 text-lg">{report.headline}</p>
@@ -406,9 +444,9 @@ function ReportView() {
             ); })}</ul></GlassPanel>
           <GlassPanel className="p-5"><p className="hud-label mb-2">What to try next</p><ul className="list-disc space-y-1 pl-5 text-sm text-ink2">{report.lessons.map((l) => <li key={l}>{l}</li>)}</ul></GlassPanel>
           <div className="flex flex-wrap gap-2">
-            <GameButton variant="primary" onClick={() => begin(ev, attempt + 1)}>Fly again (new dice)</GameButton>
+            <GameButton variant="primary" onClick={() => (record?.ascent ? beginMission(record, true) : begin(ev, attempt + 1))}>{record?.ascent ? "Fly operations again (new dice)" : "Fly again (new dice)"}</GameButton>
             <GameButton variant="outline" onClick={reset}>Back to briefing</GameButton>
-            <Link href="/design" className="inline-flex items-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-ink2 hover:text-ink">Redesign spacecraft</Link>
+            <Link href="/design" onClick={clearMission} className="inline-flex items-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-ink2 hover:text-ink">{record?.ascent ? "Start a new mission" : "Redesign spacecraft"}</Link>
           </div>
         </div>
       </div>

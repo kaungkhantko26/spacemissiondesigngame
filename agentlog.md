@@ -172,3 +172,10 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Architect UI: per-instrument measurement, fit-to-contract label, mass-scope note, source link; "Assumptions and sources" in the design review.
 - Team Up labels honest: Lunar Landing -> Lunar Orbit Mission; Mars and Telescope marked planned with a "Playable" note; results for Moon missions need the lunar-orbit capture (TLI alone shows "lunar leg not flown").
 - Tests: `instruments.test.ts` added; game/review tests updated. Not done yet (review work order): one saved mission lifecycle (ascent -> operations), real archived MAG/ER target layer, same-seed comparison, learner testing.
+
+## Session: saved mission lifecycle
+- `src/game/mission.ts`: one persisted mission record (localStorage `smd-mission`) from Architect to report: ascent -> transit -> operating -> complete/lost, with the Design, ascent result, transit (cruise/insertion, who paid the departure burn) and a snapshot of running operations.
+- Architect records the real ascent (grade, score, failure) and, for the Moon, the transfer and capture; the Moon "science ops" dice are no longer rolled there. After capture the player takes over in Mission Control. Mars/others keep the old odds-based result and say so.
+- Mission Control starts from lunar orbit (`createOpsFromMission`): propellant = design budget minus capture, minus departure only when the spacecraft (not the launcher) flew it. Saved every 3 s, "Resume operations" after reload, report shows the mission record, "Fly operations again" replays with new dice. The old simulated-launch run is kept as a labelled practice run.
+- Menu: "Your mission" card (single orange action, 4 steps, Resume/Report states); menu items describe what they do; layout tightened into three columns.
+- Tests: `mission.test.ts`. Verified end to end in a browser: Architect -> ascent -> capture -> Take over -> operations -> reload -> Resume.
