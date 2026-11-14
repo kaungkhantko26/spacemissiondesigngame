@@ -152,3 +152,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Cosmetics now real: unlocks tied to actual play (src/game/progress.ts, saved in localStorage), toasts on unlock, equipped look restored on load, emote sets the menu astronaut pose, patch + suit show on the ID badge, own look on the Team Up lineup. Profile layout fixed (preview visible, badge beside history). Launch sound: hiss and noise burst removed, ~70% quieter.
 - Profile picture templates: 9 templates (initial, helmet, rocket, planet, moon, star, satellite, comet, alien) with background/colour/frame/shape, saved in localStorage (src/game/avatar.ts, AvatarArt, AvatarEditor); used by PlayerAvatar for the local player everywhere.
 - Menu astronaut: drag to turn (inertia, eases back to the waving pose after ~2.5s idle).
+- Removed the ambient bed (old-TV hum) from menus: only the soft click remains outside the flight.
