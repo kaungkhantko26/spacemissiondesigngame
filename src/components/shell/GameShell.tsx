@@ -20,6 +20,16 @@ export function GameShell({ children }: { children: React.ReactNode }) {
   const { toasts, dismissToast, confirm, closeConfirm, reducedMotion, highContrast, muted, set } = useUIStore();
   const profile = usePlayerStore((s) => s.profile);
 
+  useEffect(() => { // a page from before a new deploy may ask for a script that no longer exists: reload once to pick up the new version
+    const reloadOnce = () => {
+      try { const last = Number(window.sessionStorage.getItem("smd-reload") ?? 0); if (Date.now() - last < 30_000) return; window.sessionStorage.setItem("smd-reload", String(Date.now())); } catch { /* storage unavailable */ }
+      window.location.reload();
+    };
+    const onError = (e: Event) => { const t = e.target; if (t instanceof HTMLScriptElement && t.src.includes("/_next/static/")) reloadOnce(); };
+    const onRejection = (e: PromiseRejectionEvent) => { const m = String((e.reason as { name?: string; message?: string } | undefined)?.name ?? "") + String((e.reason as { message?: string } | undefined)?.message ?? ""); if (/ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module/i.test(m)) reloadOnce(); };
+    window.addEventListener("error", onError, true); window.addEventListener("unhandledrejection", onRejection);
+    return () => { window.removeEventListener("error", onError, true); window.removeEventListener("unhandledrejection", onRejection); };
+  }, []);
   useEffect(() => { // restore saved cosmetics, progress and profile picture from this browser
     void useAvatar.persist.rehydrate(); void useFlag.persist.rehydrate();
     void Promise.resolve(useIdentity.persist.rehydrate()).then(() => { const n = useIdentity.getState().name; if (n) usePlayerStore.setState((st) => ({ profile: { ...st.profile, username: n } })); });
