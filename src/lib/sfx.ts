@@ -131,13 +131,6 @@ function sfxNow(c: AudioContext, kind: SfxKind) {
   else { out.gain.value = 0.5; tone("sine", 1200, 1200, 0.25, 0.5); tone("sine", 1800, 1800, 0.25, 0.3, 0.05); } // blip: sound check
 }
 
-/** Shared quiet bed for menus and design screens (the flight and Moon views have their own sound). */
-let bed: SpaceHum | null = null;
-export function setAmbientBed(on: boolean) {
-  const c = audioContext(); if (!c) return;
-  if (on) { bed ??= new SpaceHum(c, 0.012); bed.set(true); void c.resume().catch(() => undefined); } else bed?.set(false);
-}
-
 /** Quiet spacecraft ambience for the coast: low electrical hum plus ventilation hiss. */
 export class SpaceHum {
   private g: GainNode; private nodes: { stop(): void }[] = [];
