@@ -1,4 +1,6 @@
 "use client";
+import { AvatarArt } from "./AvatarArt";
+import { DEFAULT_AVATAR, useAvatar } from "@/game/avatar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -104,7 +106,10 @@ export function StatBar({ label, value, max = 10, next, tone = "cyan" }: { label
     </div>
   );
 }
-export function PlayerAvatar({ player, size = 40 }: { player: Pick<Player, "username" | "avatarColor">; size?: number }) {
+export function PlayerAvatar({ player, size = 40 }: { player: Pick<Player, "username" | "avatarColor"> & { id?: string }; size?: number }) {
+  const mine = useAvatar(); // your own customised picture; other players keep their colour + initial
+  if (player.id === "p1" && mine.template !== "initial") return <AvatarArt style={mine} name={player.username} size={size} />;
+  if (player.id === "p1" && (mine.bg !== DEFAULT_AVATAR.bg || mine.shape !== "circle" || mine.frame !== "none" || mine.fg !== DEFAULT_AVATAR.fg)) return <AvatarArt style={mine} name={player.username} size={size} />;
   return (
     <span className="grid shrink-0 place-items-center rounded-full font-bold text-[#04101f] ring-1 ring-white/30" aria-label={`${player.username} avatar`}
       style={{ width: size, height: size, background: player.avatarColor, fontSize: size * 0.4 }}>

@@ -9,6 +9,7 @@ import {
 } from "@/components/ui";
 import { Astronaut, Scene3D, PlanetModel } from "@/components/three/lazy";
 import { IdBadge } from "./IdBadge";
+import { AvatarEditor } from "./AvatarEditor";
 import { useProgress, withUnlocks } from "@/game/progress";
 import { AstronautGuide, TestVoiceButton, TutorialButton } from "./MenuGuide";
 import { ProfileWidget } from "@/components/shell/GameShell";
@@ -218,6 +219,7 @@ export function ProfileScreen() {
               <XPProgressBar className="mt-3 max-w-md" xp={profile.progression.xp} max={profile.progression.xpForNextLevel} />
             </div>
           </GlassPanel>
+          <AvatarEditor name={profile.username} />
           <div className="grid items-start gap-4 md:grid-cols-[300px_1fr]">
             <IdBadge profile={profile} patch={patchItem ? { name: patchItem.name, color: patchItem.color, accent: patchItem.accent } : null} suit={look.suit} />
             <div className="grid content-start gap-4">
