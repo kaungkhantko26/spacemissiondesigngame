@@ -2,11 +2,14 @@
 import { useRef, useState } from "react";
 import { PlayerAvatar } from "@/components/ui";
 import { useUIStore } from "@/stores";
+import { FlagView } from "@/components/ui/FlagView";
+import { useFlag } from "@/game/flags";
 import type { PlayerProfile } from "@/types";
 
 /** Crew ID badge hanging from a lanyard. Idles with a slow pendulum swing; drag the card sideways and let go to make it swing back. */
 export function IdBadge({ profile, patch, suit }: { profile: PlayerProfile; patch?: { name: string; color: string; accent: string } | null; suit?: string }) {
   const reduced = useUIStore((s) => s.reducedMotion);
+  const flagId = useFlag((s) => s.flagId), custom = useFlag((s) => s.custom);
   const [angle, setAngle] = useState(0);
   const [drag, setDrag] = useState(false);
   const start = useRef(0);
@@ -42,6 +45,7 @@ export function IdBadge({ profile, patch, suit }: { profile: PlayerProfile; patc
             <div className="px-4 pt-3 text-center">
               <p className="font-display text-2xl font-bold leading-tight">{profile.username}</p>
               <p className="text-[10px] uppercase tracking-[.25em] text-ink2">Mission Commander</p>
+              <div className="mt-1.5 flex justify-center"><FlagView id={flagId} custom={custom} width={34} label="Your flag" /></div>
             </div>
             <dl className="mx-4 mt-3 grid grid-cols-2 gap-2 text-center text-[10px]">
               <div className="rounded-md bg-white/5 py-1.5"><dt className="uppercase tracking-wider text-muted">Level</dt><dd className="font-display text-base font-bold text-gold">{profile.progression.level}</dd></div>
