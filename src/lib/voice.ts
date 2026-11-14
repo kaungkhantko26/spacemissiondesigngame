@@ -8,6 +8,8 @@ export type VoiceId = keyof typeof lines;
 let ctx: AudioContext | null = null, installed = false, gen = 0, source: AudioBufferSourceNode | null = null;
 const buffers = new Map<string, Promise<AudioBuffer | null>>();
 
+/** The shared audio context (also used by the sound effects). */
+export const audioContext = (): AudioContext | null => context();
 function context(): AudioContext | null {
   if (ctx) return ctx;
   const AC = typeof window !== "undefined" ? (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) : undefined;

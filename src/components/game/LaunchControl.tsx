@@ -8,7 +8,8 @@ import { cn } from "@/lib/mission";
 import { DATASET, vehicleById } from "@/game/data";
 import { LAUNCH, RULES, buildRocket, guidancePitch, scoreFlight, type Difficulty, type Flight } from "@/game/launch/core";
 import { MoonLeg } from "./MoonLeg";
-import { playVoice, primeVoice, stopVoice, type VoiceId } from "@/lib/voice";
+import { playVoice, primeVoice, stopVoice, audioContext, type VoiceId } from "@/lib/voice";
+import { RocketSound, playSfx } from "@/lib/sfx";
 import { BRIEFING_TOUR, FLIGHT_TOUR, Tour, pendingTour, setPendingTour } from "./Tour";
 import { LaunchSession, payloadFor } from "@/game/launch/session";
 import { useLaunchSetup } from "@/game/launch/store";
@@ -225,6 +226,22 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     if (say) playVoice(say, !voice);
   }, [s.ms, s.phase, s.running, voice, f.mission]);
   useEffect(() => () => stopVoice(), []);
+  // rocket sound design: engine follows throttle / altitude / max-Q, one-shots for milestones
+  const engine = useRef<RocketSound | null>(null);
+  const sfxCalled = useRef(new Set<string>());
+  useEffect(() => {
+    const c = audioContext();
+    if (!voice || !c) { engine.current?.silence(); return; }
+    if (!engine.current) engine.current = new RocketSound(c);
+    engine.current.update(s.throttle, s.tel.alt, s.tel.q, s.running && s.engineOn && s.warp <= 2 && s.phase !== "failed");
+  }, [s.throttle, s.tel.alt, s.tel.q, s.running, s.engineOn, s.warp, s.phase, voice]);
+  useEffect(() => {
+    if (!voice) return;
+    const EV: Record<string, Parameters<typeof playSfx>[0]> = { liftoff: "ignition", sep: "separation", sep2: "separation", ignition2: "ignite2", ignition3: "ignite2", tliStart: "ignite2", orbit: "chime", tli: "chime" };
+    for (const [k, kind] of Object.entries(EV)) if (s.ms[k] !== undefined && !sfxCalled.current.has(k)) { sfxCalled.current.add(k); playSfx(kind); }
+    if (s.phase === "failed" && !sfxCalled.current.has("failed")) { sfxCalled.current.add("failed"); playSfx("explosion"); engine.current?.silence(); }
+  }, [s.ms, s.phase, voice]);
+  useEffect(() => () => { engine.current?.dispose(); engine.current = null; }, []);
   const start = () => { primeVoice(); session.start(); setS(snap(session)); };
   const togglePause = useCallback(() => { if (session.flight.t > -LAUNCH.countdownS + 0.01 || session.running) session.toggleRun(); setS(snap(session)); }, [session]);
   const setWarp = useCallback((w: number) => { session.setWarp(w); setS(snap(session)); }, [session]);
@@ -318,7 +335,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
         </ul>
         <div data-tour="controls" className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--border)] bg-bg/85 p-2">
           <B label={s.running ? "Pause (P)" : "Resume (P)"} onClick={togglePause} disabled={s.phase === "countdown" && !s.running && s.t <= -LAUNCH.countdownS + 0.01}>{s.running ? <Pause className="size-4" /> : <Play className="size-4" />}</B>
-          <B label={voice ? "Mute countdown voice" : "Unmute countdown voice"} on={voice} onClick={() => setVoice((v) => !v)}>{voice ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}</B>
+          <B label={voice ? "Mute sound" : "Unmute sound"} on={voice} onClick={() => setVoice((v) => !v)}>{voice ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}</B>
           {rules.autopilot !== "none" && <B label={rules.autopilot === "full" ? "Autopilot (A)" : "Upper-stage guidance (A)"} on={apActive} onClick={toggleAuto}><Bot className="size-4" />{rules.autopilot === "full" ? "Autopilot" : "Upper guidance"}</B>}
           <span className="hud-label px-1">Pitch</span>
           <B label="Raise nose (↑)" disabled={!manualPitch} {...held("up")}><ArrowUp className="size-4" /></B>
