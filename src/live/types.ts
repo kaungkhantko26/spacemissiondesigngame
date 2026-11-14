@@ -135,8 +135,8 @@ export interface Result {
   awards: Record<string, { xp: number; newCosmetics: string[]; totalXp: number; rank: string }>;
 }
 export interface OpsIncident {
-  id: string; label: string; text: string; deadline: number; serverNow: number;
-  options: { id: string; label: string; hint: string; role: RoleId; cost: number }[];
+  id: string; label: string; text: string; positive?: boolean; deadline: number; serverNow: number;
+  options: { id: string; label: string; hint: string; role: RoleId; cost: number; perk: string | null }[];
 }
 export interface OpsView {
   status: "running" | "done" | "lost"; tick: number; ticks: number; month: number; totalMonths: number;
@@ -144,7 +144,8 @@ export interface OpsView {
   ctl: { duty: number; downlink: "normal" | "boost"; mode: "nominal" | "safe" };
   incident: OpsIncident | null; log: { tick: number; kind: "info" | "good" | "bad" | "alert" | "decision"; text: string }[];
   timeline: { t: number; power: number; storage: number; health: number; eff: number }[];
-  repairIn: number; serverNow: number; tickMs: number; nextAt: number; safeNow: boolean;
+  repairIn: number; serverNow: number; tickMs: number; nextAt: number; safeNow: boolean; decisions: number;
+  crew: { who: string; role: RoleId; trait: string; skill: string; skillLabel: string; desc: string; active: boolean }[];
 }
 export interface OpsSummary { lost: boolean; budgetLeftM: number; budget0: number; handled: number; missed: number; brownouts: number; timeline: OpsView["timeline"] }
 export interface RoomMember { id: string; name: string; rank: string; equipped: Record<string, string>; online: boolean; bot?: boolean }

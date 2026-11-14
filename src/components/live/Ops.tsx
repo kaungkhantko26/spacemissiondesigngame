@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useGame } from "@/live/store";
 import { GameButton, GlassPanel } from "@/components/ui";
 import { fmtMoney } from "@/live/format";
+import { OpsScene } from "./OpsScene";
 import type { RoleId } from "@/live/types";
 
 const swallow = (p: Promise<unknown>) => { p.catch(() => {}); };
@@ -37,21 +38,22 @@ export function Ops() {
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
       <div className="space-y-3">
         <GlassPanel className="p-4">
-          <div className="flex justify-between text-sm"><b>Month {op.month} / {op.totalMonths}</b><span className="text-ink2">You are: {mine ? roleName(mine) : "observer"}{op.safeNow && " · SAFE MODE"}</span></div>
+          <div className="flex justify-between text-sm"><b>Month {op.month} / {op.totalMonths} · {op.decisions} decisions</b><span className="text-ink2">You are: {mine ? roleName(mine) : "observer"}{op.safeNow && " · SAFE MODE"}</span></div>
           <div className="mt-2 h-2 overflow-hidden rounded bg-white/10"><div className="h-full bg-cyan transition-all duration-500" style={{ width: `${pct}%` }} /></div>
         </GlassPanel>
+        <OpsScene op={op} inc={inc} />
         <GlassPanel className="grid gap-4 p-4 sm:grid-cols-3">
           <Gauge label="Battery power" value={op.res.power} good="high" note="Low = brownout" />
           <Gauge label="Onboard memory" value={op.res.storage} good="low" note="Full = data thrown away" />
           <Gauge label="Hardware health" value={op.res.health} good="high" note="0 = spacecraft lost" />
         </GlassPanel>
         {inc && (
-          <GlassPanel active className="space-y-2 border-orange p-4">
-            <div className="flex justify-between"><h2 className="font-display text-xl font-bold text-orange">⚠ {inc.label}</h2><span className="font-mono text-orange">{incLeft}s</span></div>
+          <GlassPanel active className={`space-y-2 p-4 ${inc.positive ? "border-ok" : "border-orange"}`}>
+            <div className="flex justify-between"><h2 className={`font-display text-xl font-bold ${inc.positive ? "text-ok" : "text-orange"}`}>{inc.positive ? "★" : "⚠"} {inc.label}</h2><span className="font-mono text-orange">{incLeft}s</span></div>
             <p className="text-sm">{inc.text}</p>
-            <div className="grid gap-2 sm:grid-cols-3">{inc.options.map((o) => (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{inc.options.map((o) => (
               <button key={o.id} onClick={() => swallow(g.opsRespond(o.id))} className="rounded-lg border border-white/15 p-2 text-left text-sm hover:border-orange">
-                <b>{o.label}</b><div className="text-xs text-ink2">{o.hint}</div>
+                <b>{o.label}</b>{o.perk && <span className="ml-1 rounded bg-gold/20 px-1 text-[10px] text-gold">PERK</span>}<div className="text-xs text-ink2">{o.hint}</div>
                 <div className="mt-1 text-[10px] text-muted">Suits: {roleName(o.role)}{o.cost > 0 && ` · costs ${fmtMoney(o.cost)}`}</div>
               </button>))}</div>
             <p className="text-xs text-muted">Discuss as a crew — no answer means the worst default happens.</p>
@@ -71,6 +73,8 @@ export function Ops() {
         </GlassPanel>
       </div>
       <GlassPanel className="max-h-[70vh] overflow-auto p-4">
+        <h3 className="mb-1 font-semibold">Crew traits in play</h3>
+        <ul className="mb-3 space-y-1 text-[11px]">{op.crew.map((c, i) => <li key={i} className={c.active ? "text-ink2" : "text-muted line-through"} title={c.desc}><b className="text-ink">{c.who}</b> — {c.trait} <span className="text-gold">({c.skillLabel})</span></li>)}</ul>
         <h3 className="mb-2 font-semibold">Mission log</h3>
         <ul className="space-y-1 text-xs">{[...op.log].reverse().map((l, i) => <li key={i} className={KIND[l.kind]}>M{Math.round(l.tick * (op.totalMonths / op.ticks))}: {l.text}</li>)}</ul>
         {room.hostId === profile.id && <GameButton variant="ghost" className="mt-3" onClick={() => swallow(g.toLobby())}>Abort mission</GameButton>}

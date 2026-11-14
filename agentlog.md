@@ -44,3 +44,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Main flow (/team, /team/lobby, /mission/select|briefing|roles|characters|confirm|gameplay|results) now renders live screens (src/components/live/Screens.tsx) in the original UI style when NEXT_PUBLIC_API_URL is set; mock screens remain as fallback. Routes follow the server room state (useGate).
 - Mission Operations phase (/mission/ops, src/components/live/Ops.tsx): after launch the team flies the mission in real time (gauges, role controls, incidents with a countdown). Needs the updated backend (room status 'ops').
 - Dev tools (when server DEV_TOOLS != 0): lobby 'Add test player', design 'Auto-design'.
+- Ops v2: ~10 min run, 16 incident types, trait-driven options, animated OpsScene (SVG). Requires backend with opstraits.
