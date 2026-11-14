@@ -135,3 +135,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Menu: astronaut greets on hover/click (speech bubble + browser voice) and offers a 7-step narrated How to play tutorial (src/components/screens/MenuGuide.tsx); also a How to play button under the menu.
 - Menu greeting bubble: dropped backdrop-blur/transform animation (Safari hides the WebGL astronaut canvas under blurred overlays).
 - Menu astronaut: greeting voice plays once per visit; "How to play" is now a skippable spotlight tour (src/components/game/Tour.tsx) over the real menu, Launch Control briefing and flight HUD. Voice lines load from public/voice/<id>.mp3 (ElevenLabs; scripts/generate-voice.mjs, docs/voice-script.md) with browser speech fallback.
+- Added the real greeting voice clip public/voice/greeting.mp3 (countdown clips still use browser speech until provided).
