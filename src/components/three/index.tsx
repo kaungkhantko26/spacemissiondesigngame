@@ -1,8 +1,9 @@
 "use client";
-import { Component, Suspense, useRef, type ReactNode } from "react";
+import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Stars } from "@react-three/drei";
-import type { Group } from "three";
+import { OrbitControls, Stars, useAnimations, useGLTF } from "@react-three/drei";
+import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { type Group, type Mesh, type MeshStandardMaterial } from "three";
 import { useUIStore } from "@/stores";
 
 /** Error boundary: 3D must never block navigation. */
@@ -57,51 +58,61 @@ function Lights({ preset }: { preset: LightPreset }) {
   );
 }
 
-/* ---------- Procedural astronaut (replaceable with GLB later) ---------- */
+/* ---------- Astronaut (rigged GLB, recolourable skins) ---------- */
 export interface AstronautLook {
   suit: string; skin?: string; helmet?: string; accent?: string; pack?: string;
   pose?: "idle" | "wave" | "ready" | "celebrate";
 }
-export function Astronaut({ suit, skin = "#f0c8a0", helmet = "#4fc3f7", accent = "#168bff", pack = "#9fb3c8", pose = "idle", position = [0, 0, 0], scale = 1 }:
+export const ASTRONAUT_URL = "/models/astronaut.glb";
+const POSE_CLIP = { idle: "idle", wave: "wave", ready: "floating", celebrate: "moon_walk" } as const;
+const MODEL_HEIGHT = 3.1165; // native height of the GLB in its own units
+const TARGET_HEIGHT = 2.4; // world units, feet resting on y=-0.25
+
+export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = [0, 0, 0], scale = 1 }:
   AstronautLook & { position?: [number, number, number]; scale?: number }) {
+  const { scene, animations } = useGLTF(ASTRONAUT_URL);
+  // Per-instance clone so skins and animation state never leak between crew members.
+  const model = useMemo(() => {
+    const c = cloneSkeleton(scene);
+    c.traverse((o) => {
+      const m = o as Mesh;
+      if (m.isMesh) m.material = (m.material as MeshStandardMaterial).clone();
+    });
+    return c;
+  }, [scene]);
+  // Source model is ~3.12 units tall (T-pose bounds measured offline); scale it to TARGET_HEIGHT.
+  const k = TARGET_HEIGHT / MODEL_HEIGHT;
+  const offset: [number, number, number] = [0, -0.25, 0.08 * k];
   const root = useRef<Group>(null);
-  const arm = useRef<Group>(null);
+  const { actions } = useAnimations(animations, root);
   const reduced = useUIStore((s) => s.reducedMotion);
-  useFrame(({ clock }) => {
-    if (reduced || !root.current) return;
-    const t = clock.elapsedTime;
-    root.current.position.y = position[1] + Math.sin(t * 1.6) * 0.03; // breathing
-    root.current.rotation.y = Math.sin(t * 0.6) * 0.12;                 // head/body sway
-    if (arm.current) {
-      arm.current.rotation.z = pose === "wave" ? -2.4 + Math.sin(t * 6) * 0.4 : pose === "celebrate" ? -2.7 + Math.sin(t * 8) * 0.2 : pose === "ready" ? -0.4 : -0.15;
-    }
-  });
-  const body = <meshStandardMaterial color={suit} roughness={0.55} />;
+
+  // Skin: tint the suit materials; the near-black visor takes the helmet colour.
+  useEffect(() => {
+    model.traverse((o) => {
+      const m = o as Mesh;
+      if (!m.isMesh) return;
+      const mat = m.material as MeshStandardMaterial;
+      if (mat.name === "material_1") mat.color.set(helmet).multiplyScalar(0.25);
+      else mat.color.set(suit);
+    });
+  }, [model, suit, helmet]);
+
+  useEffect(() => {
+    const action = actions[POSE_CLIP[pose]] ?? actions.idle;
+    if (!action) return;
+    action.reset().fadeIn(0.25).play();
+    if (reduced) action.setEffectiveTimeScale(0);
+    return () => { action.fadeOut(0.2); };
+  }, [actions, pose, reduced]);
+
   return (
     <group ref={root} position={position} scale={scale}>
-      {/* torso */}
-      <mesh position={[0, 0.9, 0]}><capsuleGeometry args={[0.42, 0.55, 8, 16]} />{body}</mesh>
-      {/* chest panel */}
-      <mesh position={[0, 1.0, 0.4]}><boxGeometry args={[0.35, 0.22, 0.05]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.4} /></mesh>
-      {/* backpack */}
-      <mesh position={[0, 0.95, -0.45]}><boxGeometry args={[0.6, 0.8, 0.28]} /><meshStandardMaterial color={pack} roughness={0.7} /></mesh>
-      {/* head + visor */}
-      <mesh position={[0, 1.85, 0]}><sphereGeometry args={[0.5, 24, 24]} /><meshStandardMaterial color="#eef3fa" roughness={0.3} /></mesh>
-      <mesh position={[0, 1.85, 0.12]}><sphereGeometry args={[0.4, 24, 24]} /><meshStandardMaterial color="#12284d" metalness={0.5} roughness={0.25} /></mesh>
-      <mesh position={[0, 1.82, 0.3]} scale={[1, 0.95, 0.75]}><sphereGeometry args={[0.3, 20, 20]} /><meshStandardMaterial color={skin} /></mesh><mesh position={[-0.1, 1.86, 0.55]}><sphereGeometry args={[0.035, 8, 8]} /><meshBasicMaterial color="#1a1a2e" /></mesh><mesh position={[0.1, 1.86, 0.55]}><sphereGeometry args={[0.035, 8, 8]} /><meshBasicMaterial color="#1a1a2e" /></mesh>
-      <mesh position={[0, 1.85, 0.27]} scale={[1.05, 1.05, 0.5]}><sphereGeometry args={[0.38, 24, 24]} /><meshStandardMaterial color={helmet} transparent opacity={0.25} metalness={0.6} roughness={0.1} /></mesh>
-      {/* arms */}
-      <group ref={arm} position={[0.55, 1.35, 0]}><mesh position={[0.3, -0.05, 0]} rotation={[0, 0, Math.PI / 2]}><capsuleGeometry args={[0.13, 0.5, 6, 12]} />{body}</mesh></group>
-      <mesh position={[-0.75, 1.05, 0]} rotation={[0, 0, 0.3]}><capsuleGeometry args={[0.13, 0.5, 6, 12]} />{body}</mesh>
-      {/* legs */}
-      <mesh position={[-0.2, 0.2, 0]}><capsuleGeometry args={[0.16, 0.5, 6, 12]} />{body}</mesh>
-      <mesh position={[0.2, 0.2, 0]}><capsuleGeometry args={[0.16, 0.5, 6, 12]} />{body}</mesh>
-      {/* boots */}
-      <mesh position={[-0.2, -0.2, 0.06]}><boxGeometry args={[0.3, 0.16, 0.42]} /><meshStandardMaterial color={accent} /></mesh>
-      <mesh position={[0.2, -0.2, 0.06]}><boxGeometry args={[0.3, 0.16, 0.42]} /><meshStandardMaterial color={accent} /></mesh>
+      <primitive object={model} scale={k} position={offset} />
     </group>
   );
 }
+useGLTF.preload(ASTRONAUT_URL);
 
 export function CrewLineup({ crew, pose = "idle" }: { crew: (AstronautLook | null)[]; pose?: AstronautLook["pose"] }) {
   const n = crew.length;
