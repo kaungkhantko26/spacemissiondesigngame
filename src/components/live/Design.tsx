@@ -93,6 +93,7 @@ export function Design() {
           <div className="text-xs text-ink2">Approved: {room.approvals.length}/{humans}</div>
           <GameButton onClick={() => swallow(g.approve(!approved))}>{approved ? "Withdraw approval" : "Approve design"}</GameButton>
           {room.hostId === me && <GameButton variant="primary" disabled={!pv?.launchReady} onClick={() => swallow(g.launch())}>🚀 Launch</GameButton>}
+          {cat.rules.devTools && <GameButton variant="outline" onClick={() => swallow(g.devAutodesign())}>🛠 Auto-design (dev)</GameButton>}
           <GameButton variant="ghost" onClick={() => swallow(g.toLobby())}>Abort</GameButton>
         </GlassPanel>
       </aside>

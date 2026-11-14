@@ -77,7 +77,7 @@ export interface Catalog {
   stats: StatInfo[]; roles: RoleInfo[]; characters: CharacterInfo[];
   missions: MissionInfo[]; comingSoon: ComingSoon[]; modifiers: ModifierInfo[]; cosmetics: CosmeticsInfo;
   traitPreview: Record<Difficulty, Record<string, TraitPreview>>;
-  rules: { hardGate: { enabled: boolean; requires: string } };
+  rules: { devTools: boolean; hardGate: { enabled: boolean; requires: string } };
   realMissionCount: number;
 }
 
@@ -147,7 +147,7 @@ export interface OpsView {
   repairIn: number; serverNow: number; tickMs: number; nextAt: number; safeNow: boolean;
 }
 export interface OpsSummary { lost: boolean; budgetLeftM: number; budget0: number; handled: number; missed: number; brownouts: number; timeline: OpsView["timeline"] }
-export interface RoomMember { id: string; name: string; rank: string; equipped: Record<string, string>; online: boolean }
+export interface RoomMember { id: string; name: string; rank: string; equipped: Record<string, string>; online: boolean; bot?: boolean }
 export interface Slot { slot: string; role: RoleId; playerId: string | null; ai: boolean; characterId: string | null }
 export interface ChatMsg { from: string; name: string; text: string; at: number }
 export interface Room {
@@ -172,5 +172,6 @@ export type ClientMessage =
   | { t: "role.claim"; slot: string; characterId: string } | { t: "role.release" }
   | { t: "room.start_design" } | { t: "design.set"; patch: DesignPatch } | { t: "design.approve"; approved: boolean }
   | { t: "launch" } | { t: "ops.set"; patch: Partial<{ duty: number; downlink: "normal" | "boost"; mode: "nominal" | "safe" }> }
+  | { t: "dev.autodesign" } | { t: "dev.addbot" } | { t: "dev.removebot" }
   | { t: "ops.respond"; option: string } | { t: "ops.repair" } | { t: "room.redesign" } | { t: "room.to_lobby" } | { t: "chat"; text: string }
   | { t: "profile.upgrade"; stat: StatId } | { t: "profile.rename"; name: string } | { t: "cosmetic.equip"; item: string };

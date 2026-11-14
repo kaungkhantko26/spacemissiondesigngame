@@ -88,10 +88,13 @@ export function LiveLobby() {
               <PlayerAvatar player={{ username: m.name, avatarColor: colorOf(m.id) }} size={64} />
               <p className="font-bold">{m.name} {m.id === room.hostId && <Crown className="inline size-4 text-gold" aria-label="Host" />}</p>
               <p className="text-xs text-ink2">{m.rank}</p>
-              <StatusPill state={m.online ? "ok" : "warning"}>{m.online ? <Wifi className="inline size-3" /> : <WifiOff className="inline size-3" />} {m.online ? "connected" : "reconnecting"}</StatusPill>
+              <StatusPill state={m.online || m.bot ? "ok" : "warning"}>{m.online ? <Wifi className="inline size-3" /> : <WifiOff className="inline size-3" />} {m.bot ? "test bot" : m.online ? "connected" : "reconnecting"}</StatusPill>
             </> : <span className="text-ink2">Waiting for player…</span>}
           </GlassPanel></li>))}
       </ul>
+      {g.catalog?.rules.devTools && host && <GlassPanel className="flex flex-wrap items-center gap-2 p-3"><span className="text-xs text-muted">DEV TOOLS</span>
+        <GameButton variant="outline" onClick={() => swallow(g.devAddBot())} disabled={room.members.length >= 4}>🛠 Add test player</GameButton>
+        <GameButton variant="ghost" onClick={() => swallow(g.devRemoveBot())} disabled={!room.members.some((m) => m.bot)}>Remove test player</GameButton></GlassPanel>}
       <div className="flex justify-end gap-2">
         <GameButton variant="ghost" onClick={() => { swallow(g.leaveRoom()); router.push("/team"); }}>Leave room</GameButton>
         {host ? <GameButton variant="primary" onClick={() => router.push("/mission/select")}>Next: Select Mission</GameButton>
