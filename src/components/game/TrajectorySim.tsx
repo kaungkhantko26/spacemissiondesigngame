@@ -43,6 +43,24 @@ const smoothstep = (x: number) => { const t = clamp(x, 0, 1); return t * t * (3 
 const UP = new Vector3(0, 1, 0);
 const nearStart = (traj: Trajectory): [number, number, number] => { const c = traj.sample(0).craft; return [c[0] + traj.earthR * 0.6, c[1] + traj.earthR * 0.5, c[2] + traj.earthR * 1.1]; };
 
+/** Apollo-style spacecraft (command module, service module, engine bell, high-gain dish, RCS quads), nose along +Y, about 2 units long. */
+function SpacecraftModel() {
+  return (
+    <group>
+      <mesh position={[0, 0.78, 0]}><coneGeometry args={[0.3, 0.55, 20]} /><meshStandardMaterial color="#d9d6cf" metalness={0.5} roughness={0.35} emissive="#3a3935" /></mesh>
+      <mesh position={[0, 0.44, 0]}><cylinderGeometry args={[0.3, 0.32, 0.12, 20]} /><meshStandardMaterial color="#8a8c92" metalness={0.6} roughness={0.4} emissive="#222" /></mesh>
+      <mesh position={[0, -0.05, 0]}><cylinderGeometry args={[0.32, 0.32, 0.8, 20]} /><meshStandardMaterial color="#ecebe6" metalness={0.4} roughness={0.4} emissive="#3a3935" /></mesh>
+      <mesh position={[0, -0.05, 0]}><cylinderGeometry args={[0.325, 0.325, 0.1, 20]} /><meshStandardMaterial color="#2b2d33" emissive="#111" /></mesh>
+      <mesh position={[0, -0.62, 0]} rotation={[Math.PI, 0, 0]}><coneGeometry args={[0.2, 0.42, 16, 1, true]} /><meshStandardMaterial color="#6d6a63" metalness={0.8} roughness={0.35} side={2} emissive="#1c1b19" /></mesh>
+      {[0, 1, 2, 3].map((i) => <mesh key={i} position={[Math.cos(i * Math.PI / 2) * 0.35, -0.2, Math.sin(i * Math.PI / 2) * 0.35]}><boxGeometry args={[0.1, 0.18, 0.1]} /><meshStandardMaterial color="#9a9ca2" emissive="#222" /></mesh>)}
+      <group position={[0.4, -0.3, 0]} rotation={[0, 0, -0.5]}>
+        <mesh position={[0.12, 0, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.02, 0.02, 0.35, 8]} /><meshStandardMaterial color="#aaa" /></mesh>
+        <mesh position={[0.34, 0, 0]} rotation={[0, 0, -Math.PI / 2]}><coneGeometry args={[0.2, 0.08, 20, 1, true]} /><meshStandardMaterial color="#e8e6df" side={2} emissive="#333" /></mesh>
+      </group>
+    </group>
+  );
+}
+
 /** Cinematic camera + craft orientation state (a class so per-frame mutation happens through methods, not on hook values). */
 class CineRig {
   pos = new Vector3(); look = new Vector3(); init = false; prev = false;
@@ -50,7 +68,7 @@ class CineRig {
   /** Leaving cinematic mode: forget the camera so it re-initialises next time. */
   reset() { this.prev = false; this.init = false; }
   /** Point the craft marker along its direction of travel (relative to the Moon while in lunar orbit). */
-  orient(craft: Mesh | null, s: ReturnType<Trajectory["sample"]>, s2: ReturnType<Trajectory["sample"]>, capturing: boolean) {
+  orient(craft: Group | null, s: ReturnType<Trajectory["sample"]>, s2: ReturnType<Trajectory["sample"]>, capturing: boolean) {
     this.vel.set(s2.craft[0] - s.craft[0], s2.craft[1] - s.craft[1], s2.craft[2] - s.craft[2]);
     if (capturing) this.vel.sub(this.v1.set(s2.target[0] - s.target[0], s2.target[1] - s.target[1], s2.target[2] - s.target[2]));
     if (craft && this.vel.lengthSq() > 1e-12) craft.quaternion.setFromUnitVectors(UP, this.fwd.copy(this.vel).normalize());
@@ -81,7 +99,7 @@ class CineRig {
 /** Everything inside the single R3F canvas. State lives in `head` (mutated per frame, never React state). */
 function World({ traj, head, labels }: { traj: Trajectory; head: Playhead; labels: LabelBus }) {
   const boom = useRef<{ t0: number } | null>(null), flash = useRef<Mesh>(null), fire = useRef<Mesh>(null), prevFollow = useRef(head.follow);
-  const earth = useRef<Group>(null), target = useRef<Group>(null), craft = useRef<Mesh>(null), controls = useRef<OrbitControlsImpl>(null);
+  const earth = useRef<Group>(null), target = useRef<Group>(null), craft = useRef<Group>(null), controls = useRef<OrbitControlsImpl>(null);
   const { camera, size } = useThree();
   const proj = useMemo(() => new Vector3(), []);
   const [rig] = useState(() => new CineRig());
@@ -202,7 +220,7 @@ function World({ traj, head, labels }: { traj: Trajectory; head: Playhead; label
       {!moon && <mesh scale={traj.viewRadius * 0.035}><sphereGeometry args={[1, 16, 16]} /><meshBasicMaterial color="#ffd27a" /></mesh>}
       <mesh ref={flash} visible={false}><sphereGeometry args={[1, 16, 16]} /><meshBasicMaterial color="#fff4c2" transparent depthWrite={false} /></mesh>
       <mesh ref={fire} visible={false}><sphereGeometry args={[1, 16, 16]} /><meshBasicMaterial color="#ff6a1a" transparent depthWrite={false} /></mesh>
-      <mesh ref={craft}><coneGeometry args={[0.55, 1.6, 8]} /><meshBasicMaterial color="#ffffff" /></mesh>
+      <group ref={craft}><SpacecraftModel /></group>
       <OrbitControls ref={controls} enablePan={false} target={head.follow ? traj.sample(0).craft : traj.centre} minDistance={moon ? 1 : 8} maxDistance={traj.viewRadius * 5} />
     </>
   );
