@@ -8,7 +8,7 @@ import {
   BackButton, GameButton, GlassPanel, LoadingBar, ScreenContainer, StatBar, XPProgressBar, LevelBadge, PlayerAvatar,
 } from "@/components/ui";
 import { Astronaut, Scene3D, PlanetModel } from "@/components/three/lazy";
-import { AstronautGuide, TutorialButton } from "./MenuGuide";
+import { AstronautGuide, TestVoiceButton, TutorialButton } from "./MenuGuide";
 import { ProfileWidget } from "@/components/shell/GameShell";
 import { usePlayerStore, useCosmeticsStore, useUIStore } from "@/stores";
 import { cn } from "@/lib/mission";
@@ -144,7 +144,7 @@ export function MenuScreen() {
               </Link>
             ))}
           </nav>
-          <div className="mt-4 flex items-center gap-4"><TutorialButton /><p className="hud-label">Press 1–{MENU.length} to jump</p></div>
+          <div className="mt-4 flex items-center gap-4"><TutorialButton /><TestVoiceButton /><p className="hud-label">Press 1–{MENU.length} to jump</p></div>
         </div>
         <div className="h-[460px] md:h-[min(80vh,860px)]">
           <AstronautGuide><Scene3D camera={[0, 0, 7]} label="Your astronaut"><MenuAstronaut look={look} pose={pose} /></Scene3D></AstronautGuide>

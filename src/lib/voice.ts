@@ -21,14 +21,22 @@ function load(id: string): Promise<AudioBuffer | null> {
     p = (async () => {
       const c = context(); if (!c) return null;
       try {
-        const res = await fetch(asset(`/voice/${id}.mp3`)); if (!res.ok) return null;
+        const res = await fetch(asset(`/voice/${id}.mp3`)); if (!res.ok) { lastError = `clip ${id} HTTP ${res.status}`; return null; }
         const data = await res.arrayBuffer();
-        return await new Promise<AudioBuffer | null>((ok) => { c.decodeAudioData(data, ok, () => ok(null)); }); // callback form: older Safari has no promise version
-      } catch { return null; }
+        return await new Promise<AudioBuffer | null>((ok) => { c.decodeAudioData(data, ok, () => { lastError = `clip ${id} could not be decoded`; ok(null); }); }); // callback form: older Safari has no promise version
+      } catch (e) { lastError = `clip ${id}: ${e instanceof Error ? e.message : "load failed"}`; return null; }
     })();
     buffers.set(id, p);
   }
   return p;
+}
+/** Call synchronously inside a click handler: creates and resumes the audio context during the gesture (Safari requires that). */
+export function primeVoice() { unlock(); }
+let lastError = "";
+/** What the browser reports, for the Test voice button. */
+export function voiceStatus(): string {
+  const c = ctx;
+  return `audio ${c ? c.state : "not created"}${lastError ? ` · ${lastError}` : ""}`;
 }
 function unlock() {
   const c = context(); if (!c) return;
@@ -66,3 +74,5 @@ export async function playVoice(id: VoiceId, muted: boolean): Promise<boolean> {
   src.buffer = buf; src.connect(c.destination); src.start(); source = src;
   return true;
 }
+
+if (typeof window !== "undefined") installVoiceUnlock(); // listen from page load so the very first click already unlocks audio

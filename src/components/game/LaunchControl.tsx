@@ -8,7 +8,7 @@ import { cn } from "@/lib/mission";
 import { DATASET, vehicleById } from "@/game/data";
 import { LAUNCH, RULES, buildRocket, guidancePitch, scoreFlight, type Difficulty, type Flight } from "@/game/launch/core";
 import { MoonLeg } from "./MoonLeg";
-import { playVoice, stopVoice, type VoiceId } from "@/lib/voice";
+import { playVoice, primeVoice, stopVoice, type VoiceId } from "@/lib/voice";
 import { BRIEFING_TOUR, FLIGHT_TOUR, Tour, pendingTour, setPendingTour } from "./Tour";
 import { LaunchSession, payloadFor } from "@/game/launch/session";
 import { useLaunchSetup } from "@/game/launch/store";
@@ -225,7 +225,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     if (say) playVoice(say, !voice);
   }, [s.ms, s.phase, s.running, voice, f.mission]);
   useEffect(() => () => stopVoice(), []);
-  const start = () => { session.start(); setS(snap(session)); };
+  const start = () => { primeVoice(); session.start(); setS(snap(session)); };
   const togglePause = useCallback(() => { if (session.flight.t > -LAUNCH.countdownS + 0.01 || session.running) session.toggleRun(); setS(snap(session)); }, [session]);
   const setWarp = useCallback((w: number) => { session.setWarp(w); setS(snap(session)); }, [session]);
 

@@ -7,11 +7,22 @@ import { SRGBColorSpace, Vector3, type Group, type Mesh, type MeshStandardMateri
 import { BootGear, Headgear, ShoulderGear, patternTexture } from "./Gear";
 import { useUIStore } from "@/stores";
 import { asset } from "@/lib/asset";
+import { create } from "zustand";
+
+/** True once an astronaut model has actually been shown, so screens can swap a poster image for the live 3D one. */
+export const useAstronautReady = create<{ ready: boolean; set: () => void }>((set) => ({ ready: false, set: () => set({ ready: true }) }));
 
 /** Error boundary: 3D must never block navigation. */
-class Boundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
+class Boundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean; tries: number }> {
+  state = { failed: false, tries: 0 };
+  private timer: ReturnType<typeof setTimeout> | null = null;
   static getDerivedStateFromError() { return { failed: true }; }
+  /** A dropped connection while a big model downloads must not leave a permanent hole: forget the failed request and try again a few times. */
+  componentDidCatch() {
+    if (this.state.tries >= 4) return;
+    this.timer = setTimeout(() => { useGLTF.clear(ASTRONAUT_URL); this.setState((st) => ({ failed: false, tries: st.tries + 1 })); }, 2500 * (this.state.tries + 1));
+  }
+  componentWillUnmount() { if (this.timer) clearTimeout(this.timer); }
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
@@ -90,6 +101,8 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
   const offset: [number, number, number] = [0, -0.25, 0.08 * k];
   const root = useRef<Group>(null);
   const { actions } = useAnimations(animations, root);
+  const markReady = useAstronautReady((st) => st.set);
+  useEffect(() => { markReady(); }, [markReady]);
   const reduced = useUIStore((s) => s.reducedMotion);
 
   // Skin: tint the suit materials; the near-black visor takes the helmet colour.
@@ -142,7 +155,8 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
     </group>
   );
 }
-useGLTF.preload(ASTRONAUT_URL);
+/** Only screens that actually show the astronaut ask for it; the Launch Control and Moon views never download the model. */
+export const preloadAstronaut = () => useGLTF.preload(ASTRONAUT_URL);
 
 export function CrewLineup({ crew, pose = "idle" }: { crew: (AstronautLook | null)[]; pose?: AstronautLook["pose"] }) {
   const n = crew.length;

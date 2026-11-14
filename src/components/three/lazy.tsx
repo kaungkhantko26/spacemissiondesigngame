@@ -11,5 +11,5 @@ export const Scene3D = dynamic(() => import("./index").then((m) => m.Scene3D), {
   loading: () => <SkeletonLoader className="h-full w-full min-h-48" />,
 });
 export {
-  Astronaut, CrewLineup, PlanetModel, MissionHangar, OrbitalVisualization, SpacecraftPreview,
+  Astronaut, preloadAstronaut, useAstronautReady, CrewLineup, PlanetModel, MissionHangar, OrbitalVisualization, SpacecraftPreview,
 } from "./index";
