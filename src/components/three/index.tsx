@@ -22,15 +22,15 @@ const Fallback = ({ label }: { label: string }) => (
 export type LightPreset = "studio" | "hangar" | "orbit";
 
 /** Shared canvas wrapper: quality-aware DPR, lighting presets, optional controls. */
-export function Scene3D({ children, camera = [0, 1.2, 5], controls = false, light = "studio", stars = true, label = "3D scene", className = "h-full w-full" }: {
-  children: ReactNode; camera?: [number, number, number]; controls?: boolean; light?: LightPreset; stars?: boolean; label?: string; className?: string;
+export function Scene3D({ children, camera = [0, 1.2, 5], controls = false, light = "studio", stars = true, label = "3D scene", className = "h-full w-full", far }: {
+  children: ReactNode; camera?: [number, number, number]; controls?: boolean; light?: LightPreset; stars?: boolean; label?: string; className?: string; far?: number;
 }) {
   const quality = useUIStore((s) => s.quality);
   const dpr: [number, number] = quality === "low" ? [1, 1] : quality === "medium" ? [1, 1.5] : [1, 2];
   return (
     <div className={className} aria-label={label} role="img">
       <Boundary fallback={<Fallback label={label} />}>
-        <Canvas dpr={dpr} camera={{ position: camera, fov: 40 }} gl={{ antialias: quality !== "low" }}>
+        <Canvas dpr={dpr} camera={{ position: camera, fov: 40, ...(far ? { far } : {}) }} gl={{ antialias: quality !== "low" }}>
           <Suspense fallback={null}>
             <Lights preset={light} />
             {stars && <Stars radius={60} depth={30} count={quality === "low" ? 500 : 1800} factor={3} fade />}

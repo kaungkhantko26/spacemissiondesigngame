@@ -1,13 +1,14 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Rocket, Wand2, RotateCcw, Pencil } from "lucide-react";
 import { BackButton, GameButton, GlassPanel, ScreenContainer, StatusPill } from "@/components/ui";
 import { Astronaut, Scene3D } from "@/components/three/lazy";
-import { useUIStore } from "@/stores";
 import { cn } from "@/lib/mission";
 import { ANTENNAS, DATASET, DESTINATIONS, GAME, launchReliability } from "@/game/data";
 import type { Check, Evaluation, MissionResult } from "@/game/engine";
 import { useDesignStore, useEvaluation } from "@/game/store";
+import { buildTrajectory } from "@/game/trajectory";
+import { TrajectorySim } from "./TrajectorySim";
 
 const fmt = (n: number, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d });
 const usd = (n: number) => (n >= 1e9 ? `$${fmt(n / 1e9, 2)}B` : `$${fmt(n / 1e6)}M`);
@@ -170,33 +171,28 @@ function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void })
 }
 
 function FlightView({ ev, result, onAgain, onRetry }: { ev: Evaluation; result: MissionResult; onAgain: () => void; onRetry: () => void }) {
-  const reduced = useUIStore((s) => s.reducedMotion);
-  const [shown, setShown] = useState(reduced ? result.phases.length : 0);
-  const done = shown >= result.phases.length;
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => { // reset the reveal whenever a new result arrives
-    const t = setTimeout(() => setShown(reduced ? result.phases.length : 0), 0);
-    return () => clearTimeout(t);
-  }, [result, reduced]);
-  useEffect(() => {
-    if (done) return;
-    timer.current = setTimeout(() => setShown((s) => s + 1), 1100);
-    return () => { if (timer.current) clearTimeout(timer.current); };
-  }, [shown, done]);
+  const failIndex = (() => { const i = result.phases.findIndex((p) => !p.passed); return i === -1 ? null : (i as 0 | 1 | 2 | 3); })();
+  const traj = useMemo(() => buildTrajectory(ev.destination, failIndex), [ev.destination, failIndex]);
+  const [u, setU] = useState(0);
+  const [seenEnd, setSeenEnd] = useState(false);
+  const [crew, setCrew] = useState(false);
+  const onUpdate = useCallback((nu: number, d: boolean) => { setU(nu); if (d) setSeenEnd(true); }, []);
+  const revealed = result.phases.filter((_, i) => seenEnd || u >= traj.reveal[i] - 1e-6);
+  const finished = seenEnd;
   return (
-    <ScreenContainer title={done ? (result.success ? "Mission success" : "Mission lost") : "Mission in progress"} subtitle={`${ev.destination.name} · ${ev.vehicle.name} · ${ev.design.propulsionId === "chem" ? "chemical" : ev.electric?.name}`}>
-      <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
+    <ScreenContainer title={finished ? (result.success ? "Mission success" : "Mission lost") : "Mission in progress"} subtitle={`${ev.destination.name} · ${ev.vehicle.name} · ${ev.design.propulsionId === "chem" ? "chemical" : ev.electric?.name}`}>
+      <div className="grid gap-4 xl:grid-cols-[minmax(320px,430px)_1fr]">
         <GlassPanel className="p-5">
           <ol className="space-y-3" aria-live="polite">
-            {result.phases.slice(0, Math.max(shown, 0)).map((ph) => (
+            {revealed.map((ph) => (
               <li key={ph.id} className="enter flex gap-3">
                 <span aria-hidden className={cn("mt-0.5 grid size-6 shrink-0 place-items-center rounded-sm border text-sm", ph.passed ? "border-ok text-ok" : "border-bad text-bad")}>{ph.passed ? "✓" : "✕"}</span>
                 <div><p className="font-display text-lg uppercase tracking-wider">{ph.label}</p><p className="text-sm text-ink2">{ph.story}</p><p className="text-xs text-muted">Odds were {fmt(ph.probability * 100)} %</p></div>
               </li>
             ))}
-            {!done && <li className="text-sm text-muted">Standing by…</li>}
+            {!finished && <li className="text-sm text-muted">Tracking spacecraft…</li>}
           </ol>
-          {done && (
+          {finished && (
             <div className="enter mt-6 border-t border-[var(--border)] pt-4">
               <p className="text-lg">{result.headline}</p>
               <div className="mt-3 flex items-end gap-6">
@@ -211,15 +207,19 @@ function FlightView({ ev, result, onAgain, onRetry }: { ev: Evaluation; result: 
               <div className="mt-5 flex flex-wrap gap-2">
                 <GameButton variant="primary" icon={<Pencil className="size-4" />} onClick={onAgain}>Redesign</GameButton>
                 <GameButton variant="outline" icon={<RotateCcw className="size-4" />} onClick={onRetry}>Fly again (new dice)</GameButton>
-                <BackButton href="/menu" label="Main menu" />
+                <GameButton variant="ghost" onClick={() => setCrew((c) => !c)}>{crew ? "Back to trajectory" : "Meet the commander"}</GameButton>
               </div>
             </div>
           )}
         </GlassPanel>
-        <GlassPanel className="min-h-[360px] p-3">
-          <Scene3D camera={[0, 1, 5]} label={result.success ? "Commander celebrating" : "Commander waiting"}>
-            <Astronaut suit="#e8eef7" pose={!done ? "ready" : result.success ? "celebrate" : "idle"} position={[0, -1, 0]} />
-          </Scene3D>
+        <GlassPanel className="min-h-[520px] overflow-hidden p-0">
+          {crew ? (
+            <Scene3D camera={[0, 1, 5]} label={result.success ? "Commander celebrating" : "Commander waiting"}>
+              <Astronaut suit="#e8eef7" pose={result.success ? "celebrate" : "idle"} position={[0, -1, 0]} />
+            </Scene3D>
+          ) : (
+            <TrajectorySim key={`${result.score}-${result.reached}-${ev.destination.id}`} traj={traj} onUpdate={onUpdate} startAtEnd={seenEnd} className="h-full min-h-[520px]" />
+          )}
         </GlassPanel>
       </div>
     </ScreenContainer>

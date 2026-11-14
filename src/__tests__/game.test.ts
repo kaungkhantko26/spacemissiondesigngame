@@ -61,3 +61,36 @@ describe("simulation", () => {
     expect(Math.min(...xs)).toBeGreaterThanOrEqual(0); expect(Math.max(...xs)).toBeLessThan(1);
   });
 });
+
+import { buildTrajectory } from "@/game/trajectory";
+describe("trajectory (Earth → Moon from dataset μ)", () => {
+  const moon = DESTINATIONS.find((d) => d.id === "moon")!;
+  it("TLI starts ~10.9 km/s at perigee and slows to ~0.2 km/s at lunar distance", () => {
+    const t = buildTrajectory(moon, null);
+    const early = t.sample(t.markers.seg1 + 1e-4).telemetry.speedKmS;
+    const late = t.sample(t.markers.seg2 - 1e-4).telemetry.speedKmS;
+    expect(early).toBeGreaterThan(10.5); expect(early).toBeLessThan(11.2);
+    expect(late).toBeGreaterThan(0.1); expect(late).toBeLessThan(0.3);
+  });
+  it("coast takes ~5 days and the Moon is waiting at arrival", () => {
+    const t = buildTrajectory(moon, null);
+    const s = t.sample(t.markers.seg2 + 1e-4);
+    expect(s.telemetry.metS / 86400).toBeGreaterThan(4.5); expect(s.telemetry.metS / 86400).toBeLessThan(6);
+    expect(s.telemetry.rangeKm).toBeLessThan(21000); // inside the approach offset
+  });
+  it("captures into a 100 km orbit on success; failures end the path early or fly past", () => {
+    const ok = buildTrajectory(moon, null); const end = ok.sample(1);
+    expect(end.telemetry.rangeKm).toBeLessThan(2000); expect(end.lost).toBe(false);
+    expect(buildTrajectory(moon, 1).uEnd).toBeLessThan(1);
+    const miss = buildTrajectory(moon, 2).sample(1);
+    expect(miss.telemetry.rangeKm).toBeGreaterThan(5000);
+  });
+  it("planet transfers are sun-centred and arrive at the target", () => {
+    const mars = DESTINATIONS.find((d) => d.id === "mars")!; const t = buildTrajectory(mars, null);
+    expect(t.mode).toBe("sun");
+    const arr = t.sample(t.markers.seg2 + 1e-4);
+    expect(arr.telemetry.metS / 86400).toBeGreaterThan(255); expect(arr.telemetry.rangeKm).toBeLessThan(2e7);
+    const ven = buildTrajectory(DESTINATIONS.find((d) => d.id === "venus")!, null).sample(0.79);
+    expect(ven.telemetry.rangeKm).toBeLessThan(2e7);
+  });
+});
