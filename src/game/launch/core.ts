@@ -248,7 +248,7 @@ export function guidancePitch(f: Flight): number {
   const aR = tGo < 20 ? clamp(-vr / 10, -6, 6) : (6 * (tgtH - h - (2 / 3) * vr * tGo)) / (tGo * tGo);
   const aT = Math.max(0.5, thrust / f.m);
   const need = muEarth / (r * r) - (vt * vt) / r + clamp(aR, -15, 15);
-  return deg(Math.asin(clamp(need / aT, -0.3, 0.97)));
+  return clamp(deg(Math.asin(clamp(need / aT, -0.3, 0.97))), -5, 95); // the cue never asks for a pitch the controls cannot reach
 }
 
 /* ---------- Step ---------- */

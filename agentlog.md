@@ -162,3 +162,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Stale-deploy 404s: deploy-pages.sh now keeps the previous _next/static assets on gh-pages, and GameShell reloads once when a /_next/static script fails to load.
 - Greeting bubble anchored next to the astronaut (right-[53%], top-[20%]) instead of the far left of the panel.
 - Greeting bubble now at torso height to the left of the astronaut (not above him).
+- Manual pilot fixes: guidance cue clamped to the reachable pitch range (-5..95; it asked for -17 at the top), arrow keys/Space work even when the throttle slider or a button has focus, held pitch keys release on window blur/tab change. Verified by a scripted manual Pilot flight in the browser; bot flights 34/36 (2 pre-existing Saturn V orbit-on-Commander failures).
