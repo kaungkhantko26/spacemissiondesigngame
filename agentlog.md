@@ -128,3 +128,6 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 
 ## Session: Team Up gameplay
 - /mission/gameplay now runs the real launch sim (Saturn V + Moon leg for Lunar Landing, Falcon-class orbit otherwise) using the chosen difficulty; results screen shows the real score (src/game/launch/teamResult.ts). Mock telemetry removed.
+- Fix: Team Up setup/crew now persist in sessionStorage (refresh no longer bounces to mission select). Launch countdown has launch-director voice (speechSynthesis) with mute toggle.
+- Removed the Chinese launch vehicle (Long March 3B/E) and Jiuquan launch site from the dataset, scenery and 3D models per product direction.
+- Moon mission pacing: auto-warp 5x for the last 90 s before the TLI window with autopilot on, and 10x for the ~4.5 min TLI burn (it looked like a stall at 1x).

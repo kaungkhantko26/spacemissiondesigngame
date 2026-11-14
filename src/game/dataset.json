@@ -230,24 +230,6 @@
    "max_stage": 2
   },
   {
-   "id": "ll2_cfg_50",
-   "name": "Long March 3B/E",
-   "manufacturer": "China Aerospace Science and Technology Corporation",
-   "manufacturer_country": "CHN",
-   "leo_capacity_kg": 12000,
-   "gto_capacity_kg": 5500,
-   "launch_cost_usd": 70000000,
-   "total_launches": 78,
-   "successful_launches": 76,
-   "reusable": false,
-   "launch_mass_t": 456,
-   "liftoff_thrust_kn": 5924,
-   "diameter_m": 3.35,
-   "length_m": 56.3,
-   "min_stage": 3,
-   "max_stage": 3
-  },
-  {
    "id": "ll2_cfg_164",
    "name": "Falcon 9",
    "manufacturer": "SpaceX",
@@ -524,16 +506,6 @@
    "lon": 63.342,
    "launches": 487,
    "rotation_boost_m_s": 323.55
-  },
-  {
-   "id": "ll2_pad_22",
-   "name": "Launch Area 94 (SLS-2 / 603)",
-   "location": "Jiuquan Satellite Launch Center, People's Republic of China",
-   "country": "CHN",
-   "lat": 40.960482,
-   "lon": 100.298059,
-   "launches": 139,
-   "rotation_boost_m_s": 351.23
   }
  ]
 }

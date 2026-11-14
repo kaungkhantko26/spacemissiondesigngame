@@ -28,7 +28,6 @@ const STYLES: Record<string, RocketStyle> = {
   ll2_cfg_134: { body: "#c9d2c4", accent: "#3a6b3a", boosters: 4, boosterLen: 0.55, boosterRad: 0.34, boosterNose: true, taper: true },
   ll2_cfg_16: { body: "#f3f5f9", accent: "#2858a8", boosters: 0, boosterLen: 0, boosterRad: 0, boosterNose: false },
   ll2_cfg_121: { body: "#f1f3f8", accent: "#1f4aa0", boosters: 2, boosterLen: 0.45, boosterRad: 0.46, boosterNose: true },
-  ll2_cfg_50: { body: "#f1ede6", accent: "#c8382c", boosters: 4, boosterLen: 0.5, boosterRad: 0.3, boosterNose: true },
   ll2_cfg_164: { body: "#f2f5fa", accent: "#101216", boosters: 0, boosterLen: 0, boosterRad: 0, boosterNose: false },
   ll2_cfg_21: { body: "#d9792e", accent: "#f2d9b0", boosters: 2, boosterLen: 0.86, boosterRad: 1, boosterNose: true },
   ll2_cfg_161: { body: "#f2f5fa", accent: "#101216", boosters: 2, boosterLen: 0.86, boosterRad: 1, boosterNose: true },

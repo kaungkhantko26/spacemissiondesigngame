@@ -6,7 +6,7 @@ import {
   BackButton, GameButton, GlassPanel, LoadingBar, PlayerAvatar, ScreenContainer, StatBar, StatusPill,
 } from "@/components/ui";
 import { Astronaut, CrewLineup, MissionHangar, OrbitalVisualization, PlanetModel, Scene3D } from "@/components/three/lazy";
-import { useCrewSelectionStore, useLobbyStore, useMissionSetupStore, useUIStore } from "@/stores";
+import { hydrateTeamSetup, useCrewSelectionStore, useLobbyStore, useMissionSetupStore, useUIStore } from "@/stores";
 import { useLobby } from "./Team";
 import { cn, missionAvailability, roleCounts } from "@/lib/mission";
 import { characters, difficulties, missions, modifiers, players, traits, telemetrySeed } from "@/data/mock";
@@ -24,8 +24,10 @@ function useSetup() {
   const { missionId, difficultyId } = useMissionSetupStore();
   const mission = missions.find((m) => m.id === missionId) ?? null;
   const difficulty = difficulties.find((d) => d.id === difficultyId)!;
-  useEffect(() => { if (!mission) router.replace("/mission/select"); }, [mission, router]);
-  return { mission, difficulty };
+  const [ready, setReady] = useState(false);
+  useEffect(() => { void hydrateTeamSetup().then(() => setReady(true)); }, []);
+  useEffect(() => { if (ready && !mission) router.replace("/mission/select"); }, [ready, mission, router]);
+  return { mission, difficulty, ready };
 }
 const mods = (m: Mission, d: DifficultyId): MissionModifier[] => m.modifiersByDifficulty[d].map((id) => modifiers.find((x) => x.id === id)!).filter(Boolean);
 const modIcon = { power: Zap, radio: Radio, weight: Weight, alert: AlertTriangle } as const;
@@ -193,7 +195,7 @@ export function RolesScreen() {
 const STAT_LABEL: Record<keyof Character["stats"], string> = { research: "Research", analysis: "Analysis", communication: "Communication", maintenance: "Maintenance", coordination: "Coordination" };
 export function CharactersScreen() {
   const router = useRouter();
-  const { mission, difficulty } = useSetup();
+  const { mission, difficulty, ready } = useSetup();
   const lobby = useLobby();
   const ids = useMemo(() => lobby?.members.map((m) => m.playerId) ?? [ME], [lobby]);
   const { assignments, ensure, chooseCharacter, confirmCharacter } = useCrewSelectionStore();
@@ -203,7 +205,7 @@ export function CharactersScreen() {
   useEffect(() => ensure(ids), [ids, ensure]);
   const mine = assignments[ME];
   const roster = characters.filter((c) => c.role === mine?.roleId);
-  useEffect(() => { if (mine && !mine.roleId) router.replace("/mission/roles"); }, [mine, router]);
+  useEffect(() => { if (ready && mine && !mine.roleId) router.replace("/mission/roles"); }, [ready, mine, router]);
   if (!mission || !mine?.roleId) return null;
   const shown = characters.find((c) => c.id === (view ?? mine.characterId ?? roster[0]?.id))!;
   const other = characters.find((c) => c.id === cmp);
