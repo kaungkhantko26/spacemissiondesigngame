@@ -24,14 +24,17 @@ export function AstronautGuide({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [tour, setTour] = useState(false);
   const hide = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const greeted = useRef(false); // the voice plays only the first time in this visit
+  const greeted = useRef(false); // the voice plays only once, but only counts once sound actually started
   const greet = () => {
     if (hide.current) clearTimeout(hide.current);
     setOpen(true);
     if (greeted.current) return;
-    greeted.current = true;
-    try { if (window.sessionStorage.getItem("smd-greeted")) return; window.sessionStorage.setItem("smd-greeted", "1"); } catch { /* storage unavailable */ }
-    playVoice("greeting", muted);
+    try { if (window.sessionStorage.getItem("smd-greeted")) { greeted.current = true; return; } } catch { /* storage unavailable */ }
+    void playVoice("greeting", muted).then((ok) => {
+      if (!ok) return; // blocked before a click: the next hover or click tries again
+      greeted.current = true;
+      try { window.sessionStorage.setItem("smd-greeted", "1"); } catch { /* ignore */ }
+    });
   };
   const leave = () => { hide.current = setTimeout(() => setOpen(false), 600); };
   useEffect(() => () => { if (hide.current) clearTimeout(hide.current); stopVoice(); }, []);
