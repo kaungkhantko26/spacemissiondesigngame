@@ -27,7 +27,7 @@ export function AvatarArt({ style, name, size = 64 }: { style: AvatarStyle; name
       <defs><clipPath id={id}>{clip}</clipPath><linearGradient id={`${id}-g`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={bg} /><stop offset="1" stopColor={bg} stopOpacity=".72" /></linearGradient></defs>
       <g clipPath={`url(#${id})`}><rect width="100" height="100" fill={`url(#${id}-g)`} />
         <ellipse cx="38" cy="26" rx="34" ry="20" fill="#fff" opacity=".14" />
-        {template === "initial" ? <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fontSize="44" fontWeight="700" fill={fg} fontFamily="inherit">{name[0]}</text>
+        {template === "initial" ? <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fontSize="44" fontWeight="700" fill={fg} fontFamily="Inter, system-ui, sans-serif">{name[0]}</text>
           : <g transform="translate(22 22) scale(2.33)"><Glyph id={template} fg={fg} bg={bg} /></g>}
       </g>
       {frame !== "none" && (shape === "circle" ? <circle cx="50" cy="50" r="43" fill="none" stroke={fg} strokeWidth="3" opacity=".9" /> : shape === "rounded" ? <rect x="7" y="7" width="86" height="86" rx="25" fill="none" stroke={fg} strokeWidth="3" opacity=".9" /> : <polygon points={HEX} fill="none" stroke={fg} strokeWidth="3" opacity=".9" />)}

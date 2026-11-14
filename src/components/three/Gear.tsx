@@ -68,7 +68,7 @@ function FlagCloth() {
   const flagId = useFlag((s) => s.flagId), custom = useFlag((s) => s.custom);
   const [cloth] = useState(() => new Cloth(384, 250));
   cloth.flag(flagId, custom);
-  return <mesh position={[-0.17, 0.42, 0]}><planeGeometry args={[0.34, 0.22]} /><meshStandardMaterial map={cloth.tex} side={2} roughness={0.8} emissive="#ffffff" emissiveMap={cloth.tex} emissiveIntensity={0.35} /></mesh>;
+  return <group><mesh position={[-0.17, 0.5, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.008, 0.008, 0.36, 8]} /><meshStandardMaterial color="#e8eef7" metalness={0.7} roughness={0.3} /></mesh><mesh position={[-0.175, 0.385, 0]}><planeGeometry args={[0.34, 0.22]} /><meshStandardMaterial map={cloth.tex} side={2} roughness={0.8} emissive="#ffffff" emissiveMap={cloth.tex} emissiveIntensity={0.35} /></mesh></group>;
 }
 /** Round chest patch with an emblem. */
 export function PatchGear({ kind, color, accent }: { kind: string; color: string; accent: string }) {

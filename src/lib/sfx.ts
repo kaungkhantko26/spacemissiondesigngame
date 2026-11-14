@@ -27,12 +27,12 @@ function playSample(c: AudioContext, id: SampleId, gain = 1): boolean {
   const s = c.createBufferSource(), g = c.createGain(); s.buffer = b; g.gain.value = gain; s.connect(g); g.connect(c.destination); s.start(); return true;
 }
 function noise(c: AudioContext, kind: "white" | "brown", dur = 4): AudioBuffer {
-  const b = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate), d = b.getChannelData(0);
-  let last = 0;
-  for (let i = 0; i < d.length; i++) {
-    const w = Math.random() * 2 - 1;
-    if (kind === "white") d[i] = w; else { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
-  }
+  const n = Math.floor(c.sampleRate * dur), x = Math.floor(c.sampleRate * 0.4); // x = crossfade length so the loop has no audible seam
+  const raw = new Float32Array(n + x); let last = 0;
+  for (let i = 0; i < raw.length; i++) { const w = Math.random() * 2 - 1; if (kind === "white") raw[i] = w; else { last = (last + 0.02 * w) / 1.02; raw[i] = last * 3.5; } }
+  const b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = raw[i];
+  for (let i = 0; i < x; i++) { const t = i / x; d[i] = raw[i] * Math.sqrt(t) + raw[n + i] * Math.sqrt(1 - t); } // equal-power blend of the tail into the head
   return b;
 }
 function loop(c: AudioContext, buf: AudioBuffer): AudioBufferSourceNode { const s = c.createBufferSource(); s.buffer = buf; s.loop = true; return s; }
@@ -58,8 +58,7 @@ export class RocketSound {
     this.hiss = c.createGain(); white.connect(this.hissBp); this.hissBp.connect(this.hiss); this.hiss.connect(this.master);
     const flutter = c.createOscillator(), flutterAmt = c.createGain(); flutter.frequency.value = 7; flutterAmt.gain.value = 0; flutter.connect(flutterAmt); flutterAmt.connect(this.hiss.gain);
     // sub-bass thump you feel more than hear
-    const o1 = c.createOscillator(), o2 = c.createOscillator(); o1.frequency.value = 38; o2.frequency.value = 57; o2.type = "triangle";
-    this.sub = c.createGain(); o1.connect(this.sub); o2.connect(this.sub); this.sub.connect(this.master);
+    this.sub = c.createGain(); this.sub.connect(this.master); // (no tonal layers: they buzzed on small speakers)
     // max-Q buffeting: amplitude-chopped noise
     const buf = loop(c, noise(c, "white", 2)), bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 260; bp.Q.value = 1.2;
     this.rattle = c.createGain(); this.rattle.gain.value = 0;
@@ -71,7 +70,7 @@ export class RocketSound {
       const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 6000; const g = c.createGain(); g.gain.value = 0;
       src.connect(lp); lp.connect(g); g.connect(this.master); src.start(); this.samp = { g, lp }; this.stops.push(() => { try { src.stop(); } catch { /* stopped */ } });
     });
-    for (const n of [brown, white, flutter, o1, o2, buf, chop]) { n.start(); this.stops.push(() => { try { n.stop(); } catch { /* already stopped */ } }); }
+    for (const n of [brown, white, flutter, buf, chop]) { n.start(); this.stops.push(() => { try { n.stop(); } catch { /* already stopped */ } }); }
   }
   /** Called whenever the flight state changes. throttle 0..1, alt in metres, q in Pa. `fast` = the game was paused: cut the sound quickly. The fade itself is done by the audio engine, so it always finishes even if update() is never called again. */
   update(throttle: number, alt: number, q: number, on: boolean, fast = false) {
@@ -81,11 +80,11 @@ export class RocketSound {
     const synth = this.samp ? 0 : 1;
     this.master.gain.setTargetAtTime(Math.min(0.3, v * 0.3 * (0.45 + 0.55 * exterior) + 0.0005), t, tc);
     if (this.samp) { this.samp.g.gain.setTargetAtTime(v, t, tc); this.samp.lp.frequency.setTargetAtTime(900 + 9000 * exterior, t, 0.4); }
-    this.rumble.gain.setTargetAtTime(0.4 * v * synth, t, tc);
-    this.rumbleLp.frequency.setTargetAtTime(70 + 50 * exterior * v, t, 0.4);
+    this.rumble.gain.setTargetAtTime(0.9 * v * synth, t, tc);
+    this.rumbleLp.frequency.setTargetAtTime(220 + 140 * exterior * v, t, 0.6);
     this.hiss.gain.setTargetAtTime(0, t, tc);
     this.hissBp.frequency.setTargetAtTime(500 + 900 * v, t, 0.3);
-    this.sub.gain.setTargetAtTime(0.4 * v * synth, t, tc);
+    this.sub.gain.setTargetAtTime(0, t, tc);
     this.rattle.gain.setTargetAtTime(0, t, tc);
   }
   silence() { this.master.gain.setTargetAtTime(0, this.c.currentTime, 0.1);}
@@ -115,9 +114,9 @@ function sfxNow(c: AudioContext, kind: SfxKind) {
     g.gain.setValueAtTime(0.0001, seconds(c, delay)); g.gain.linearRampToValueAtTime(gain, seconds(c, delay + 0.01)); g.gain.exponentialRampToValueAtTime(0.0001, seconds(c, delay + dur));
     o.connect(g); g.connect(out); o.start(seconds(c, delay)); o.stop(seconds(c, delay + dur + 0.05));
   };
-  if (kind === "ignition") { out.gain.value = 0.28; burst("brown", 5, [70, 420], 1.0, 2.2, 5); tone("sine", 34, 30, 4, 0.5); }
+  if (kind === "ignition") { out.gain.value = 0.28; burst("brown", 5, [90, 380], 1.0, 2.2, 5); }
   else if (kind === "separation") { out.gain.value = 0.5; burst("white", 0.25, [2500, 300], 0.5, 0.002, 0.25); tone("sine", 95, 28, 0.5, 0.9); tone("square", 900, 300, 0.12, 0.12, 0.03); tone("triangle", 420, 180, 0.4, 0.2, 0.08);  }
-  else if (kind === "ignite2") { out.gain.value = 0.3; burst("brown", 2.2, [80, 400], 0.8, 1.0, 2.2); tone("sine", 40, 55, 1.8, 0.35); }
+  else if (kind === "ignite2") { out.gain.value = 0.3; burst("brown", 2.2, [90, 380], 0.8, 1.0, 2.2); }
   else if (kind === "explosion") { out.gain.value = 0.8; burst("white", 3.6, [5000, 90], 1, 0.003, 3.6); burst("brown", 4.5, [400, 60], 1, 0.01, 4.5); tone("sine", 80, 22, 2.5, 1); }
   else if (kind === "chime") { out.gain.value = 0.5; tone("sine", 880, 880, 0.9, 0.5); tone("sine", 1318, 1318, 1.1, 0.4, 0.18); }
   else if (kind === "click") { out.gain.value = 0.22; tone("sine", 820, 620, 0.05, 0.5); }
