@@ -1,7 +1,9 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, Pause, Play, Rocket, RotateCcw, Power, Layers, Bot, Octagon, Volume2, VolumeX } from "lucide-react";
+import { ArrowDown, ArrowUp, Pause, Play, Rocket, RotateCcw, Power, Layers, Bot, Octagon, Volume2, VolumeX, Keyboard } from "lucide-react";
+import { ControlsHelp, MANUAL_TOUR } from "./FlightHelp";
+import { explainFailure } from "@/game/launch/coach";
 import { BackButton, GameButton, GlassPanel, ScreenContainer } from "@/components/ui";
 import { useUIStore } from "@/stores";
 import { cn } from "@/lib/mission";
@@ -164,8 +166,13 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   const [showResult, setShowResult] = useState(false);
   const [leg, setLeg] = useState(false); // Moon mission: coast to the Moon after TLI
   const [tour, setTour] = useState(false);
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage is only readable after mount
-  useEffect(() => { if (pendingTour() === "flight") setTour(true); }, []);
+  const [help, setHelp] = useState(false);
+  const [school, setSchool] = useState(false); // first-time manual flight school
+  useEffect(() => { // storage is only readable after mount
+    if (pendingTour() === "flight") { setTour(true); return; } // eslint-disable-line react-hooks/set-state-in-effect
+    if (session.flight.rules.autopilot === "full") return;
+    try { if (!window.localStorage.getItem("smd-manual-school")) setSchool(true); } catch { /* storage unavailable */ } // eslint-disable-line react-hooks/set-state-in-effect
+  }, [session]);
 
   useEffect(() => {
     const el = canvas.current, box = wrap.current; if (!el || !box) return;
@@ -271,6 +278,8 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
       else if (k === "r") session.restart();
       else if (k === "a") toggleAuto();
       else if (k === "p") togglePause();
+      else if (k === "h" || k === "?") setHelp((v) => !v);
+      else if (k === "m") setVoice((v) => !v);
       else if (["1", "2", "3", "4", "5"].includes(k)) setWarp([1, 2, 5, 10, 50][Number(k) - 1]);
     };
     const up = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (k === "arrowup") session.hold("up", false); if (k === "arrowdown") session.hold("down", false); if (k === " " && !(e.target as HTMLElement | null)?.closest("input:not([type=range]),select,textarea")) e.preventDefault(); /* a focused button must not also "click" on Space */ };
@@ -291,6 +300,8 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   if (leg) return <MoonLeg flight={f} onAgain={onAgain} onExit={onExit} />;
   return (
     <main className="relative flex min-h-[calc(100vh-70px)] flex-1 flex-col">
+      {school && <Tour steps={MANUAL_TOUR.filter((st) => st.target !== "[data-tour=cue]" || rules.guideCue)} doneLabel="Start flying" onDone={() => { setSchool(false); try { window.localStorage.setItem("smd-manual-school", "1"); } catch { /* ignore */ } }} onSkip={() => { setSchool(false); try { window.localStorage.setItem("smd-manual-school", "1"); } catch { /* ignore */ } }} />}
+      {help && <ControlsHelp onClose={() => setHelp(false)} />}
       {tour && <Tour steps={FLIGHT_TOUR} doneLabel="Let's fly" onDone={() => { setTour(false); setPendingTour(null); }} onSkip={() => { setTour(false); setPendingTour(null); }} />}
       <div ref={wrap} className="absolute inset-0"><canvas ref={canvas} className="h-full w-full" aria-label="Rocket flight view" role="img" /></div>
 
@@ -316,7 +327,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
         )}
         {(s.phase === "tli" || s.phase === "translunar") && <p className="text-[11px] text-ink2">Apogee <b className="text-orange tabular-nums">{fmt(tel.apoKm)}</b> km → Moon at 384,400 km{tel.tliErrDeg !== null ? ` · window error ${tel.tliErrDeg.toFixed(1)}°` : ""}</p>}
         {rules.guideCue && manualPitch && s.phase !== "countdown" && s.stage <= 2 && (
-          <p className="text-[11px] text-ink2" aria-live="off">Cue: <b className="text-ok">{s.cue.toFixed(0)}°</b> {Math.abs(pitchErr) < 2 ? "✓ on target" : pitchErr > 0 ? "▲ raise nose" : "▼ lower nose"}</p>
+          <p data-tour="cue" className="text-[11px] text-ink2" aria-live="off">Cue: <b className="text-ok">{s.cue.toFixed(0)}°</b> {Math.abs(pitchErr) < 2 ? "✓ on target" : pitchErr > 0 ? "▲ raise nose" : "▼ lower nose"}</p>
         )}
       </dl>
 
@@ -347,18 +358,21 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
           {s.log.slice(-3).map((l, i) => <li key={`${l.t}-${i}`} className={cn("rounded-sm bg-bg/70 px-2 py-0.5", l.tone === "good" ? "text-ok" : l.tone === "bad" ? "text-bad" : l.tone === "warn" ? "text-warn" : "text-ink2")}><span className="mr-2 text-muted tabular-nums">{clock(l.t)}</span>{l.text}</li>)}
         </ul>
         <div data-tour="controls" data-nosound className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--border)] bg-bg/85 p-2">
-          <B label={s.running ? "Pause (P)" : "Resume (P)"} onClick={togglePause} disabled={s.phase === "countdown" && !s.running && s.t <= -LAUNCH.countdownS + 0.01}>{s.running ? <Pause className="size-4" /> : <Play className="size-4" />}</B>
+          <B label={s.running ? "Pause (P)" : "Resume (P)"} onClick={togglePause} disabled={s.phase === "countdown" && !s.running && s.t <= -LAUNCH.countdownS + 0.01}>{s.running ? <Pause className="size-4" /> : <Play className="size-4" />}<kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">P</kbd></B>
           <B label={voice ? "Mute sound" : "Unmute sound"} on={voice} onClick={() => setVoice((v) => !v)}>{voice ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}</B>
-          {rules.autopilot !== "none" && <B label={rules.autopilot === "full" ? "Autopilot (A)" : "Upper-stage guidance (A)"} on={apActive} onClick={toggleAuto}><Bot className="size-4" />{rules.autopilot === "full" ? "Autopilot" : "Upper guidance"}</B>}
-          <span className="hud-label px-1">Pitch</span>
-          <B label="Raise nose (↑)" disabled={!manualPitch} {...held("up")}><ArrowUp className="size-4" /></B>
-          <B label="Lower nose (↓)" disabled={!manualPitch} {...held("down")}><ArrowDown className="size-4" /></B>
-          <label className="flex items-center gap-2 text-xs text-ink2"><span className="hud-label">Throttle</span>
+          {rules.autopilot !== "none" && <B label={rules.autopilot === "full" ? "Autopilot (A)" : "Upper-stage guidance (A)"} on={apActive} onClick={toggleAuto}><Bot className="size-4" />{rules.autopilot === "full" ? "Autopilot" : "Upper guidance"}<kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">A</kbd></B>}
+          <div data-tour="pitch" className="flex items-center gap-2">
+            <span className="hud-label px-1">Pitch</span>
+            <B label="Raise nose (↑)" disabled={!manualPitch} {...held("up")}><ArrowUp className="size-4" /></B>
+            <B label="Lower nose (↓)" disabled={!manualPitch} {...held("down")}><ArrowDown className="size-4" /></B>
+          </div>
+          <label data-tour="throttle" className="flex items-center gap-2 text-xs text-ink2"><span className="hud-label">Throttle</span>
             <input type="range" min={0} max={100} value={Math.round((manualThrottle ? session.input.throttle : s.throttle) * 100)} disabled={!manualThrottle} aria-label="Throttle" className="w-28"
-              onChange={(e) => { session.setThrottle(Number(e.target.value) / 100); setS(snap(session)); }} /></label>
-          <B label="Stage separation / ignite (Space)" disabled={!stageReady} onClick={() => session.stage()}><Layers className="size-4" />{rules.autoStaging ? "Staging auto" : "Stage"}</B>
-          <B label="Engine cutoff (X)" disabled={!canCut} onClick={() => session.cut()}><Octagon className="size-4" />Cut</B>
-          <B label="Restart engine (R)" disabled={!canRestart} onClick={() => session.restart()}><Power className="size-4" />{s.phase === "parking" ? "Ignite TLI" : "Restart"}</B>
+              onChange={(e) => { session.setThrottle(Number(e.target.value) / 100); setS(snap(session)); }} /><kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">W/S</kbd></label>
+          <B data-tour="stage" label="Stage separation / ignite (Space)" disabled={!stageReady} onClick={() => session.stage()}><Layers className="size-4" />{rules.autoStaging ? "Staging auto" : "Stage"}<kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">Space</kbd></B>
+          <B data-tour="cut" label="Engine cutoff (X)" disabled={!canCut} onClick={() => session.cut()}><Octagon className="size-4" />Cut<kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">X</kbd></B>
+          <B label="Restart engine (R)" disabled={!canRestart} onClick={() => session.restart()}><Power className="size-4" />{s.phase === "parking" ? "Ignite TLI" : "Restart"}<kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">R</kbd></B>
+          <B label="Keyboard controls (H)" onClick={() => setHelp(true)}><Keyboard className="size-4" /><kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">H</kbd></B>
           <div data-tour="warp" role="radiogroup" aria-label="Time warp" className="ml-auto flex items-center gap-2">
             <span className="hud-label !text-sm">Warp</span>
             <div className="flex overflow-hidden rounded-md border border-[var(--border)]">
@@ -386,7 +400,14 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
               {[["Max-Q", `${(f.maxQ / 1000).toFixed(1)} kPa`], ["Peak G", `${f.maxG.toFixed(1)} g`], ["Fuel left", `${Math.round(tel.prop2 * 100)} %`], ["Kármán line", result.karman ? "reached" : "no"]].map(([k, v]) => (
                 <div key={k} className="rounded-md bg-white/5 p-2"><dt className="text-muted">{k}</dt><dd className="font-display text-base">{v}</dd></div>))}
             </dl>
-            {!result.ok && <p className="mt-3 text-xs text-ink2">Tip: {f.rules.autopilot === "full" ? "turn the autopilot on and let it fly the climb." : f.rules.guideCue ? "follow the pitch cue, throttle down near max-Q, and cut the engine at orbital speed." : "ease the pitch over gradually, throttle through max-Q, and watch your fuel."}</p>}
+            {!result.ok && (() => { const c = explainFailure(f); return (
+              <section className="mt-4 rounded-lg border border-bad/40 bg-bad/10 p-3 text-sm" aria-label="Why the mission failed">
+                <p className="font-display text-lg font-bold text-bad">{c.title}</p>
+                <p className="mt-1 text-xs text-ink2"><b className="text-ink">What happened:</b> {c.why}</p>
+                <p className="mt-2 text-xs font-semibold text-ink">What to do next time</p>
+                <ol className="mt-1 list-decimal space-y-1 pl-5 text-xs text-ink2">{c.steps.map((st) => <li key={st}>{st}</li>)}</ol>
+                <p className="mt-2 text-[11px] text-muted">Press H on the flight screen any time to see every key.</p>
+              </section>); })()}
             <div className="mt-5 flex flex-wrap gap-2">
               {f.mission === "moon" && result.ok && !onContinue && <GameButton variant="primary" icon={<Rocket className="size-4" />} onClick={() => setLeg(true)}>Continue: coast to the Moon</GameButton>}
               {onContinue && result.ok && <GameButton variant="primary" icon={<Rocket className="size-4" />} onClick={onContinue}>Continue: {continueLabel ?? "next phase"}</GameButton>}

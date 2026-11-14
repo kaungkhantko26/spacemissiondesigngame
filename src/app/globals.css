@@ -66,6 +66,7 @@ h1, h2, h3, .font-display { font-family: var(--font-display); }
   background-size: 260px 220px;
   animation: drift 120s linear infinite;
 }
+@keyframes toastbar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 @keyframes drift { to { background-position: -520px 440px; } }
 /* Display type: uppercase, tracked, game-HUD feel */
 h1, h2 { letter-spacing: .02em; }
