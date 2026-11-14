@@ -5,20 +5,26 @@ import { asset } from "./asset";
  *  plus one-shots for ignition, stage separation, upper-stage ignition, loss of vehicle and a success chime. */
 const seconds = (c: AudioContext, s: number) => c.currentTime + s;
 
-/** Recorded samples: drop mp3 files into public/sfx/<id>.mp3 (engine, ignition, separation, ignite2, explosion, chime, click, space) and they replace the synthesised sounds. */
+/** Recorded samples: drop mp3 files into public/sfx/<id>.mp3 (engine, ignition, separation, ignite2, explosion, chime, click, space) and list their ids in public/sfx/manifest.json; they then replace the synthesised sounds. */
 const SAMPLE_IDS = ["engine", "ignition", "separation", "ignite2", "explosion", "chime", "click", "space"] as const;
 type SampleId = (typeof SAMPLE_IDS)[number];
 const samples = new Map<SampleId, AudioBuffer | null>();
 let sampleLoad: Promise<void> | null = null;
 export function preloadSfx(): Promise<void> {
   const c = audioContext(); if (!c) return Promise.resolve();
-  sampleLoad ??= Promise.all(SAMPLE_IDS.map(async (id) => {
-    try {
-      const res = await fetch(asset(`/sfx/${id}.mp3`)); if (!res.ok) { samples.set(id, null); return; }
-      const data = await res.arrayBuffer();
-      samples.set(id, await new Promise<AudioBuffer | null>((ok) => { c.decodeAudioData(data, ok, () => ok(null)); }));
-    } catch { samples.set(id, null); }
-  })).then(() => undefined);
+  // public/sfx/manifest.json lists the recorded files that exist, e.g. { "samples": ["engine", "ignition"] }; nothing else is requested, so there are no 404s
+  sampleLoad ??= (async () => {
+    let listed: string[] = [];
+    try { const m = await fetch(asset("/sfx/manifest.json")); if (m.ok) listed = ((await m.json()) as { samples?: string[] }).samples ?? []; } catch { /* no manifest: synthesised sounds only */ }
+    await Promise.all(SAMPLE_IDS.map(async (id) => {
+      if (!listed.includes(id)) { samples.set(id, null); return; }
+      try {
+        const res = await fetch(asset(`/sfx/${id}.mp3`)); if (!res.ok) { samples.set(id, null); return; }
+        const data = await res.arrayBuffer();
+        samples.set(id, await new Promise<AudioBuffer | null>((ok) => { c.decodeAudioData(data, ok, () => ok(null)); }));
+      } catch { samples.set(id, null); }
+    }));
+  })();
   return sampleLoad;
 }
 const sample = (id: SampleId) => samples.get(id) ?? null;
