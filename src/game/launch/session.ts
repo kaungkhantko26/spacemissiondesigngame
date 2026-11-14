@@ -5,11 +5,11 @@ import { DATASET, vehicleById } from "../data";
 /** Real-time wrapper around a Flight: input state, held keys and time warp. Lives outside React; the UI polls it. */
 export class LaunchSession {
   flight: Flight; input: Input; warp = 1; running = false; held = { up: false, down: false };
-  constructor(public difficulty: Difficulty, siteId: string, vehicleId: string, seed: number) {
+  constructor(public difficulty: Difficulty, siteId: string, vehicleId: string, seed: number, payloadKg?: number) {
     const rules = RULES[difficulty];
     const v = vehicleById(vehicleId) ?? DATASET.vehicles[0];
     const site = DATASET.launch_sites.find((s) => s.id === siteId) ?? DATASET.launch_sites[0];
-    this.flight = createFlight(buildRocket(v, v.leo_capacity_kg * rules.payloadFrac), rules, site, seed);
+    this.flight = createFlight(buildRocket(v, payloadKg ?? v.leo_capacity_kg * rules.payloadFrac), rules, site, seed);
     this.input = defaultInput(rules);
   }
   get done() { return this.flight.phase === "orbit" || this.flight.phase === "failed"; }

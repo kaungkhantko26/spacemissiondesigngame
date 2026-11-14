@@ -122,7 +122,7 @@ const B = ({ label, onClick, disabled, children, on, ...rest }: { label: string;
     className={cn("inline-flex h-10 items-center gap-1.5 rounded-md border px-3 font-display text-sm uppercase tracking-wider transition disabled:opacity-35", on ? "border-orange bg-orange/15 text-orange" : "border-[var(--border)] bg-panel text-ink2 hover:text-ink")}>{children}</button>
 );
 
-function Flight({ session, onExit, onAgain }: { session: LaunchSession; onExit: () => void; onAgain: () => void }) {
+export function AscentFlight({ session, onExit, onAgain, onContinue, continueLabel, exitLabel }: { session: LaunchSession; onExit: () => void; onAgain: () => void; onContinue?: () => void; continueLabel?: string; exitLabel?: string }) {
   const reduced = useUIStore((s) => s.reducedMotion);
   const rules = session.flight.rules;
   const canvas = useRef<HTMLCanvasElement>(null), wrap = useRef<HTMLDivElement>(null);
@@ -281,9 +281,10 @@ function Flight({ session, onExit, onAgain }: { session: LaunchSession; onExit: 
             </dl>
             {!result.ok && <p className="mt-3 text-xs text-ink2">Tip: {f.rules.autopilot === "full" ? "turn the autopilot on and let it fly the climb." : f.rules.guideCue ? "follow the pitch cue, throttle down near max-Q, and cut the engine at orbital speed." : "ease the pitch over gradually, throttle through max-Q, and watch your fuel."}</p>}
             <div className="mt-5 flex flex-wrap gap-2">
-              <GameButton variant="primary" icon={<RotateCcw className="size-4" />} onClick={onAgain}>Fly again</GameButton>
-              <GameButton variant="outline" onClick={onExit}>Change setup</GameButton>
-              {result.ok && <Link href="/design" className="inline-flex items-center rounded-md border border-[var(--border-strong)] bg-panel px-4 py-2.5 font-display text-sm uppercase tracking-wider text-ink hover:border-ink2">Next: design the Moon mission</Link>}
+              {onContinue && result.ok && <GameButton variant="primary" icon={<Rocket className="size-4" />} onClick={onContinue}>Continue: {continueLabel ?? "next phase"}</GameButton>}
+              <GameButton variant={onContinue && result.ok ? "outline" : "primary"} icon={<RotateCcw className="size-4" />} onClick={onAgain}>Fly again</GameButton>
+              <GameButton variant="outline" onClick={onExit}>{exitLabel ?? "Change setup"}</GameButton>
+              {result.ok && !onContinue && <Link href="/design" className="inline-flex items-center rounded-md border border-[var(--border-strong)] bg-panel px-4 py-2.5 font-display text-sm uppercase tracking-wider text-ink hover:border-ink2">Next: design the Moon mission</Link>}
             </div>
           </GlassPanel>
         </div>
@@ -299,5 +300,5 @@ export function LaunchControl() {
   const [attempt, setAttempt] = useState(0);
   const launch = useCallback((n: number) => { setSession(new LaunchSession(difficulty, siteId, vehicleId, 1000 + n * 7919)); setAttempt(n); }, [difficulty, siteId, vehicleId]);
   if (!session) return <Briefing onStart={() => launch(attempt)} />;
-  return <Flight key={`${attempt}`} session={session} onExit={() => setSession(null)} onAgain={() => launch(attempt + 1)} />;
+  return <AscentFlight key={`${attempt}`} session={session} onExit={() => setSession(null)} onAgain={() => launch(attempt + 1)} />;
 }

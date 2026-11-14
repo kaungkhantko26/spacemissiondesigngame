@@ -6,10 +6,14 @@ import { BackButton, GameButton, GlassPanel, ScreenContainer, StatusPill } from 
 import { Astronaut, Scene3D } from "@/components/three/lazy";
 import { cn } from "@/lib/mission";
 import { ANTENNAS, DATASET, DESTINATIONS, GAME, launchReliability } from "@/game/data";
-import type { Check, Evaluation, MissionResult } from "@/game/engine";
+import { seedFromDesign, simulate, type Check, type Evaluation, type MissionResult } from "@/game/engine";
 import { useDesignStore, useEvaluation } from "@/game/store";
 import { buildTrajectory } from "@/game/trajectory";
 import { TrajectorySim } from "./TrajectorySim";
+import { AscentFlight } from "./LaunchControl";
+import { LaunchSession } from "@/game/launch/session";
+import { RULES, type Difficulty } from "@/game/launch/core";
+import { useLaunchSetup } from "@/game/launch/store";
 import { CraftPreview } from "./CraftPreview";
 import { usePartThumbs } from "./partThumbs";
 
@@ -48,7 +52,7 @@ const Slider = ({ label, value, min, max, step = 1, unit, onChange, note }: { la
 );
 
 export function DesignStudio() {
-  const { design, patch, toggleInstrument, autoFill, quickStart, launch, redesign, reset } = useDesignStore();
+  const { design, patch, toggleInstrument, autoFill, quickStart, redesign, reset } = useDesignStore();
   const [qsFailed, setQsFailed] = useState(false);
   const ev = useEvaluation();
   const thumbs = usePartThumbs();
@@ -56,8 +60,27 @@ export function DesignStudio() {
   const dest = ev.destination;
   const maxProp = 40_000;
 
-  const onLaunch = () => { const r = launch(); if (r) setFlight(r); };
-  if (flight) return <FlightView ev={ev} result={flight} onAgain={() => { setFlight(null); redesign(); }} onRetry={() => { const r = launch(); if (r) setFlight(r); }} />;
+  const [ascent, setAscent] = useState<{ session: LaunchSession; n: number } | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  /** Every mission now starts with the real ground-to-orbit ascent (Launch Control) from the chosen spaceport. */
+  const startAscent = (n: number) => {
+    const setup = useLaunchSetup.getState();
+    setAttempt(n);
+    setAscent({ n, session: new LaunchSession(setup.difficulty, setup.siteId, ev.vehicle.id, 1000 + n * 7919, Math.min(ev.wetKg, ev.vehicle.leo_capacity_kg)) });
+  };
+  const onLaunch = () => startAscent(attempt + 1);
+  const finishAscent = () => {
+    if (!ascent) return;
+    const f = ascent.session.flight, site = f.site.location.split(",")[0];
+    // The ascent decided the launch phase; the remaining phases (cruise, insertion, science) still roll on the design's odds.
+    const r = simulate({ ...ev, probabilities: { ...ev.probabilities, launch: 1 } }, seedFromDesign(design, ascent.n));
+    r.phases[0] = { ...r.phases[0], probability: 1, story: `Reached a ${f.tel.periKm.toFixed(0)} × ${f.tel.apoKm.toFixed(0)} km orbit — ${f.rules.name} launch from ${site}.` };
+    setFlight(r); setAscent(null);
+  };
+  if (ascent && !flight) {
+    return <AscentFlight key={ascent.n} session={ascent.session} onExit={() => setAscent(null)} onAgain={() => startAscent(ascent.n + 1)} onContinue={finishAscent} continueLabel={`fly to the ${ev.destination.name}`} exitLabel="Back to design" />;
+  }
+  if (flight) return <FlightView ev={ev} result={flight} onAgain={() => { setFlight(null); redesign(); }} onRetry={() => { setFlight(null); startAscent(attempt + 1); }} />;
 
   return (
     <ScreenContainer title="Mission Architect" subtitle="Real orbital physics, real launch records, real NASA instruments — balance them all." actions={<div className="flex gap-2"><GameButton variant="ghost" icon={<RotateCcw className="size-4" />} onClick={reset}>Reset</GameButton><BackButton href="/menu" label="Main menu" /></div>}>
@@ -168,6 +191,21 @@ export function DesignStudio() {
   );
 }
 
+function LaunchSetupFields() {
+  const { siteId, difficulty, set } = useLaunchSetup();
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+      <label className="block"><span className="hud-label">Spaceport</span>
+        <select value={siteId} onChange={(e) => set({ siteId: e.target.value })} aria-label="Spaceport" className="mt-1 w-full px-2 py-1.5">
+          {DATASET.launch_sites.map((s) => <option key={s.id} value={s.id}>{s.location.split(",")[0]} (+{Math.round(s.rotation_boost_m_s)} m/s)</option>)}
+        </select></label>
+      <label className="block"><span className="hud-label">Launch difficulty</span>
+        <select value={difficulty} onChange={(e) => set({ difficulty: e.target.value as Difficulty })} aria-label="Launch difficulty" className="mt-1 w-full px-2 py-1.5">
+          {(["easy", "medium", "hard"] as const).map((d) => <option key={d} value={d}>{RULES[d].name} ({d})</option>)}
+        </select></label>
+    </div>
+  );
+}
 const stateText: Record<Check["state"], string> = { ok: "OK", warn: "Tight", bad: "Fail" };
 const stateColor = { ok: "text-ok", warn: "text-warn", bad: "text-bad" } as const;
 function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void }) {
@@ -195,6 +233,7 @@ function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void })
       </dl>
       <details className="mt-3 text-xs text-ink2"><summary className="cursor-pointer">Cost breakdown</summary>
         <ul className="mt-1 space-y-0.5">{Object.entries(ev.costBreakdown).map(([k, v]) => <li key={k} className="flex justify-between"><span>{k}</span><span className="tabular-nums">{usd(v)}</span></li>)}</ul></details>
+      <LaunchSetupFields />
       <GameButton variant="primary" className="mt-4 w-full py-3 text-lg" disabled={!ev.goNoGo} icon={<Rocket className="size-5" />} onClick={onLaunch}>{ev.goNoGo ? "Go for launch" : "No-go"}</GameButton>
       {!ev.goNoGo && <p className="mt-2 text-center text-xs text-bad" role="status">Fix the failing checks to unlock launch.</p>}
       {ev.destination.id === "moon" && <Link href="/mission-control" className="mt-2 block rounded-lg border border-[var(--border)] px-4 py-2 text-center text-sm text-ink2 transition hover:border-orange hover:text-ink">Or fly it live in Mission Control →</Link>}
@@ -250,7 +289,7 @@ function FlightView({ ev, result, onAgain, onRetry }: { ev: Evaluation; result: 
               <Astronaut suit="#e8eef7" pose={result.success ? "celebrate" : "idle"} position={[0, -1, 0]} />
             </Scene3D>
           ) : (
-            <TrajectorySim key={`${result.score}-${result.reached}-${ev.destination.id}`} traj={traj} onUpdate={onUpdate} startAtEnd={seenEnd} awaitLaunch className="h-full min-h-[520px]" />
+            <TrajectorySim key={`${result.score}-${result.reached}-${ev.destination.id}`} traj={traj} onUpdate={onUpdate} startAtEnd={seenEnd} startU={traj.mode === "moon" ? traj.markers.seg1 * 0.35 : 0} className="h-full min-h-[520px]" />
           )}
         </GlassPanel>
       </div>

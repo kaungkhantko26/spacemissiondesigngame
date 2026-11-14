@@ -144,15 +144,15 @@ const Btn = ({ label, onClick, on, children }: { label: string; onClick: () => v
     className={cn("grid size-9 place-items-center rounded-md border bg-panel text-ink2 transition hover:text-ink", on ? "border-orange text-orange" : "border-[var(--border)]")}>{children}</button>
 );
 
-export function TrajectorySim({ traj, onUpdate, className, startAtEnd = false, awaitLaunch = false }: { traj: Trajectory; onUpdate: (u: number, done: boolean) => void; className?: string; startAtEnd?: boolean; awaitLaunch?: boolean }) {
+export function TrajectorySim({ traj, onUpdate, className, startAtEnd = false, awaitLaunch = false, startU = 0 }: { traj: Trajectory; onUpdate: (u: number, done: boolean) => void; className?: string; startAtEnd?: boolean; awaitLaunch?: boolean; startU?: number }) {
   const reducedMotion = useUIStore((s) => s.reducedMotion);
   const reduced = reducedMotion || startAtEnd;
   const gated = awaitLaunch && !reduced; // wait on the pad until the player starts the countdown
   const closeUp = traj.mode === "moon" && gated;
-  const [head] = useState(() => { const h = new Playhead(reduced ? traj.uEnd : 0, !reduced && !gated); if (closeUp) { h.follow = true; h.autoOverview = true; } return h; });
+  const [head] = useState(() => { const h = new Playhead(reduced ? traj.uEnd : startU, !reduced && !gated); if (closeUp) { h.follow = true; h.autoOverview = true; } return h; });
   const [count, setCount] = useState<number | null>(null);
   const [launched, setLaunched] = useState(!gated);
-  const [ui, setUi] = useState({ u: reduced ? traj.uEnd : 0, playing: !reduced && !gated, follow: closeUp, speed: 1 });
+  const [ui, setUi] = useState({ u: reduced ? traj.uEnd : startU, playing: !reduced && !gated, follow: closeUp, speed: 1 });
   const [tel, setTel] = useState<Telemetry>(() => traj.sample(reduced ? traj.uEnd : 0).telemetry);
   const [lost, setLost] = useState(false);
   const [labels] = useState(() => new LabelBus());
