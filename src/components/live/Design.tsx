@@ -1,6 +1,6 @@
 "use client";
 /** Live multiplayer design phase. Same look as the offline Mission Architect; values and checks come from the server. */
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Lock, Rocket, Wand2 } from "lucide-react";
 import { useGame } from "@/live/store";
 import { GameButton, GlassPanel, StatusPill } from "@/components/ui";
@@ -36,6 +36,31 @@ function Owned({ n, title, hint, field, children }: { n: number; title: string; 
       </p>
       <div className={cn(!can && "pointer-events-none select-none opacity-60")} aria-disabled={!can}>{children(can)}</div>
     </Section>
+  );
+}
+
+/** Crew comms: the team has to talk through trade-offs, because each seat only controls its own parts. */
+function CrewChat() {
+  const g = useGame(); const room = g.room; const me = g.profile?.id;
+  const [text, setText] = useState(""); const end = useRef<HTMLDivElement>(null);
+  const n = room?.chat.length ?? 0;
+  useEffect(() => { end.current?.scrollIntoView({ block: "nearest" }); }, [n]);
+  if (!room) return null;
+  const send = () => { const t = text.trim(); if (!t) return; setText(""); swallow(g.chat(t)); };
+  return (
+    <GlassPanel className="p-4">
+      <p className="hud-label">Crew comms</p>
+      <div className="mt-2 max-h-44 min-h-16 space-y-1 overflow-y-auto text-xs" role="log" aria-live="polite">
+        {room.chat.length === 0 && <p className="text-muted">No messages yet. Say what you need from the other seats.</p>}
+        {room.chat.slice(-40).map((c, i) => <p key={i} className="text-ink2"><b className={c.from === me ? "text-orange" : "text-cyan"}>{c.name}</b> {c.text}</p>)}
+        <div ref={end} />
+      </div>
+      <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); send(); }}>
+        <input value={text} onChange={(e) => setText(e.target.value)} maxLength={200} placeholder="Message your crew…" aria-label="Message your crew"
+          className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-sm text-white" />
+        <GameButton type="submit" variant="outline" disabled={!text.trim()}>Send</GameButton>
+      </form>
+    </GlassPanel>
   );
 }
 
@@ -153,6 +178,8 @@ export function Design() {
               <ul className="mt-1 space-y-0.5">{Object.entries(pv.breakdown).map(([k, v]) => <li key={k} className="flex justify-between"><span>{k}</span><span className="tabular-nums">${fmt(v, 1)}M</span></li>)}</ul></details>}
             {pv && pv.score != null && <p className="mt-3 text-xs text-ink2">Projected score if the flight goes well: <b className="text-ink">{pv.score}</b> ({pv.grade}). Each phase can still fail.</p>}
           </GlassPanel>
+
+          <CrewChat />
 
           {pv?.challenges && room.challenge?.eligible && <GlassPanel className="p-4"><p className="hud-label !text-gold">Time-attack {pv.challenges.count}/{pv.challenges.total}</p>
             {pv.challenges.list.map((c) => <p key={c.id} className={cn("mt-1 text-xs", c.completed ? "text-ok" : "text-ink2")}>{c.completed ? "✔" : "○"} <b>{c.name}</b>: {c.desc}</p>)}

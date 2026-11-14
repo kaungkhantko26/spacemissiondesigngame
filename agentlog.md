@@ -82,3 +82,6 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Roles: 3-column (mission summary + crew slots | role cards | responsibilities panel).
 - Characters: 3-column with 3D Astronaut preview (colours seeded from the same id as the portrait via `lookOf`), roster, stats + portrait, perks/flaw, compare dropdown, Confirm selection.
 - Confirm: hangar scene with CrewLineup + crew summary panel.
+
+## 2026-11-14 — Crew comms in design phase
+- Added `CrewChat` panel to the live Mission Architect sidebar (uses existing server `chat` message). Design screen otherwise already uses his Section/Pick/Slider/GameChip + review panel.
