@@ -1,5 +1,7 @@
 import { BriefingScreen } from "@/components/screens/Mission";
+import { LiveBriefing } from "@/components/live/Screens";
 
+// Live backend mode when NEXT_PUBLIC_API_URL is set; otherwise the original mock screen.
 export default function Page() {
-  return <BriefingScreen />;
+  return process.env.NEXT_PUBLIC_API_URL ? <LiveBriefing /> : <BriefingScreen />;
 }

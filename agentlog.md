@@ -12,3 +12,4 @@
 - Enable with `NEXT_PUBLIC_API_URL` (see `.env.example`). Visual design intentionally minimal (to be restyled).
 - Verified client vs real backend in Node; typecheck of live code done with stubs only — run `npm test && npm run build` locally.
 - Added /play/profile, /play/cosmetics, /play/stats (live XP, upgrades, trophies); main menu routes to /play/* when NEXT_PUBLIC_API_URL is set.
+- Main flow (/team, /team/lobby, /mission/select|briefing|roles|characters|confirm|gameplay|results) now renders live screens (src/components/live/Screens.tsx) in the original UI style when NEXT_PUBLIC_API_URL is set; mock screens remain as fallback. Routes follow the server room state (useGate).

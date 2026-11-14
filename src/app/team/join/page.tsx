@@ -1,5 +1,7 @@
 import { JoinScreen } from "@/components/screens/Team";
+import { LiveTeam } from "@/components/live/Screens";
 
+// Live backend mode when NEXT_PUBLIC_API_URL is set; otherwise the original mock screen.
 export default function Page() {
-  return <JoinScreen />;
+  return process.env.NEXT_PUBLIC_API_URL ? <LiveTeam /> : <JoinScreen />;
 }
