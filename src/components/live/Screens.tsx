@@ -171,6 +171,7 @@ export function LiveMissionSelect() {
           </GlassPanel>
           <div className="flex justify-end"><GameButton variant="primary" disabled={!valid} onClick={() => g.setup(m, d).then(() => router.push("/mission/briefing")).catch(() => {})}>Continue to Briefing</GameButton></div>
         </div>
+      </div>
     </ScreenContainer>
   );
 }
