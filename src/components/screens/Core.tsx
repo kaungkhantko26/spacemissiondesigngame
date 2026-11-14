@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useThree } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
+import type { Group } from "three";
 import { ChevronDown, Rocket, Satellite, Users, User, Shirt, BarChart3, Settings, FlaskConical, Radar, Lock, Check } from "lucide-react";
 import {
   BackButton, GameButton, GlassPanel, LoadingBar, ScreenContainer, StatBar, XPProgressBar, LevelBadge, PlayerAvatar,
@@ -64,11 +65,28 @@ export function SplashScreen() {
 }
 
 /** Sized from the canvas's visible height AND width: as tall as the panel allows (feet near the bottom edge) without clipping the waving arm. */
-function MenuAstronaut({ look, pose }: { look: ReturnType<typeof useLook>; pose: "idle" | "wave" | "ready" | "celebrate" }) {
+/** Drag-to-turn state for the menu astronaut (a class so pointer handlers and the render loop share it without mutating hook values). */
+export class Spin {
+  offset = 0; velocity = 0; dragging = false; idle = 0;
+  private lastX = 0;
+  down(x: number) { this.dragging = true; this.lastX = x; this.velocity = 0; }
+  move(x: number) { if (!this.dragging) return; const d = (x - this.lastX) * 0.012; this.lastX = x; this.offset += d; this.velocity = d * 60; this.idle = 0; }
+  up() { this.dragging = false; }
+  /** Inertia while spinning, then a slow ease back to the waving pose after a few idle seconds. */
+  step(dt: number) {
+    if (this.dragging) return;
+    this.idle += dt;
+    if (Math.abs(this.velocity) > 0.01) { this.offset += this.velocity * dt; this.velocity *= Math.pow(0.04, dt); } else this.velocity = 0;
+    if (this.idle > 2.5) this.offset *= Math.pow(0.35, dt);
+  }
+}
+function MenuAstronaut({ look, pose, spin }: { look: ReturnType<typeof useLook>; pose: "idle" | "wave" | "ready" | "celebrate"; spin: Spin }) {
   const { width, height } = useThree((st) => st.viewport);
   const scale = Math.min(0.34 * height, width * 0.3, 3); // leaves headroom: some clips (moon walk) lift the model
   const y = -height / 2 + 0.25 * scale + 0.03 * height; // the model's feet sit 0.25·scale below its origin
-  return <Astronaut {...look} pose={pose} position={[Math.min(width * 0.12, 2.4), y, 0]} scale={scale} rotationY={-Math.PI / 4} />;
+  const g = useRef<Group>(null);
+  useFrame((_, dt) => { spin.step(Math.min(dt, 0.1)); g.current?.rotation.set(0, spin.offset, 0); });
+  return <group ref={g} position={[Math.min(width * 0.12, 2.4), y, 0]}><Astronaut {...look} pose={pose} position={[0, 0, 0]} scale={scale} rotationY={-Math.PI / 4} /></group>;
 }
 
 /* ---------- Main menu ---------- */
@@ -130,6 +148,7 @@ export function MenuScreen() {
   const [hover, setPose] = useState<Pose | null>(null);
   const pose: Pose = hover ?? home;
   const [more, setMore] = useState(false);
+  const [spin] = useState(() => new Spin());
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -166,7 +185,7 @@ export function MenuScreen() {
 
         </div>
         <div className="h-[460px] md:h-[min(80vh,860px)]">
-          <AstronautGuide><Scene3D camera={[0, 0, 7]} label="Your astronaut"><MenuAstronaut look={look} pose={pose} /></Scene3D></AstronautGuide>
+          <AstronautGuide spin={spin}><Scene3D camera={[0, 0, 7]} label="Your astronaut"><MenuAstronaut look={look} pose={pose} spin={spin} /></Scene3D></AstronautGuide>
         </div>
       </div>
     </main>
