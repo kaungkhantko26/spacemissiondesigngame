@@ -1,18 +1,23 @@
-import { LAUNCH, buildRocket, createFlight, defaultInput, stepFlight, type Difficulty, type Flight, type Input } from "./core";
+import { LAUNCH, buildRocket, createFlight, defaultInput, stepFlight, type Difficulty, type Flight, type Input, type MissionKind } from "./core";
 import { RULES } from "./core";
 import { DATASET, vehicleById } from "../data";
 
+/** Default payload: orbit = a share of LEO capacity; Moon mission = the Apollo 11 spacecraft (Saturn V) or a lighter lunar payload for other rockets. */
+export function payloadFor(v: { leo_capacity_kg: number; tli_payload_kg?: number }, frac: number, mission: MissionKind): number {
+  if (mission === "moon") return v.tli_payload_kg ?? Math.round(v.leo_capacity_kg * frac * 0.45);
+  return v.leo_capacity_kg * frac;
+}
 /** Real-time wrapper around a Flight: input state, held keys and time warp. Lives outside React; the UI polls it. */
 export class LaunchSession {
   flight: Flight; input: Input; warp = 1; running = false; private acc = 0; held = { up: false, down: false };
-  constructor(public difficulty: Difficulty, siteId: string, vehicleId: string, seed: number, payloadKg?: number) {
+  constructor(public difficulty: Difficulty, siteId: string, vehicleId: string, seed: number, payloadKg?: number, public mission: MissionKind = "orbit") {
     const rules = RULES[difficulty];
     const v = vehicleById(vehicleId) ?? DATASET.vehicles[0];
     const site = DATASET.launch_sites.find((s) => s.id === siteId) ?? DATASET.launch_sites[0];
-    this.flight = createFlight(buildRocket(v, payloadKg ?? v.leo_capacity_kg * rules.payloadFrac), rules, site, seed);
+    this.flight = createFlight(buildRocket(v, payloadKg ?? payloadFor(v, rules.payloadFrac, mission)), rules, site, seed, mission);
     this.input = defaultInput(rules);
   }
-  get done() { return this.flight.phase === "orbit" || this.flight.phase === "failed"; }
+  get done() { return this.flight.phase === "orbit" || this.flight.phase === "translunar" || this.flight.phase === "failed"; }
   tick(dtReal: number) {
     if (!this.running || this.done) return;
     this.input.pitchRate = (this.held.up ? 1 : 0) - (this.held.down ? 1 : 0);

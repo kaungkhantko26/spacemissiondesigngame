@@ -58,7 +58,28 @@ function bells(r: number, count: number, y = 0): Group {
   return g;
 }
 
+/** Saturn V in true proportions (110.6 m): S-IC with 5 F-1 bells and fins, S-II, S-IVB, instrument unit, Apollo CSM and the escape tower. */
+export function makeSaturnV(): Group {
+  const g = new Group(), white = std("#f3f3ef", { metalness: 0.15, roughness: 0.55 }), black = std("#16181d", { metalness: 0.2, roughness: 0.6 }), gold = FOIL();
+  const R1 = 5.05, y1 = 42, y2 = 66.8, y3 = 70.5, y4 = 88.3;
+  g.add(mesh(cyl(R1, R1, y1, 36), white, 0, y1 / 2, 0));
+  g.add(mesh(cyl(R1 * 1.004, R1 * 1.004, 5, 36), black, 0, 36, 0), mesh(cyl(R1 * 1.004, R1 * 1.004, 4, 36), black, 0, 22, 0), mesh(cyl(R1 * 1.004, R1 * 1.004, 2.4, 36), black, 0, 10, 0));
+  g.add(mesh(cyl(R1, R1, y2 - y1, 36), white, 0, (y1 + y2) / 2, 0), mesh(cyl(R1 * 1.004, R1 * 1.004, 1.6, 36), black, 0, y1 + 1, 0));
+  g.add(mesh(cyl(3.3, R1, y3 - y2, 36), white, 0, (y2 + y3) / 2, 0));                         // S-II/S-IVB interstage cone
+  g.add(mesh(cyl(3.3, 3.3, y4 - y3, 32), white, 0, (y3 + y4) / 2, 0), mesh(cyl(3.34, 3.34, 1.2, 32), black, 0, y3 + 1.2, 0));
+  g.add(mesh(cyl(3.3, 3.3, 0.9, 32), std("#d9dbe0"), 0, y4 + 0.45, 0));                         // instrument unit
+  g.add(mesh(cyl(1.95, 1.95, 7.5, 28), std("#e6e8ee", { metalness: 0.4 }), 0, y4 + 0.9 + 3.75, 0));
+  g.add(mesh(new ConeGeometry(1.95, 3.5, 28), std("#dcdfe6", { metalness: 0.3 }), 0, y4 + 0.9 + 7.5 + 1.75, 0));
+  const lesY = y4 + 0.9 + 7.5 + 3.5;
+  g.add(mesh(cyl(0.6, 1.5, 1.6, 20), std("#c8553d"), 0, lesY + 0.8, 0), mesh(cyl(0.18, 0.18, 7.5, 10), STEEL(), 0, lesY + 1.6 + 3.75, 0), mesh(new ConeGeometry(0.5, 1.6, 14), std("#c8553d"), 0, lesY + 9.9, 0));
+  for (let i = 0; i < 4; i++) { const a = (i * Math.PI) / 2 + Math.PI / 4; const fin = mesh(new BoxGeometry(0.5, 10, 6.5), black, Math.cos(a) * (R1 + 2.4), 4.2, Math.sin(a) * (R1 + 2.4)); fin.rotation.y = -a; g.add(fin); }
+  const bell = std("#3b4251", { metalness: 0.7, roughness: 0.35 });
+  for (let i = 0; i < 5; i++) { const a = (i / 4) * Math.PI * 2, rad = i === 4 ? 0 : 2.9; const b = mesh(new CylinderGeometry(0.9, 1.9, 4.4, 20, 1, true), bell, Math.cos(a) * rad, -1.6, Math.sin(a) * rad); (b.material as MeshStandardMaterial).side = DoubleSide; g.add(b); }
+  return g;
+}
+
 export function makeRocket(vehicleId: string, lengthM = 40, diameterM = 3.5): Group {
+  if (vehicleId === "ll2_cfg_93") return makeSaturnV();
   const st = STYLES[vehicleId] ?? DEFAULT_STYLE;
   const root = new Group();
   const r = diameterM / 2, L = Math.max(lengthM, diameterM * 6);

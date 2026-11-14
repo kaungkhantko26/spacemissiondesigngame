@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DATASET } from "@/game/data";
-import { LAUNCH, RULES, buildRocket, createFlight, defaultInput, orbitElements, scoreFlight, stepFlight, type Difficulty, type Flight } from "@/game/launch/core";
+import { LAUNCH, MOON_DIST_M, RULES, TLI, buildRocket, createFlight, defaultInput, orbitElements, scoreFlight, stepFlight, type Difficulty, type Flight, type MissionKind } from "@/game/launch/core";
 import { flyWithBot } from "@/game/launch/bot";
 
 const site = DATASET.launch_sites[0];
@@ -13,7 +13,7 @@ const autopilot = (f: Flight): Flight => { const i = defaultInput(f.rules); whil
 
 describe("rocket model (dataset-calibrated)", () => {
   it("every vehicle has a flyable thrust-to-weight and ~9.3–10 km/s of ideal Δv at full capacity", () => {
-    for (const v of DATASET.vehicles) {
+    for (const v of DATASET.vehicles.filter((x) => !x.stages)) { // Saturn V uses its real stage data instead of the calibrated split
       const r = buildRocket(v, v.leo_capacity_kg);
       expect(r.twr0).toBeGreaterThanOrEqual(LAUNCH.twrMin - 0.001); expect(r.twr0).toBeLessThanOrEqual(LAUNCH.twrMax + 0.001);
       expect(r.dvIdeal).toBeGreaterThan(9200); expect(r.dvIdeal).toBeLessThan(LAUNCH.dvIdealMs + 60); // heavy payload fractions can't reach the target with sane structure
@@ -119,5 +119,57 @@ describe("real-environment scenery", () => {
     const b = biomeFor("ll2_pad_87"), sum = (c: number[]) => c[0] + c[1] + c[2];
     expect(sum(skyAt(0, b))).toBeGreaterThan(sum(skyAt(15000, b))); expect(sum(skyAt(15000, b))).toBeGreaterThan(sum(skyAt(120000, b)));
     expect(sum(skyAt(150000, b))).toBeLessThan(40);
+  });
+});
+
+const SATURN = DATASET.vehicles.find((v) => v.name === "Saturn V")!;
+const moonFlight = (v = SATURN, d: Difficulty = "easy", seed = 1, siteIdx = 0) =>
+  createFlight(buildRocket(v, v.tli_payload_kg ?? Math.round(v.leo_capacity_kg * RULES[d].payloadFrac * 0.45)), RULES[d], DATASET.launch_sites[siteIdx], seed, "moon" as MissionKind);
+const flyAuto = (f: Flight, maxT = 9000) => { const i = defaultInput(f.rules); while (!["orbit", "translunar", "failed"].includes(f.phase) && f.t < maxT) { stepFlight(f, i); i.stage = false; i.cut = false; i.restart = false; } return f; };
+
+describe("Saturn V and the mission to the Moon", () => {
+  it("is built from the dataset's verified three-stage data", () => {
+    const r = buildRocket(SATURN, SATURN.tli_payload_kg!);
+    expect(r.stageNames).toEqual(["S-IC", "S-II", "S-IVB"]); expect(r.s3).toBeDefined();
+    expect(Math.round(r.s1.propKg)).toBe(Math.round(SATURN.stages![0].prop_kg)); expect(Math.round(r.s3!.dryKg)).toBe(Math.round(SATURN.stages![2].dry_kg));
+    expect(r.m0).toBeGreaterThan(2.9e6); expect(r.m0).toBeLessThan(3.0e6); expect(r.twr0).toBeGreaterThan(1.15); expect(r.twr0).toBeLessThan(1.3);
+  });
+  it("the autopilot reaches orbit with the Saturn V, through all three stages", () => {
+    const f = flyAuto(createFlight(buildRocket(SATURN, SATURN.leo_capacity_kg * 0.6), RULES.easy, site, 1));
+    expect(f.phase, f.failure ?? "").toBe("orbit");
+    for (const k of ["meco", "sep", "ignition2", "meco2", "sep2", "ignition3"]) expect(f.milestones[k], k).toBeDefined();
+    expect(f.milestones.ignition3).toBeGreaterThan(f.milestones.ignition2);
+  });
+  it("Moon mission (Cadet autopilot): parking orbit → TLI window → TLI → apogee at the Moon", () => {
+    const f = flyAuto(moonFlight());
+    expect(f.phase, f.failure ?? "").toBe("translunar");
+    expect(f.milestones.orbit).toBeLessThan(f.milestones.tliStart); expect(f.milestones.tliStart).toBeLessThan(f.milestones.tli);
+    expect(f.milestones.tliStart - f.milestones.orbit).toBeGreaterThan(1800); // you really wait for the window
+    const apo = orbitElements(f.x, f.y, f.vx, f.vy).apo + 6.371e6;
+    expect(apo / MOON_DIST_M()).toBeGreaterThan(TLI.tolLow); expect(apo / MOON_DIST_M()).toBeLessThan(TLI.tolHigh);
+    expect(f.park!.fuel).toBeGreaterThan(0.4); // S-IVB still has most of its propellant for TLI
+  });
+  it("Pilot and Commander test pilots complete the Moon mission", () => {
+    for (const d of ["medium", "hard"] as const) for (const siteIdx of [0, 2, 4]) {
+      const f = flyWithBot(moonFlight(SATURN, d, 3, siteIdx)); expect(f.phase, `${d}@${siteIdx}: ${f.failure}`).toBe("translunar");
+    }
+  });
+  it("small rockets cannot reach the Moon and the message points to the Saturn V", () => {
+    const f = flyAuto(moonFlight(vehicle("Atlas V 401")));
+    expect(f.phase).toBe("failed"); expect(f.failure).toMatch(/Saturn V/);
+  });
+  it("igniting TLI outside the window fails the mission (the Moon is not where the burn ends)", () => {
+    const f = moonFlight(SATURN), i = defaultInput(f.rules); i.autopilot = false; i.upperGuidance = false;
+    // fly the ascent on autopilot, then take over in parking orbit and ignite immediately
+    const auto = defaultInput(f.rules);
+    while (f.phase !== "parking" && f.phase !== "failed" && f.t < 2000) { stepFlight(f, auto); auto.stage = false; }
+    expect(f.phase).toBe("parking");
+    auto.autopilot = false; // hand over: pitch is held, TLI must be started by hand
+    auto.restart = true; stepFlight(f, auto); auto.restart = false;
+    expect(f.phase).toBe("tli"); expect(Math.abs(f.tliErr!)).toBeGreaterThan(TLI.windowFailRad);
+  });
+  it("a completed Moon mission scores more than reaching orbit alone", () => {
+    const moon = scoreFlight(flyAuto(moonFlight())), orbit = scoreFlight(flyAuto(createFlight(buildRocket(SATURN, 80000), RULES.easy, site, 1)));
+    expect(moon.ok && orbit.ok).toBe(true); expect(moon.score).toBeGreaterThan(orbit.score); expect(moon.max).toBe(1300);
   });
 });

@@ -7,6 +7,8 @@ import raw from "./dataset.json";
  */
 export interface Body { id: string; name: string; mu: number; radius_m: number; gravity: number | null; sma_m: number | null; parent: string | null; irradiance_w_m2?: number }
 export interface Vehicle { id: string; name: string; manufacturer: string; manufacturer_country: string; leo_capacity_kg: number; gto_capacity_kg: number | null; launch_cost_usd: number; total_launches: number; successful_launches: number; reusable: boolean;
+  /** Saturn V only: verified stage data + the Apollo 11 spacecraft mass; price is a game value */
+  stages?: { stage: string; dry_kg: number; prop_kg: number; engines: number; engine: string; engine_thrust_n: number }[]; tli_payload_kg?: number; launch_cost_is_game?: boolean;
   launch_mass_t: number | null; liftoff_thrust_kn: number | null; diameter_m: number | null; length_m: number | null; min_stage: number | null; max_stage: number | null }
 export interface LaunchSite { id: string; name: string; location: string; country: string; lat: number; lon: number; launches: number; rotation_boost_m_s: number }
 export interface ElectricThruster { id: string; name: string; type: string; thrust_n: number; power_w: number; isp_s: number }

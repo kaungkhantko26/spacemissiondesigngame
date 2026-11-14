@@ -1,4 +1,4 @@
-import { LAUNCH, R_E, density, orbitElements, padPosition, thrustDir, type Flight } from "@/game/launch/core";
+import { LAUNCH, MOON_DIST_M, R_E, TLI, density, orbitElements, padPosition, thrustDir, type Flight } from "@/game/launch/core";
 import { biomeFor, drawClouds, drawComplex, drawSky, drawSmoke, drawTerrain, trailAlpha, updateSmoke, type Biome, type Puff, type Scene } from "./launchScenery";
 import type { RocketSprite } from "./partThumbs";
 
@@ -26,9 +26,17 @@ export function updateView(v: SceneView, f: Flight, dtReal: number, reduced: boo
   const b = onPad ? 0.5 : Math.max(0, 0.5 * (1 - alt / 40_000));
   const tx = lerp(lerp(f.x, pad.x, b), 0, s), ty = lerp(lerp(f.y, pad.y, b), 0, s);
   const eAsc = Math.max(onPad ? 190 : 260, 2.1 * d + 160);
-  const tLogE = lerp(Math.log(eAsc), Math.log(R * 1.35), s);
+  let tLogE = lerp(Math.log(eAsc), Math.log(R * 1.35), s), cx = tx, cy = ty;
+  if (f.mission === "moon" && (f.phase === "tli" || f.phase === "translunar" || f.phase === "parking")) {
+    // pull back to frame the whole transfer ellipse (Earth at one end, the Moon at the apogee)
+    const el = orbitElements(f.x, f.y, f.vx, f.vy);
+    if (el.bound && el.apo > 15_000_000) {
+      const rApo = el.apo + R, a = Math.atan2(el.ey, el.ex) + Math.PI;
+      tLogE = Math.log(rApo * 0.62); cx = Math.cos(a) * rApo * 0.5; cy = Math.sin(a) * rApo * 0.5;
+    }
+  }
   const k = 1 - Math.exp(-dtReal * (onPad ? 3 : 2.2));
-  v.cx += (tx - v.cx) * k; v.cy += (ty - v.cy) * k; v.logE += (tLogE - v.logE) * k;
+  v.cx += (cx - v.cx) * k; v.cy += (cy - v.cy) * k; v.logE += (tLogE - v.logE) * k;
   const thrusting = f.engineOn && f.tel.thrust > 0;
   v.shake = reduced ? 0 : thrusting && alt < 8000 ? Math.min(1, (f.tel.thrust / (f.rocket.s1.thrustSlN || 1)) * (1 - alt / 8000)) * 2.2 : 0;
   v.flicker = reduced ? 0.5 : Math.random();
@@ -39,6 +47,7 @@ export function updateView(v: SceneView, f: Flight, dtReal: number, reduced: boo
 }
 
 export function drawFlight(ctx: CanvasRenderingContext2D, W: number, H: number, f: Flight, v: SceneView) {
+  if (!(W > 8 && H > 8) || !Number.isFinite(v.logE)) return; // canvas not laid out yet
   const alt = Math.hypot(f.x, f.y) - R, b = v.biome, now = performance.now() / 1000;
   const E = Math.exp(v.logE), k = (Math.min(W, H) * 0.5 * 0.9) / E;
   const sh = v.shake ? () => (Math.random() - 0.5) * v.shake * 2 : () => 0;
@@ -88,8 +97,21 @@ export function drawFlight(ctx: CanvasRenderingContext2D, W: number, H: number, 
   if (el.bound && f.liftedOff && (f.stage === 2 || f.phase === "coast") && E > 4_000) {
     const e = Math.min(el.e, 0.999), p = el.a * (1 - e * e), wp = Math.atan2(el.ey, el.ex), dir = el.hz < 0 ? -1 : 1;
     ctx.strokeStyle = "rgba(79,200,247,.9)"; ctx.lineWidth = 1.6; ctx.beginPath(); let pen = false;
-    for (let i = 0; i <= 240; i++) { const nu = (i / 240) * Math.PI * 2, r = p / (1 + e * Math.cos(nu)); if (r < R) { pen = false; continue; } const a = wp + dir * nu; const x = sx(r * Math.cos(a)), y = sy(r * Math.sin(a)); if (pen) ctx.lineTo(x, y); else ctx.moveTo(x, y); pen = true; }
+    for (let i = 0; i <= 720; i++) { const nu = (i / 720) * Math.PI * 2, r = p / (1 + e * Math.cos(nu)); if (r < R) { pen = false; continue; } const a = wp + dir * nu; const x = sx(r * Math.cos(a)), y = sy(r * Math.sin(a)); if (pen) ctx.lineTo(x, y); else ctx.moveTo(x, y); pen = true; }
     ctx.stroke();
+  }
+
+  // ---- Moon mission: the Moon waits at the end of the transfer; TLI window marker on the parking orbit
+  if (f.mission === "moon" && (f.phase === "parking" || f.phase === "tli" || f.phase === "translunar")) {
+    const ma = f.tliStartAngle - TLI.leadRad + Math.PI, D = MOON_DIST_M(), mx = sx(D * Math.cos(ma)), my = sy(D * Math.sin(ma));
+    ctx.setLineDash([3, 8]); ctx.strokeStyle = "rgba(200,210,230,.25)"; ctx.lineWidth = 1; ctx.beginPath(); arc(D, 0, Math.PI * 2, 360); ctx.stroke(); ctx.setLineDash([]);
+    const mr = Math.max(5, 1_737_400 * k), mg = ctx.createRadialGradient(mx - mr * 0.3, my - mr * 0.3, mr * 0.1, mx, my, mr); mg.addColorStop(0, "#e8e8ea"); mg.addColorStop(1, "#8d8f96");
+    ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(mx, my, mr, 0, 7); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.font = "11px sans-serif"; ctx.fillText("Moon", mx + mr + 5, my + 4);
+    if (f.phase === "parking" && f.park) {
+      const rp = R + ((f.park.periKm + f.park.apoKm) / 2) * 1000, wx = sx(rp * Math.cos(f.tliStartAngle)), wy = sy(rp * Math.sin(f.tliStartAngle));
+      ctx.strokeStyle = "#ff7a33"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(wx, wy, 9, 0, 7); ctx.stroke(); ctx.fillStyle = "#ff7a33"; ctx.fillText("TLI window", wx + 13, wy - 4);
+    }
   }
 
   // ---- launch complex, tower, smoke
@@ -133,15 +155,15 @@ export function drawFlight(ctx: CanvasRenderingContext2D, W: number, H: number, 
   // ---- spent stage (3-D sprite lower part, tumbling)
   const sp = v.sprite;
   for (const d of f.debris) {
-    const Ld = Math.max(10, f.rocket.lengthM * 0.62 * k), wd = Math.max(3, Ld * (sp?.aspect ?? 0.06) * 1.25);
+    const part = d.bot - d.top, Ld = Math.max(10, f.rocket.lengthM * part * k), wd = Math.max(3, f.rocket.lengthM * k * (sp?.aspect ?? 0.06) * 1.25);
     ctx.save(); ctx.translate(sx(d.x), sy(d.y)); ctx.rotate(Math.atan2(d.vx, d.vy) + f.t * 0.25);
-    if (sp) ctx.drawImage(sp.img, 0, sp.img.height * 0.38, sp.img.width, sp.img.height * 0.62, -wd / 2, -Ld / 2, wd, Ld); else { ctx.fillStyle = "#9aa4b4"; ctx.fillRect(-2, -Ld / 2, 4, Ld); }
+    if (sp) ctx.drawImage(sp.img, 0, sp.img.height * d.top, sp.img.width, sp.img.height * part, -wd / 2, -Ld / 2, wd, Ld); else { ctx.fillStyle = "#9aa4b4"; ctx.fillRect(-2, -Ld / 2, 4, Ld); }
     ctx.restore();
   }
 
   // ---- rocket
   const td = thrustDir(f), ang = Math.atan2(td.x, td.y), onGround = f.phase === "countdown" || !f.liftedOff;
-  const frac = f.stage === 1 ? 1 : 0.38, len = f.rocket.lengthM * frac, L = Math.max(16, Math.min(f.stage === 1 ? 320 : 200, len * k));
+  const stg = f.phase === "coast" ? f.sepFrom + 1 : f.stage, frac = stg === 1 ? 1 : stg === 2 ? f.rocket.stageFrac[0] : f.rocket.stageFrac[1], len = f.rocket.lengthM * frac, L = Math.max(16, Math.min(f.stage === 1 ? 320 : 200, len * k));
   const Wd = sp ? Math.max(3, L / frac * sp.aspect * 1.25) : Math.max(3, Math.min(L * 0.13, 12));
   ctx.save(); ctx.translate(onGround ? padX : sx(f.x), onGround ? padY : sy(f.y)); ctx.rotate(f.liftedOff ? ang : pad.angle);
   if (f.phase !== "failed") {
@@ -152,7 +174,7 @@ export function drawFlight(ctx: CanvasRenderingContext2D, W: number, H: number, 
       ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(-fw * 0.7, 0); ctx.quadraticCurveTo(-fw * 0.9, fl * 0.5, 0, fl); ctx.quadraticCurveTo(fw * 0.9, fl * 0.5, fw * 0.7, 0); ctx.closePath(); ctx.fill();
     }
     if (sp) {
-      const sh0 = f.stage === 1 ? 0 : 0, sH = f.stage === 1 ? sp.img.height : sp.img.height * 0.38;
+      const sh0 = 0, sH = sp.img.height * frac;
       ctx.drawImage(sp.img, 0, sh0, sp.img.width, sH, -Wd / 2, -L, Wd, L);
     } else {
       ctx.fillStyle = f.stage === 1 ? "#f2f5fa" : "#cfd6e2"; ctx.fillRect(-Wd / 2, -L, Wd, L);
