@@ -198,7 +198,8 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   const apActive = rules.autopilot === "full" ? s.autopilot : rules.autopilot === "upper" ? s.upper && s.stage >= 2 : false;
   const manualPitch = !apActive, manualThrottle = !apActive || (rules.autopilot === "upper" && s.stage === 1);
   const toggleAuto = useCallback(() => { session.toggleAssist(); setS(snap(session)); }, [session]);
-  const [voice, setVoice] = useState(true); // launch-director voice (browser speech synthesis)
+  const muted = useUIStore((st) => st.muted);
+  const [voice, setVoice] = useState(!muted); // launch-director voice and flight sound
   const spoken = useRef(Number.POSITIVE_INFINITY);
   useEffect(() => {
     const t = s.t, running = s.running && s.phase !== "failed";
@@ -333,7 +334,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
         <ul className="pointer-events-none max-w-xl space-y-0.5 text-sm" aria-live="polite">
           {s.log.slice(-3).map((l, i) => <li key={`${l.t}-${i}`} className={cn("rounded-sm bg-bg/70 px-2 py-0.5", l.tone === "good" ? "text-ok" : l.tone === "bad" ? "text-bad" : l.tone === "warn" ? "text-warn" : "text-ink2")}><span className="mr-2 text-muted tabular-nums">{clock(l.t)}</span>{l.text}</li>)}
         </ul>
-        <div data-tour="controls" className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--border)] bg-bg/85 p-2">
+        <div data-tour="controls" data-nosound className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--border)] bg-bg/85 p-2">
           <B label={s.running ? "Pause (P)" : "Resume (P)"} onClick={togglePause} disabled={s.phase === "countdown" && !s.running && s.t <= -LAUNCH.countdownS + 0.01}>{s.running ? <Pause className="size-4" /> : <Play className="size-4" />}</B>
           <B label={voice ? "Mute sound" : "Unmute sound"} on={voice} onClick={() => setVoice((v) => !v)}>{voice ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}</B>
           {rules.autopilot !== "none" && <B label={rules.autopilot === "full" ? "Autopilot (A)" : "Upper-stage guidance (A)"} on={apActive} onClick={toggleAuto}><Bot className="size-4" />{rules.autopilot === "full" ? "Autopilot" : "Upper guidance"}</B>}

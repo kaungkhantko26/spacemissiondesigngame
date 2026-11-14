@@ -8,6 +8,7 @@ import { GameButton } from "@/components/ui";
 import { useUIStore } from "@/stores";
 import { Tour, setPendingTour, type TourStep } from "@/components/game/Tour";
 import { installVoiceUnlock, playVoice, primeVoice, stopVoice, voiceStatus } from "@/lib/voice";
+import { playSfx } from "@/lib/sfx";
 
 const MENU_TOUR: TourStep[] = [
   { target: "[data-tour=astronaut]", title: "Meet your astronaut", body: "Hover over me any time for a hello. I'll walk you through the game." },
@@ -74,7 +75,8 @@ export function TestVoiceButton() {
   const [msg, setMsg] = useState("");
   const run = () => {
     primeVoice();
+    playSfx("blip"); window.setTimeout(() => playSfx("ignite2"), 350);
     void playVoice("cd-10", false).then((ok) => setMsg(ok ? "Playing… (" + voiceStatus() + ")" : "Blocked: " + voiceStatus()));
   };
-  return (<span className="inline-flex items-center gap-2"><GameButton variant="outline" onClick={run}>Test voice</GameButton>{(msg || muted) && <span role="status" className="text-xs text-muted">{muted ? "Sound is muted in the top bar. " : ""}{msg}</span>}</span>);
+  return (<span className="inline-flex items-center gap-2"><GameButton variant="outline" onClick={run}>Test sound</GameButton>{(msg || muted) && <span role="status" className="text-xs text-muted">{muted ? "Sound is muted in the top bar. " : ""}{msg}</span>}</span>);
 }
