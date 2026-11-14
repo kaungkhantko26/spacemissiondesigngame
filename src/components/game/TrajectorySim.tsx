@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
-import { BufferAttribute, BufferGeometry, Line, LineBasicMaterial, LineDashedMaterial, Vector3, type Group, type Mesh } from "three";
+import { BufferAttribute, BufferGeometry, Line, LineBasicMaterial, LineDashedMaterial, Vector3, type Group, type Mesh, type MeshBasicMaterial } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { Pause, Play, RotateCcw, SkipForward, Crosshair, Globe2 } from "lucide-react";
 import { Scene3D, PlanetModel } from "@/components/three/lazy";
@@ -21,13 +21,13 @@ export class LabelBus {
 }
 /** Mutable playback state, advanced inside the render loop (never React state). */
 export class Playhead {
-  constructor(public u: number, public playing: boolean, public speed = 1, public follow = false) {}
+  constructor(public u: number, public playing: boolean, public speed = 1, public follow = false, public autoOverview = false) {}
   advance(dt: number, durationS: number, uEnd: number) {
     if (!this.playing || this.u >= uEnd) return;
     this.u = Math.min(uEnd, this.u + (dt / durationS) * this.speed);
     if (this.u >= uEnd) this.playing = false;
   }
-  patch(p: Partial<Pick<Playhead, "u" | "playing" | "speed" | "follow">>) { Object.assign(this, p); }
+  patch(p: Partial<Pick<Playhead, "u" | "playing" | "speed" | "follow" | "autoOverview">>) { Object.assign(this, p); }
 }
 const fmt = (n: number, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d });
 const met = (s: number) => {
@@ -35,8 +35,14 @@ const met = (s: number) => {
   return `T+ ${d}d ${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m`;
 };
 
+export const overviewPos = (traj: Trajectory): [number, number, number] => traj.mode === "moon"
+  ? [traj.centre[0], traj.viewRadius * 1.05, traj.viewRadius * 0.95]
+  : [0, traj.viewRadius * 2.5, traj.viewRadius * 1.1];
+const nearStart = (traj: Trajectory): [number, number, number] => { const c = traj.sample(0).craft; return [c[0] + traj.earthR * 0.6, c[1] + traj.earthR * 0.5, c[2] + traj.earthR * 1.1]; };
+
 /** Everything inside the single R3F canvas. State lives in `head` (mutated per frame, never React state). */
 function World({ traj, head, labels }: { traj: Trajectory; head: Playhead; labels: LabelBus }) {
+  const boom = useRef<{ t0: number } | null>(null), flash = useRef<Mesh>(null), fire = useRef<Mesh>(null), prevFollow = useRef(head.follow);
   const earth = useRef<Group>(null), target = useRef<Group>(null), craft = useRef<Mesh>(null), controls = useRef<OrbitControlsImpl>(null);
   const { camera, size } = useThree();
   const proj = useMemo(() => new Vector3(), []);
@@ -74,6 +80,29 @@ function World({ traj, head, labels }: { traj: Trajectory; head: Playhead; label
     // constant on-screen size for the craft marker
     const d = camera.position.distanceTo(craft.current!.position);
     craft.current?.scale.setScalar(Math.max(d * 0.011, moon ? 0.9 : 0.2));
+    if (craft.current) craft.current.visible = !s.lost;
+    // explosion when the vehicle/spacecraft is lost: flash + fireball expanding then fading
+    if (s.lost && !boom.current) boom.current = { t0: performance.now() };
+    if (!s.lost) boom.current = null;
+    const age = boom.current ? (performance.now() - boom.current.t0) / 1000 : -1;
+    for (const [m, k, life] of [[flash.current, 0.05, 0.5], [fire.current, 0.09, 2.2]] as const) {
+      if (!m) continue;
+      const on = age >= 0 && age < life;
+      m.visible = on;
+      if (on) {
+        m.position.set(...s.craft);
+        m.scale.setScalar(Math.max(d * k * (0.4 + 3 * (age / life)), moon ? 0.5 : 0.1));
+        (m.material as MeshBasicMaterial).opacity = 1 - age / life;
+      }
+    }
+    // camera presets: close chase view on the pad/ascent, whole-system view afterwards
+    if (h.autoOverview && h.u >= traj.markers.seg1) h.patch({ autoOverview: false, follow: false });
+    if (prevFollow.current !== h.follow && controls.current) {
+      prevFollow.current = h.follow;
+      const c0 = controls.current;
+      if (h.follow) { const cp = new Vector3(...s.craft); c0.target.copy(cp); camera.position.copy(cp).add(new Vector3(traj.earthR * 0.6, traj.earthR * 0.5, traj.earthR * 1.1)); }
+      else { c0.target.set(...traj.centre); camera.position.set(...overviewPos(traj)); }
+    }
     const c = controls.current;
     if (c) {
       const here = new Vector3(...s.craft);
@@ -102,8 +131,10 @@ function World({ traj, head, labels }: { traj: Trajectory; head: Playhead; label
         {moon ? <PlanetModel kind="moon" radius={traj.targetR} /> : <mesh scale={traj.viewRadius * 0.026}><sphereGeometry args={[1, 16, 16]} /><meshBasicMaterial color="#e8a35a" /></mesh>}
       </group>
       {!moon && <mesh scale={traj.viewRadius * 0.035}><sphereGeometry args={[1, 16, 16]} /><meshBasicMaterial color="#ffd27a" /></mesh>}
+      <mesh ref={flash} visible={false}><sphereGeometry args={[1, 16, 16]} /><meshBasicMaterial color="#fff4c2" transparent depthWrite={false} /></mesh>
+      <mesh ref={fire} visible={false}><sphereGeometry args={[1, 16, 16]} /><meshBasicMaterial color="#ff6a1a" transparent depthWrite={false} /></mesh>
       <mesh ref={craft}><coneGeometry args={[0.55, 1.6, 8]} /><meshBasicMaterial color="#ffffff" /></mesh>
-      <OrbitControls ref={controls} enablePan={false} target={traj.centre} minDistance={moon ? 3 : 8} maxDistance={traj.viewRadius * 5} />
+      <OrbitControls ref={controls} enablePan={false} target={head.follow ? traj.sample(0).craft : traj.centre} minDistance={moon ? 1 : 8} maxDistance={traj.viewRadius * 5} />
     </>
   );
 }
@@ -117,10 +148,11 @@ export function TrajectorySim({ traj, onUpdate, className, startAtEnd = false, a
   const reducedMotion = useUIStore((s) => s.reducedMotion);
   const reduced = reducedMotion || startAtEnd;
   const gated = awaitLaunch && !reduced; // wait on the pad until the player starts the countdown
-  const [head] = useState(() => new Playhead(reduced ? traj.uEnd : 0, !reduced && !gated));
+  const closeUp = traj.mode === "moon" && gated;
+  const [head] = useState(() => { const h = new Playhead(reduced ? traj.uEnd : 0, !reduced && !gated); if (closeUp) { h.follow = true; h.autoOverview = true; } return h; });
   const [count, setCount] = useState<number | null>(null);
   const [launched, setLaunched] = useState(!gated);
-  const [ui, setUi] = useState({ u: reduced ? traj.uEnd : 0, playing: !reduced && !gated, follow: false, speed: 1 });
+  const [ui, setUi] = useState({ u: reduced ? traj.uEnd : 0, playing: !reduced && !gated, follow: closeUp, speed: 1 });
   const [tel, setTel] = useState<Telemetry>(() => traj.sample(reduced ? traj.uEnd : 0).telemetry);
   const [lost, setLost] = useState(false);
   const [labels] = useState(() => new LabelBus());
@@ -130,7 +162,7 @@ export function TrajectorySim({ traj, onUpdate, className, startAtEnd = false, a
   useEffect(() => { // 10 Hz bridge from the render loop to React (HUD + phase log)
     const id = setInterval(() => {
       const h = head, s = traj.sample(h.u);
-      setUi((p) => (p.u === h.u && p.playing === h.playing ? p : { ...p, u: h.u, playing: h.playing }));
+      setUi((p) => (p.u === h.u && p.playing === h.playing && p.follow === h.follow ? p : { ...p, u: h.u, playing: h.playing, follow: h.follow }));
       setTel(s.telemetry); setLost(s.lost);
       cb.current(h.u, h.u >= traj.uEnd - 1e-6);
     }, 100);
@@ -138,9 +170,7 @@ export function TrajectorySim({ traj, onUpdate, className, startAtEnd = false, a
   }, [traj, head]);
 
   const set = (p: Partial<Pick<Playhead, "u" | "playing" | "speed" | "follow">>) => { head.patch(p); setUi((s) => ({ ...s, ...p })); };
-  const camera: [number, number, number] = traj.mode === "moon"
-    ? [traj.centre[0], traj.viewRadius * 1.05, traj.viewRadius * 0.95]
-    : [0, traj.viewRadius * 2.5, traj.viewRadius * 1.1];
+  const camera = closeUp ? nearStart(traj) : overviewPos(traj);
   useEffect(() => { // T-minus countdown, then ignition
     if (count === null) return;
     const id = setTimeout(() => {

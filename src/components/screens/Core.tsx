@@ -133,7 +133,7 @@ export function MenuScreen() {
           <p className="hud-label mt-4">Press 1–{MENU.length} to jump</p>
         </div>
         <div className="h-[380px] md:h-[560px]">
-          <Scene3D camera={[0, 1, 5]} label="Your astronaut"><Astronaut suit="#e8eef7" pose={pose} position={[0, -1.2, 0]} scale={1.2} /></Scene3D>
+          <Scene3D camera={[0, 0.6, 7]} label="Your astronaut"><Astronaut suit="#e8eef7" pose={pose} position={[0, -1.5, 0]} scale={1} /></Scene3D>
         </div>
       </div>
     </main>
