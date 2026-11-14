@@ -20,5 +20,10 @@
   "parking": "Parking orbit achieved. Standing by for the translunar window.",
   "tliStart": "T L I ignition. Burn under way.",
   "tli": "Translunar injection complete. We are on our way to the Moon.",
-  "failed": "We have lost the vehicle."
+  "failed": "We have lost the vehicle.",
+  "coast": "Translunar coast under way. Next stop, the Moon.",
+  "midcourse": "Mid-course correction complete. Trajectory nominal.",
+  "approach": "Approaching the Moon. Preparing lunar orbit insertion.",
+  "captured": "Lunar orbit insertion complete. We are in orbit around the Moon. Mission accomplished.",
+  "lostcontact": "We have lost contact with the spacecraft."
 }
