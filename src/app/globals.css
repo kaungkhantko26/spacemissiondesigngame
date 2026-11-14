@@ -1,22 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #050b18;
-  --bg-secondary: #0b1730;
-  --panel: rgba(9, 25, 51, 0.78);
-  --blue-primary: #0b3d91;
-  --blue-electric: #168bff;
-  --cyan: #4fc3f7;
-  --orange: #ff8c42;
-  --gold: #ffc857;
-  --text: #f5f7fa;
-  --text-2: #aabdd3;
-  --text-muted: #7389a5;
-  --success: #36d399;
-  --warning: #fbbf24;
-  --error: #fb7185;
-  --border: rgba(79, 195, 247, 0.28);
-  --radius: 14px;
+  --bg-primary: #090d13;
+  --bg-secondary: #101722;
+  --panel: #121a25;
+  --panel-raised: #172131;
+  --blue-primary: #2a4a7a;
+  --blue-electric: #5d8fd6;
+  --cyan: #79c9dc;
+  --orange: #ff7a33;
+  --gold: #f0bd4f;
+  --text: #eef1f5;
+  --text-2: #b0bccb;
+  --text-muted: #77879b;
+  --success: #5fcf9a;
+  --warning: #f0bd4f;
+  --error: #f0707e;
+  --border: rgba(255, 255, 255, 0.11);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --radius: 8px;
 }
 
 @theme inline {
@@ -34,7 +36,7 @@
   --color-warn: var(--warning);
   --color-bad: var(--error);
   --font-sans: var(--font-inter), system-ui, sans-serif;
-  --font-display: var(--font-space), var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-display-face), var(--font-inter), system-ui, sans-serif;
 }
 
 html, body { height: 100%; }
@@ -50,12 +52,18 @@ h1, h2, h3, .font-display { font-family: var(--font-display); }
 
 .starfield {
   background:
-    radial-gradient(ellipse at 20% 10%, rgba(22,139,255,.18), transparent 55%),
-    radial-gradient(ellipse at 85% 90%, rgba(255,140,66,.12), transparent 50%),
-    linear-gradient(180deg, #050b18, #0b1730);
+    radial-gradient(120% 70% at 50% -10%, rgba(93,143,214,.10), transparent 60%),
+    linear-gradient(180deg, var(--bg-primary), #0b111a);
 }
+/* Display type: uppercase, tracked, game-HUD feel */
+h1, h2 { letter-spacing: .02em; }
+h1 { text-transform: uppercase; }
+.hud-label { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .14em; font-size: .7rem; color: var(--text-muted); }
+/* Panel: solid, hairline border, small orange corner tick */
+.panel-tick { position: relative; }
+.panel-tick::before { content: ""; position: absolute; top: -1px; left: -1px; width: 14px; height: 14px; border-top: 2px solid var(--orange); border-left: 2px solid var(--orange); border-top-left-radius: 8px; pointer-events: none; }
 .stars {
-  position: absolute; inset: 0; pointer-events: none; opacity: .8;
+  position: absolute; inset: 0; pointer-events: none; opacity: .55;
   background-image:
     radial-gradient(1px 1px at 20px 30px, #fff, transparent),
     radial-gradient(1.5px 1.5px at 120px 80px, #bde3ff, transparent),

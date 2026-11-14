@@ -10,3 +10,6 @@
 **Done:** replaced procedural astronaut with rigged GLB (`public/models/astronaut.glb`, from Tianmin435/s1203com, specular-glossiness materials converted to standard PBR). Poses map to clips (idle/wave/ready→floating/celebrate→moon_walk); reduced motion freezes animation. Skins = suit-colour tint on `material_0/2`, visor from helmet colour. Added suits: Neon Cyan, Stealth Black, Lunar Silver.
 **Verified:** typecheck, lint, production build, browser screenshot of Cosmetics (default + Launch Orange). `npm test` could not run here (vitest rolldown native binding missing in this sandbox).
 **Known issues:** GLB is 32 MB (4K PNG textures) — compress/resize textures (gltf-transform) before shipping; multiply tint darkens bright skins; broader UI rebrand not started (reference game/astronaut page were unreachable at the time).
+
+## Session 2 (cont.) — UI restyle
+Matte mission-control look replacing glass/neon: solid panels + hairline borders + orange corner tick, Rajdhani display font (uppercase, tracked), tactile press-edge buttons, segmented XP bar, tighter radii, orange selection state. Token names unchanged (`globals.css`), so all screens inherit. Reviewed backend-integration branch: client layer only (`src/live/*`, `/play/*`), no server code in this repo; not merged, will need restyling to match.

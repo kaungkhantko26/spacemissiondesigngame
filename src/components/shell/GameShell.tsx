@@ -32,9 +32,9 @@ export function GameShell({ children }: { children: React.ReactNode }) {
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-gold focus:p-2 focus:text-black">Skip to content</a>
 
       {showHeader && (
-        <header className="relative z-20 flex items-center justify-between gap-3 px-4 py-3 md:px-8">
-          <Link href="/menu" className="font-display text-lg font-bold tracking-wide">
-            <span className="text-orange">SPACE</span> MISSION <span className="hidden sm:inline">DESIGN GAME</span>
+        <header className="relative z-20 flex items-center justify-between gap-3 border-b border-[var(--border)] bg-bg/80 px-4 py-2.5 md:px-8">
+          <Link href="/menu" className="flex items-center gap-2 font-display text-xl font-bold uppercase tracking-[.16em]">
+            <span aria-hidden className="size-3 rotate-45 bg-orange" /><span>Mission <span className="text-orange">Design</span></span>
           </Link>
           <div className="flex items-center gap-2">
             <IconButton label={muted ? "Unmute audio" : "Mute audio"} onClick={() => set({ muted: !muted })}>
@@ -90,7 +90,7 @@ export function GameShell({ children }: { children: React.ReactNode }) {
 
 export function ProfileWidget({ profile }: { profile: ReturnType<typeof usePlayerStore.getState>["profile"] }) {
   return (
-    <Link href="/profile" className="flex items-center gap-3 rounded-full border border-[var(--border)] bg-panel py-1 pl-1 pr-4 hover:border-cyan">
+    <Link href="/profile" className="flex items-center gap-3 rounded-md border border-[var(--border)] bg-panel py-1 pl-1 pr-4 hover:border-[var(--border-strong)]">
       <PlayerAvatar player={profile} size={36} />
       <div className="hidden min-w-28 sm:block">
         <div className="flex items-center gap-2 text-sm font-semibold">{profile.username}<LevelBadge level={profile.progression.level} /></div>

@@ -23,7 +23,7 @@ export function useLobby() {
 
 const Card = ({ icon: I, title, body, onClick, disabled, tag }: { icon: typeof Plus; title: string; body: string; onClick?: () => void; disabled?: boolean; tag?: string }) => (
   <button onClick={onClick} disabled={disabled} className="text-left disabled:opacity-60">
-    <GlassPanel className="h-full p-6 transition hover:border-cyan hover:shadow-[0_0_24px_rgba(79,195,247,.3)]">
+    <GlassPanel className="h-full p-6 transition hover:border-[var(--border-strong)]">
       <I className="size-8 text-cyan" aria-hidden />
       <h2 className="mt-3 text-xl font-bold">{title} {tag && <span className="ml-1 rounded bg-gold/20 px-2 text-xs text-gold">{tag}</span>}</h2>
       <p className="mt-1 text-sm text-ink2">{body}</p>
@@ -115,7 +115,7 @@ export function LobbyScreen() {
                       {m.connection === "connected" ? <Wifi className="inline size-3" /> : <WifiOff className="inline size-3" />} {m.connection}
                     </StatusPill>
                     <button aria-pressed={m.ready} onClick={() => void lobbyService.setReady(m.playerId, !m.ready)}
-                      className={cn("rounded-full border px-4 py-1 text-sm", m.ready ? "border-ok text-ok" : "border-white/20 text-ink2")}>{m.ready ? "✓ Ready" : "Not ready"}</button>
+                      className={cn("rounded-md border px-4 py-1 text-sm", m.ready ? "border-ok text-ok" : "border-white/20 text-ink2")}>{m.ready ? "✓ Ready" : "Not ready"}</button>
                   </>
                 ) : (
                   <button onClick={() => { sim.join(); }} className="grid place-items-center gap-2 text-ink2 hover:text-cyan"><UserPlus className="size-8" /><span>Invite Player</span><span className="text-xs text-muted">(simulates a join)</span></button>

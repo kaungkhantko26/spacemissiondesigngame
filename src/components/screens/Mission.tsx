@@ -272,7 +272,7 @@ export function ConfirmScreen() {
           <ul className="mt-3 grid gap-2">{crew.map(({ m, p, a, c }) => (
             <li key={p.id} className="flex items-center gap-2 rounded-lg bg-white/5 p-2"><PlayerAvatar player={p} size={28} />
               <span className="flex-1">{p.username}<span className="block text-xs text-muted capitalize">{a?.roleId ?? "No role"} · {c?.name ?? "No character"}</span></span>
-              <button aria-pressed={m.ready} onClick={() => void lobbyService.setReady(p.id, !m.ready)} className={cn("rounded-full border px-3 py-0.5 text-xs", m.ready ? "border-ok text-ok" : "border-white/20 text-ink2")}>{m.ready ? "✓ Ready" : "Not ready"}</button></li>))}</ul></GlassPanel>
+              <button aria-pressed={m.ready} onClick={() => void lobbyService.setReady(p.id, !m.ready)} className={cn("rounded-md border px-3 py-0.5 text-xs", m.ready ? "border-ok text-ok" : "border-white/20 text-ink2")}>{m.ready ? "✓ Ready" : "Not ready"}</button></li>))}</ul></GlassPanel>
       </div>
       {!canLaunch && <p role="status" className="text-sm text-warn">⚠ {!complete ? "Every player needs a role and character (use the demo auto-fill buttons)." : "All players must be ready."}</p>}
       <div className="flex flex-wrap justify-end gap-2">
@@ -312,7 +312,7 @@ const stateColor: Record<HudState, string> = { normal: "bg-ok", warning: "bg-war
 function Meter({ label, v, unit }: { label: string; v: { value: number; max: number; state: HudState }; unit: string }) {
   return (
     <div><div className="flex justify-between text-xs"><span>{label}</span><StatusPill state={v.state}>{v.state}</StatusPill></div>
-      <div className="mt-1 h-2 rounded-full bg-white/10" role="meter" aria-label={label} aria-valuenow={Math.round(v.value)} aria-valuemin={0} aria-valuemax={v.max}><div className={cn("h-full rounded-full", stateColor[v.state])} style={{ width: `${Math.min(100, (v.value / v.max) * 100)}%` }} /></div>
+      <div className="mt-1 h-2 rounded-sm bg-white/10" role="meter" aria-label={label} aria-valuenow={Math.round(v.value)} aria-valuemin={0} aria-valuemax={v.max}><div className={cn("h-full rounded-full", stateColor[v.state])} style={{ width: `${Math.min(100, (v.value / v.max) * 100)}%` }} /></div>
       <p className="text-xs text-muted">{Math.round(v.value)} / {v.max} {unit}</p></div>
   );
 }

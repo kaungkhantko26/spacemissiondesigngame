@@ -62,14 +62,14 @@ export function MenuScreen() {
       <div className="relative z-10 flex justify-end p-4 md:p-8"><ProfileWidget profile={profile} /></div>
       <div className="relative z-10 grid flex-1 items-center gap-6 px-6 pb-10 md:grid-cols-2 md:px-16">
         <div>
-          <p className="text-xs tracking-[.3em] text-cyan">NASA SPACE APPS CHALLENGE 2026</p>
+          <p className="hud-label !text-orange !tracking-[.3em]">NASA SPACE APPS CHALLENGE 2026</p>
           <h1 className="mt-2 text-5xl font-bold leading-tight md:text-7xl"><span className="text-orange">Space Mission</span><br />Design Game</h1>
           <nav aria-label="Main menu" className="mt-8 flex max-w-sm flex-col gap-3">
             {MENU.map((m) => (
               <Link key={m.href} href={m.href}
-                className={cn("group flex items-center gap-3 rounded-xl border px-5 py-3 font-display tracking-wide transition duration-150",
-                  m.primary ? "border-orange bg-gradient-to-r from-orange to-[#ff6a2b] py-4 text-lg font-bold text-[#1a0b00] shadow-[0_0_24px_rgba(255,140,66,.4)]"
-                    : "border-[var(--border)] bg-panel hover:border-cyan hover:shadow-[0_0_18px_rgba(79,195,247,.35)]")}>
+                className={cn("group flex items-center gap-3 rounded-lg border px-5 py-3 font-display tracking-wide transition duration-150",
+                  m.primary ? "border-orange bg-orange shadow-[0_4px_0_#b4501a] py-4 text-lg font-bold text-[#1a0b00]"
+                    : "border-[var(--border)] bg-panel hover:border-[var(--border-strong)]")}>
                 <m.icon className="size-5" aria-hidden />{m.label.toUpperCase()}
               </Link>
             ))}
@@ -171,7 +171,7 @@ export function CosmeticsScreen() {
           <div role="tablist" aria-label="Cosmetic categories" className="flex flex-wrap gap-2">
             {CATS.map((c) => (
               <button key={c.id} role="tab" aria-selected={category === c.id} onClick={() => setCategory(c.id)}
-                className={cn("rounded-full border px-4 py-1.5 text-sm", category === c.id ? "border-cyan bg-cyan/15 text-cyan" : "border-white/15 text-ink2 hover:text-ink")}>{c.label}</button>
+                className={cn("rounded-md border px-4 py-1.5 text-sm", category === c.id ? "border-orange bg-orange/10 text-orange" : "border-white/15 text-ink2 hover:text-ink")}>{c.label}</button>
             ))}
           </div>
           <ul className="grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -180,7 +180,7 @@ export function CosmeticsScreen() {
               return (
                 <li key={c.id}>
                   <button onClick={() => preview(c.id)} aria-pressed={previewId === c.id}
-                    className={cn("w-full rounded-xl border bg-panel p-3 text-left transition", previewId === c.id ? "border-cyan shadow-[0_0_18px_rgba(79,195,247,.35)]" : "border-white/10 hover:border-cyan/50")}>
+                    className={cn("w-full rounded-lg border bg-panel p-3 text-left transition", previewId === c.id ? "border-orange" : "border-white/10 hover:border-cyan/50")}>
                     <div className="mb-2 grid h-20 place-items-center rounded-lg" style={{ background: `linear-gradient(135deg, ${c.color}, ${c.accent})` }}>
                       {!c.unlocked && <Lock className="size-6 text-white/90" aria-label="Locked" />}
                     </div>
@@ -226,7 +226,7 @@ export function StatsScreen() {
           <div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-bold">Attributes</h2><p className="text-sm text-gold">Available XP: {avail}</p></div>
           <ul className="grid gap-4">
             {opts.map((o) => (
-              <li key={o.attribute} className={cn("rounded-xl border p-3", sel === o.attribute ? "border-cyan" : "border-white/10")}>
+              <li key={o.attribute} className={cn("rounded-lg border p-3", sel === o.attribute ? "border-orange" : "border-white/10")}>
                 <StatBar label={o.attribute[0].toUpperCase() + o.attribute.slice(1)} value={o.currentValue} next={sel === o.attribute ? o.nextValue : undefined} />
                 <div className="mt-2 flex items-center justify-between text-xs text-ink2">
                   <span>Next: {o.nextValue} · Cost {o.cost} XP</span>
@@ -256,7 +256,7 @@ export function StatsScreen() {
 /* ---------- Settings ---------- */
 const Row = ({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) => (
   <button role="switch" aria-checked={on} onClick={onClick} className="flex w-full items-center justify-between rounded-lg bg-white/5 p-3 text-left">
-    {label}<span className={cn("rounded-full px-3 py-0.5 text-xs", on ? "bg-ok/20 text-ok" : "bg-white/10 text-muted")}>{on ? "On" : "Off"}</span>
+    {label}<span className={cn("rounded-sm px-3 py-0.5 font-display text-xs uppercase tracking-wider", on ? "bg-ok/20 text-ok" : "bg-white/10 text-muted")}>{on ? "On" : "Off"}</span>
   </button>
 );
 
@@ -272,7 +272,7 @@ export function SettingsScreen() {
           3D quality
           <div className="flex gap-1">{(["low", "medium", "high"] as const).map((q) => (
             <button key={q} role="radio" aria-checked={ui.quality === q} onClick={() => ui.set({ quality: q })}
-              className={cn("rounded-full border px-3 py-1 text-xs capitalize", ui.quality === q ? "border-cyan text-cyan" : "border-white/15 text-ink2")}>{q}</button>))}
+              className={cn("rounded-md border px-3 py-1 text-xs capitalize", ui.quality === q ? "border-orange text-orange" : "border-white/15 text-ink2")}>{q}</button>))}
           </div>
         </div>
       </GlassPanel>
