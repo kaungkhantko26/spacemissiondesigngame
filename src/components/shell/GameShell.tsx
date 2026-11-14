@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, Volume2, VolumeX, Accessibility, X } from "lucide-react";
+import { AlertTriangle, Bell, CheckCircle2, Info, Volume2, VolumeX, Accessibility, X } from "lucide-react";
 import { useUIStore, usePlayerStore } from "@/stores";
 import { GlassPanel, GameButton, IconButton, LevelBadge, PlayerAvatar, XPProgressBar } from "@/components/ui";
 import Link from "next/link";
@@ -87,14 +87,28 @@ export function GameShell({ children }: { children: React.ReactNode }) {
         </AnimatePresence>
       </div>
 
-      {/* Toasts */}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2" role="status" aria-live="polite">
-        {toasts.map((t) => (
-          <GlassPanel key={t.id} className={cn("pointer-events-auto flex items-center gap-3 px-4 py-3 text-sm", t.tone === "success" && "border-ok", t.tone === "error" && "border-bad")}>
-            <span>{t.tone === "success" ? "✓" : t.tone === "error" ? "!" : "i"}</span>{t.message}
-            <button aria-label="Dismiss" onClick={() => dismissToast(t.id)}><X className="size-4" /></button>
-          </GlassPanel>
-        ))}
+      {/* Toasts: top-centre, above every overlay (flight HUD, tour, dialogs) */}
+      <div className="pointer-events-none fixed inset-x-0 top-3 z-[90] flex flex-col items-center gap-2 px-3" role="status" aria-live="polite">
+        <AnimatePresence initial={false}>
+          {toasts.map((t) => {
+            const tone = t.tone === "success" ? { c: "#5fcf9a", Icon: CheckCircle2, label: "Done" } : t.tone === "error" ? { c: "#f0707e", Icon: AlertTriangle, label: "Problem" } : { c: "#79c9dc", Icon: Info, label: "Notice" };
+            return (
+              <motion.div key={t.id} layout initial={{ opacity: 0, y: reducedMotion ? 0 : -18, scale: reducedMotion ? 1 : 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: reducedMotion ? 0 : -10, transition: { duration: 0.15 } }}
+                transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-[#0d1424]/95 shadow-[0_14px_40px_rgba(0,0,0,.55)]">
+                <div className="flex items-start gap-3 p-3 pr-2">
+                  <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full" style={{ background: `${tone.c}22`, color: tone.c }}><tone.Icon className="size-[18px]" aria-hidden /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-[.18em]" style={{ color: tone.c }}>{tone.label}</p>
+                    <p className="text-sm leading-snug text-ink">{t.message}</p>
+                  </div>
+                  <button aria-label="Dismiss notification" onClick={() => dismissToast(t.id)} className="rounded-md p-1.5 text-muted hover:bg-white/10 hover:text-ink"><X className="size-4" /></button>
+                </div>
+                <span aria-hidden className="absolute bottom-0 left-0 h-[3px] origin-left" style={{ background: tone.c, width: "100%", animation: reducedMotion ? "none" : "toastbar 3.5s linear forwards" }} />
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
 
       {/* Confirm dialog */}
