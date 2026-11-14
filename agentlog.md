@@ -41,3 +41,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Added `/demo` hub (src/components/screens/Demo.tsx) linking every offline-playable flow; menu has a Demo Hub entry; `/play` without `NEXT_PUBLIC_API_URL` now points to the offline demos. Live cards are disabled until the server URL is set.
 - Lint fixes in live code (impure `Date.now()` initial state, setState-in-effect in Account). Verified: typecheck, lint, 24 tests, production build.
 - No server code exists in this repo; live `/play` still needs the backend.
+- Main flow (/team, /team/lobby, /mission/select|briefing|roles|characters|confirm|gameplay|results) now renders live screens (src/components/live/Screens.tsx) in the original UI style when NEXT_PUBLIC_API_URL is set; mock screens remain as fallback. Routes follow the server room state (useGate).
