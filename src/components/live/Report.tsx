@@ -18,6 +18,9 @@ export function Report() {
         <p className="mt-2 text-sm">{r.summary}</p>
         {mine && <p className="mt-2 text-orange">+{mine.xp} XP → {mine.totalXp} ({mine.rank}){mine.newCosmetics.length > 0 && ` · Unlocked: ${mine.newCosmetics.map(item).join(", ")}`}</p>}
       </GlassPanel>
+      {r.ops && <GlassPanel className="p-4"><h3 className="font-semibold">Operations</h3>
+        <p className="text-xs text-ink2">{r.ops.lost ? "Spacecraft lost during operations. " : ""}Incidents handled {r.ops.handled}, missed {r.ops.missed}, brownouts {r.ops.brownouts}. Contingency left ${r.ops.budgetLeftM.toFixed(2)}M of ${r.ops.budget0.toFixed(2)}M.</p>
+        <div className="mt-2 flex h-16 items-end gap-0.5" aria-label="Health over time">{r.ops.timeline.map((t) => <div key={t.t} className="flex-1 bg-cyan/70" style={{ height: `${t.health}%` }} title={`Month step ${t.t}: health ${t.health}%`} />)}</div></GlassPanel>}
       {r.challenges && <GlassPanel className="p-4"><h3 className="font-semibold">Time-attack: {r.challenges.count}/{r.challenges.total}{!r.challenges.onTime && " (too slow — no cosmetic)"}</h3>
         {r.challenges.list.map((c) => <div key={c.id} className={`text-xs ${c.completed ? "text-good" : "text-ink2"}`}>{c.completed ? "✔" : "○"} {c.name}</div>)}</GlassPanel>}
       <GlassPanel className="p-4"><h3 className="font-semibold">What happened</h3>

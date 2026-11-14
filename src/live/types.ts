@@ -6,7 +6,7 @@ export type Difficulty = "easy" | "medium" | "hard";
 export type RoleId = "lead" | "engineer" | "science" | "comms";
 export type StatId = "planning" | "engineering" | "science" | "comms" | "resilience";
 export type CheckStatus = "pass" | "warn" | "fail" | "block";
-export type RoomStatus = "lobby" | "roles" | "design" | "report";
+export type RoomStatus = "lobby" | "roles" | "design" | "ops" | "report";
 export type Outcome = "success" | "partial" | "failure" | "launch_failure";
 
 export interface DifficultyInfo {
@@ -131,9 +131,22 @@ export interface Result {
   missedObjectives: { label: string; why: string; value: number | string | null; target: number | string | null }[];
   matches: RealMatch[];
   challenges: (ChallengeProgress & { onTime: boolean; eligible: boolean; rewards: string[] }) | null;
-  xp: number; attempt: number;
+  xp: number; attempt: number; ops?: OpsSummary;
   awards: Record<string, { xp: number; newCosmetics: string[]; totalXp: number; rank: string }>;
 }
+export interface OpsIncident {
+  id: string; label: string; text: string; deadline: number; serverNow: number;
+  options: { id: string; label: string; hint: string; role: RoleId; cost: number }[];
+}
+export interface OpsView {
+  status: "running" | "done" | "lost"; tick: number; ticks: number; month: number; totalMonths: number;
+  res: { power: number; storage: number; health: number; budget: number }; budget0: number;
+  ctl: { duty: number; downlink: "normal" | "boost"; mode: "nominal" | "safe" };
+  incident: OpsIncident | null; log: { tick: number; kind: "info" | "good" | "bad" | "alert" | "decision"; text: string }[];
+  timeline: { t: number; power: number; storage: number; health: number; eff: number }[];
+  repairIn: number; serverNow: number; tickMs: number; nextAt: number; safeNow: boolean;
+}
+export interface OpsSummary { lost: boolean; budgetLeftM: number; budget0: number; handled: number; missed: number; brownouts: number; timeline: OpsView["timeline"] }
 export interface RoomMember { id: string; name: string; rank: string; equipped: Record<string, string>; online: boolean }
 export interface Slot { slot: string; role: RoleId; playerId: string | null; ai: boolean; characterId: string | null }
 export interface ChatMsg { from: string; name: string; text: string; at: number }
@@ -141,7 +154,7 @@ export interface Room {
   code: string; status: RoomStatus; hostId: string; missionId: string | null; difficulty: Difficulty | null; attempt: number;
   members: RoomMember[]; slots: Slot[]; design: DesignState | null; approvals: string[];
   fieldOwners: Record<string, RoleId[]>; preview: Preview | null; challenge: ChallengeClock | null;
-  result: Result | null; chat: ChatMsg[];
+  result: Result | null; chat: ChatMsg[]; ops: OpsView | null;
 }
 
 /* ---------- socket protocol ---------- */
@@ -158,5 +171,6 @@ export type ClientMessage =
   | { t: "room.setup"; missionId: string; difficulty: Difficulty } | { t: "room.start_roles" }
   | { t: "role.claim"; slot: string; characterId: string } | { t: "role.release" }
   | { t: "room.start_design" } | { t: "design.set"; patch: DesignPatch } | { t: "design.approve"; approved: boolean }
-  | { t: "launch" } | { t: "room.redesign" } | { t: "room.to_lobby" } | { t: "chat"; text: string }
+  | { t: "launch" } | { t: "ops.set"; patch: Partial<{ duty: number; downlink: "normal" | "boost"; mode: "nominal" | "safe" }> }
+  | { t: "ops.respond"; option: string } | { t: "ops.repair" } | { t: "room.redesign" } | { t: "room.to_lobby" } | { t: "chat"; text: string }
   | { t: "profile.upgrade"; stat: StatId } | { t: "profile.rename"; name: string } | { t: "cosmetic.equip"; item: string };

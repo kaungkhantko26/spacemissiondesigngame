@@ -8,6 +8,7 @@ import { BackButton, GameButton, GlassPanel, PlayerAvatar, ScreenContainer, Stat
 import { useGame } from "@/live/store";
 import { Design } from "./Design";
 import { Report } from "./Report";
+import { Ops } from "./Ops";
 import { cn } from "@/lib/mission";
 import type { Difficulty, Room } from "@/live/types";
 
@@ -16,7 +17,7 @@ const PALETTE = ["#4fc3f7", "#ff8c42", "#a78bfa", "#34d399", "#f472b6", "#fbbf24
 const colorOf = (s: string) => PALETTE[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTE.length];
 
 /** Which route each server state belongs to. Redirects so every player follows the room. */
-type Stage = "entry" | "lobby" | "setup" | "roles" | "design" | "report";
+type Stage = "entry" | "lobby" | "setup" | "roles" | "design" | "ops" | "report";
 function useGate(stage: Stage) {
   const router = useRouter(); const { boot, ready, room, profile } = useGame();
   useEffect(() => { void boot(); }, [boot]);
@@ -25,6 +26,7 @@ function useGate(stage: Stage) {
   if (ready) {
     if (!room) target = stage === "entry" ? null : "/team";
     else if (room.status === "design") target = stage === "design" ? null : "/mission/gameplay";
+    else if (room.status === "ops") target = stage === "ops" ? null : "/mission/ops";
     else if (room.status === "report") target = stage === "report" ? null : "/mission/results";
     else if (room.status === "roles") target = stage === "roles" ? null : "/mission/roles";
     else if (stage === "entry") target = "/team/lobby";
@@ -240,3 +242,5 @@ export function LiveConfirm() {
 /* ---------- Design + results ---------- */
 export function LiveDesign() { const { ready } = useGate("design"); return ready ? <ScreenContainer title="Spacecraft Design"><ErrorBar /><Design /></ScreenContainer> : <Wait />; }
 export function LiveResults() { const { ready } = useGate("report"); return ready ? <ScreenContainer title="Mission Report"><ErrorBar /><Report /></ScreenContainer> : <Wait />; }
+
+export function LiveOps() { const { ready } = useGate("ops"); return ready ? <ScreenContainer title="Mission Operations"><ErrorBar /><Ops /></ScreenContainer> : <Wait />; }

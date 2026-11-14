@@ -12,7 +12,7 @@ interface GameState {
   setup: (missionId: string, difficulty: Difficulty) => Promise<void>;
   startRoles: () => Promise<void>; claim: (slot: string, characterId: string) => Promise<void>; release: () => Promise<void>;
   startDesign: () => Promise<void>; setDesign: (patch: DesignPatch) => Promise<void>; approve: (v: boolean) => Promise<void>;
-  launch: () => Promise<void>; redesign: () => Promise<void>; toLobby: () => Promise<void>; chat: (text: string) => Promise<void>;
+  launch: () => Promise<void>; opsSet: (patch: { duty?: number; downlink?: "normal" | "boost"; mode?: "nominal" | "safe" }) => Promise<void>; opsRespond: (option: string) => Promise<void>; opsRepair: () => Promise<void>; redesign: () => Promise<void>; toLobby: () => Promise<void>; chat: (text: string) => Promise<void>;
   upgrade: (stat: StatId) => Promise<void>; rename: (name: string) => Promise<void>; equip: (item: string) => Promise<void>;
 }
 
@@ -58,6 +58,9 @@ export const useGame = create<GameState>((set) => {
     setDesign: (patch) => send({ t: "design.set", patch }),
     approve: (approved) => send({ t: "design.approve", approved }),
     launch: () => send({ t: "launch" }),
+    opsSet: (patch) => send({ t: "ops.set", patch }),
+    opsRespond: (option) => send({ t: "ops.respond", option }),
+    opsRepair: () => send({ t: "ops.repair" }),
     redesign: () => send({ t: "room.redesign" }),
     toLobby: () => send({ t: "room.to_lobby" }),
     chat: (text) => send({ t: "chat", text }),
