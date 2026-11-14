@@ -1,9 +1,9 @@
 "use client";
 import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Stars, useAnimations, useGLTF } from "@react-three/drei";
+import { OrbitControls, Stars, useAnimations, useGLTF, useTexture } from "@react-three/drei";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { type Group, type Mesh, type MeshStandardMaterial } from "three";
+import { SRGBColorSpace, type Group, type Mesh, type MeshStandardMaterial } from "three";
 import { useUIStore } from "@/stores";
 
 /** Error boundary: 3D must never block navigation. */
@@ -30,7 +30,7 @@ export function Scene3D({ children, camera = [0, 1.2, 5], controls = false, ligh
   return (
     <div className={className} aria-label={label} role="img">
       <Boundary fallback={<Fallback label={label} />}>
-        <Canvas dpr={dpr} camera={{ position: camera, fov: 40, ...(far ? { far } : {}) }} gl={{ antialias: quality !== "low" }}>
+        <Canvas dpr={dpr} camera={{ position: camera, fov: 40, ...(far ? { far } : {}) }} gl={{ antialias: quality !== "low", powerPreference: "high-performance" }}>
           <Suspense fallback={null}>
             <Lights preset={light} />
             {stars && <Stars radius={60} depth={30} count={quality === "low" ? 500 : 1800} factor={3} fade />}
@@ -134,20 +134,34 @@ const bodyStyle: Record<BodyKind, { color: string; emissive: string }> = {
   deepspace: { color: "#6b7bd6", emissive: "#1a1f4a" },
   telescope: { color: "#c9d4e5", emissive: "#1a2438" },
 };
-export function PlanetModel({ kind, radius = 1.5, position = [0, 0, 0] }: { kind: BodyKind; radius?: number; position?: [number, number, number] }) {
+type P3 = [number, number, number];
+/** Real Earth: NASA Blue Marble map + drifting cloud layer + atmosphere rim. */
+function TexturedEarth({ radius }: { radius: number }) {
+  const [map, clouds] = useTexture(["/textures/earth.jpg", "/textures/earth_clouds.png"], (t) => { (Array.isArray(t) ? t[0] : t).colorSpace = SRGBColorSpace; });
+  const cl = useRef<Group>(null);
+  const reduced = useUIStore((st) => st.reducedMotion);
+  useFrame((_, d) => { if (cl.current && !reduced) cl.current.rotation.y += d * 0.02; });
+  return (
+    <>
+      <mesh><sphereGeometry args={[radius, 64, 64]} /><meshStandardMaterial map={map} roughness={0.85} /></mesh>
+      <group ref={cl}><mesh><sphereGeometry args={[radius * 1.012, 48, 48]} /><meshStandardMaterial map={clouds} alphaMap={clouds} transparent opacity={0.45} depthWrite={false} /></mesh></group>
+      <mesh><sphereGeometry args={[radius * 1.06, 48, 48]} /><meshBasicMaterial color="#5fb4ff" transparent opacity={0.1} depthWrite={false} /></mesh>
+    </>
+  );
+}
+function TexturedMoon({ radius }: { radius: number }) {
+  const map = useTexture("/textures/moon.jpg", (t) => { (Array.isArray(t) ? t[0] : t).colorSpace = SRGBColorSpace; });
+  return <mesh><sphereGeometry args={[radius, 48, 48]} /><meshStandardMaterial map={map} roughness={1} /></mesh>;
+}
+export function PlanetModel({ kind, radius = 1.5, position = [0, 0, 0] }: { kind: BodyKind; radius?: number; position?: P3 }) {
   const ref = useRef<Group>(null);
-  const reduced = useUIStore((s) => s.reducedMotion);
+  const reduced = useUIStore((st) => st.reducedMotion);
   useFrame((_, d) => { if (ref.current && !reduced) ref.current.rotation.y += d * 0.1; });
-  const s = bodyStyle[kind];
+  const st = bodyStyle[kind];
   return (
     <group ref={ref} position={position}>
-      <mesh><sphereGeometry args={[radius, 48, 48]} /><meshStandardMaterial color={s.color} emissive={s.emissive} emissiveIntensity={0.5} roughness={0.9} /></mesh>
-      {kind === "earth" && (
-        <>
-          <mesh scale={1.0}><sphereGeometry args={[radius * 1.001, 24, 24]} /><meshStandardMaterial color="#2fa56a" transparent opacity={0.55} wireframe /></mesh>
-          <mesh scale={1.06}><sphereGeometry args={[radius, 32, 32]} /><meshBasicMaterial color="#4fc3f7" transparent opacity={0.12} /></mesh>
-        </>
-      )}
+      {kind === "earth" ? <TexturedEarth radius={radius} /> : kind === "moon" ? <TexturedMoon radius={radius} />
+        : <mesh><sphereGeometry args={[radius, 48, 48]} /><meshStandardMaterial color={st.color} emissive={st.emissive} emissiveIntensity={0.5} roughness={0.9} /></mesh>}
     </group>
   );
 }

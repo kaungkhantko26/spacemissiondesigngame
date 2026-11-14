@@ -113,11 +113,14 @@ const Btn = ({ label, onClick, on, children }: { label: string; onClick: () => v
     className={cn("grid size-9 place-items-center rounded-md border bg-panel text-ink2 transition hover:text-ink", on ? "border-orange text-orange" : "border-[var(--border)]")}>{children}</button>
 );
 
-export function TrajectorySim({ traj, onUpdate, className, startAtEnd = false }: { traj: Trajectory; onUpdate: (u: number, done: boolean) => void; className?: string; startAtEnd?: boolean }) {
+export function TrajectorySim({ traj, onUpdate, className, startAtEnd = false, awaitLaunch = false }: { traj: Trajectory; onUpdate: (u: number, done: boolean) => void; className?: string; startAtEnd?: boolean; awaitLaunch?: boolean }) {
   const reducedMotion = useUIStore((s) => s.reducedMotion);
   const reduced = reducedMotion || startAtEnd;
-  const [head] = useState(() => new Playhead(reduced ? traj.uEnd : 0, !reduced));
-  const [ui, setUi] = useState({ u: reduced ? traj.uEnd : 0, playing: !reduced, follow: false, speed: 1 });
+  const gated = awaitLaunch && !reduced; // wait on the pad until the player starts the countdown
+  const [head] = useState(() => new Playhead(reduced ? traj.uEnd : 0, !reduced && !gated));
+  const [count, setCount] = useState<number | null>(null);
+  const [launched, setLaunched] = useState(!gated);
+  const [ui, setUi] = useState({ u: reduced ? traj.uEnd : 0, playing: !reduced && !gated, follow: false, speed: 1 });
   const [tel, setTel] = useState<Telemetry>(() => traj.sample(reduced ? traj.uEnd : 0).telemetry);
   const [lost, setLost] = useState(false);
   const [labels] = useState(() => new LabelBus());
@@ -138,6 +141,13 @@ export function TrajectorySim({ traj, onUpdate, className, startAtEnd = false }:
   const camera: [number, number, number] = traj.mode === "moon"
     ? [traj.centre[0], traj.viewRadius * 1.05, traj.viewRadius * 0.95]
     : [0, traj.viewRadius * 2.5, traj.viewRadius * 1.1];
+  useEffect(() => { // T-minus countdown, then ignition
+    if (count === null) return;
+    const id = setTimeout(() => {
+      if (count <= 1) { head.patch({ playing: true }); setLaunched(true); setCount(null); } else setCount(count - 1);
+    }, 900);
+    return () => clearTimeout(id);
+  }, [count, head]);
   const done = ui.u >= traj.uEnd;
   return (
     <div className={cn("relative overflow-hidden", className)}>
@@ -147,6 +157,16 @@ export function TrajectorySim({ traj, onUpdate, className, startAtEnd = false }:
       {["Earth", traj.targetName].map((t, i) => (
         <span key={t} ref={(el) => labels.bind(i, el)} aria-hidden className="pointer-events-none absolute left-0 top-0 whitespace-nowrap rounded-sm bg-black/60 px-1.5 py-0.5 font-display text-[11px] uppercase tracking-widest text-ink2 opacity-0">{t}</span>
       ))}
+      {!launched && (
+        <div className="absolute inset-0 z-10 grid place-items-center bg-black/30">
+          {count === null ? (
+            <div className="text-center">
+              <p className="hud-label !text-orange">Pad 39 · All systems go</p>
+              <button type="button" onClick={() => setCount(3)} className="mt-3 rounded-lg border border-orange bg-orange px-8 py-4 font-display text-xl font-bold uppercase tracking-widest text-[#1a0b00] shadow-[0_4px_0_#b4501a] transition active:translate-y-0.5">Launch from Earth</button>
+            </div>
+          ) : <p role="status" aria-live="assertive" className="font-display text-8xl font-bold text-orange tabular-nums">{count}</p>}
+        </div>
+      )}
       <dl className="pointer-events-none absolute left-3 top-3 space-y-1 rounded-md border border-[var(--border)] bg-bg/75 p-3 font-display text-sm tracking-wider" aria-label="Flight telemetry">
         <div><dt className="hud-label">Phase</dt><dd className={cn("text-base uppercase", lost ? "text-bad" : "text-orange")}>{tel.phase}</dd></div>
         <div><dt className="hud-label">Mission time</dt><dd className="tabular-nums">{met(tel.metS)}</dd></div>

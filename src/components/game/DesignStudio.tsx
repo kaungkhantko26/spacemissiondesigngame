@@ -35,7 +35,8 @@ const Slider = ({ label, value, min, max, step = 1, unit, onChange, note }: { la
 );
 
 export function DesignStudio() {
-  const { design, patch, toggleInstrument, autoFill, launch, redesign, reset } = useDesignStore();
+  const { design, patch, toggleInstrument, autoFill, quickStart, launch, redesign, reset } = useDesignStore();
+  const [qsFailed, setQsFailed] = useState(false);
   const ev = useEvaluation();
   const [flight, setFlight] = useState<MissionResult | null>(null);
   const dest = ev.destination;
@@ -46,10 +47,19 @@ export function DesignStudio() {
 
   return (
     <ScreenContainer title="Mission Architect" subtitle="Real orbital physics, real launch records, real NASA instruments — balance them all." actions={<div className="flex gap-2"><GameButton variant="ghost" icon={<RotateCcw className="size-4" />} onClick={reset}>Reset</GameButton><BackButton href="/menu" label="Main menu" /></div>}>
+      <GlassPanel active className="flex flex-wrap items-center gap-4 p-4" aria-label="Quick start">
+        <div className="min-w-60 flex-1">
+          <p className="hud-label !text-orange">New here? Three steps</p>
+          <p className="font-display text-lg font-bold uppercase tracking-wide">1 Pick Moon or Mars · 2 Build it for me · 3 Launch from Earth</p>
+          <p className="text-xs text-ink2">“Build it for me” picks the most reliable rocket, engine, power, antenna and instruments for {dest.name}. Tweak anything below afterwards.</p>
+        </div>
+        <GameButton variant="primary" icon={<Wand2 className="size-5" />} onClick={() => setQsFailed(!quickStart(design.destinationId))}>Build it for me</GameButton>
+        {qsFailed && <p role="status" className="w-full text-xs text-bad">Couldn’t find a working build automatically — adjust the sections below.</p>}
+      </GlassPanel>
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
         <div className="space-y-4">
           <Section n={1} title="Destination" hint="Δv and travel time are computed from the dataset's gravitational parameters, radii and orbits.">
-            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="grid gap-3 sm:grid-cols-2">
               {DESTINATIONS.map((d) => (
                 <li key={d.id}><Pick on={design.destinationId === d.id} onClick={() => patch({ destinationId: d.id })} className="h-full w-full">
                   <p className="font-display text-lg font-bold">{d.name}</p><p className="text-xs text-ink2">{d.tagline}</p>
@@ -218,7 +228,7 @@ function FlightView({ ev, result, onAgain, onRetry }: { ev: Evaluation; result: 
               <Astronaut suit="#e8eef7" pose={result.success ? "celebrate" : "idle"} position={[0, -1, 0]} />
             </Scene3D>
           ) : (
-            <TrajectorySim key={`${result.score}-${result.reached}-${ev.destination.id}`} traj={traj} onUpdate={onUpdate} startAtEnd={seenEnd} className="h-full min-h-[520px]" />
+            <TrajectorySim key={`${result.score}-${result.reached}-${ev.destination.id}`} traj={traj} onUpdate={onUpdate} startAtEnd={seenEnd} awaitLaunch className="h-full min-h-[520px]" />
           )}
         </GlassPanel>
       </div>

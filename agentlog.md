@@ -41,3 +41,10 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Added `/demo` hub (src/components/screens/Demo.tsx) linking every offline-playable flow; menu has a Demo Hub entry; `/play` without `NEXT_PUBLIC_API_URL` now points to the offline demos. Live cards are disabled until the server URL is set.
 - Lint fixes in live code (impure `Date.now()` initial state, setState-in-effect in Account). Verified: typecheck, lint, 24 tests, production build.
 - No server code exists in this repo; live `/play` still needs the backend.
+
+## Session 3 (cont.) — Real globe, Moon/Mars only, easier design, perf
+- Destinations limited to Moon and Mars (Venus/Mercury/Jupiter removed from `DESTINATIONS`; tests updated).
+- Real textures in `public/textures` (three.js example maps: Earth 2K + clouds, Moon 1K); `PlanetModel` uses them via `useTexture`. Mars is still a flat-colour sphere (no texture bundled).
+- `useDesignStore.quickStart(destId)`: two-phase search → most reliable go-for-launch build ("Build it for me" button + 3-step banner on /design). Tests in `quickstart.test.ts`.
+- Flight view waits on the pad: "Launch from Earth" → 3-2-1 countdown → ascent.
+- Perf: evaluation memoized (`useEvaluation`), default quality `medium`, high-performance GL hint. Still open: `astronaut.glb` is 32 MB — compress textures (gltf-transform) for faster loads.
