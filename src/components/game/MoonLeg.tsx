@@ -4,6 +4,9 @@ import { Volume2, VolumeX } from "lucide-react";
 import { useUIStore } from "@/stores";
 import { playVoice, stopVoice, audioContext, type VoiceId } from "@/lib/voice";
 import { RocketSound, SpaceHum, playSfx } from "@/lib/sfx";
+import { useProgress } from "@/game/progress";
+import { usePlayerStore } from "@/stores";
+import { RULES } from "@/game/launch/core";
 import { RotateCcw } from "lucide-react";
 import { GameButton, GlassPanel } from "@/components/ui";
 import { cn } from "@/lib/mission";
@@ -52,6 +55,14 @@ export function MoonLeg({ flight, onAgain, onExit }: { flight: Flight; onAgain: 
     hum.current.set(true);
     if (seenEnd && !fx.current.has("end")) { fx.current.add("end"); engine.current.silence(); playSfx(plan.loiOk ? "chime" : "explosion"); }
   }, [u, seenEnd, traj, plan.loiOk, voice]);
+  const counted = useRef(false);
+  useEffect(() => { // a captured Moon mission counts toward cosmetic unlocks, once
+    if (!seenEnd || !plan.loiOk || counted.current) return;
+    counted.current = true;
+    const d = (["easy", "medium", "hard"] as const).find((k) => RULES[k] === flight.rules) ?? "easy";
+    const names = useProgress.getState().recordMoonCapture(d, usePlayerStore.getState().profile.progression.level);
+    if (names.length) useUIStore.getState().toast(`Cosmetic unlocked: ${names.join(", ")}`, "success");
+  }, [seenEnd, plan.loiOk, flight.rules]);
   useEffect(() => { // the engine falls silent when the playback pauses or ends
     const id = setInterval(() => { if (performance.now() - lastMove.current > 500) engine.current?.silence(); }, 250);
     return () => clearInterval(id);

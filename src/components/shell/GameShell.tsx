@@ -8,6 +8,7 @@ import { GlassPanel, GameButton, IconButton, LevelBadge, PlayerAvatar, XPProgres
 import Link from "next/link";
 import { cn } from "@/lib/mission";
 import { GlobalSound } from "./GlobalSound";
+import { useProgress } from "@/game/progress";
 
 const BARE = ["/", "/splash", "/menu", "/mission/gameplay", "/mission/loading"];
 
@@ -16,6 +17,12 @@ export function GameShell({ children }: { children: React.ReactNode }) {
   const { toasts, dismissToast, confirm, closeConfirm, reducedMotion, highContrast, muted, set } = useUIStore();
   const profile = usePlayerStore((s) => s.profile);
 
+  useEffect(() => { // restore saved cosmetics and progress from this browser
+    void Promise.resolve(useProgress.persist.rehydrate()).then(() => {
+      const saved = useProgress.getState().equipped;
+      usePlayerStore.setState((st) => ({ profile: { ...st.profile, equipped: { ...st.profile.equipped, ...saved } } }));
+    });
+  }, []);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) set({ reducedMotion: true });
   }, [set]);

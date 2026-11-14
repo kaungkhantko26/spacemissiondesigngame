@@ -10,6 +10,8 @@ import { LAUNCH, RULES, buildRocket, guidancePitch, scoreFlight, type Difficulty
 import { MoonLeg } from "./MoonLeg";
 import { playVoice, primeVoice, stopVoice, audioContext, type VoiceId } from "@/lib/voice";
 import { RocketSound, playSfx } from "@/lib/sfx";
+import { useProgress } from "@/game/progress";
+import { usePlayerStore } from "@/stores";
 import { BRIEFING_TOUR, FLIGHT_TOUR, Tour, pendingTour, setPendingTour } from "./Tour";
 import { LaunchSession, payloadFor } from "@/game/launch/session";
 import { useLaunchSetup } from "@/game/launch/store";
@@ -243,6 +245,14 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     if (s.phase === "failed" && !sfxCalled.current.has("failed")) { sfxCalled.current.add("failed"); playSfx("explosion"); engine.current?.silence(); }
   }, [s.ms, s.phase, voice]);
   useEffect(() => () => { engine.current?.dispose(); engine.current = null; }, []);
+  const recorded = useRef(false);
+  useEffect(() => { // count the finished flight toward cosmetic unlocks, once
+    if (!(s.phase === "orbit" || s.phase === "translunar" || s.phase === "failed") || recorded.current) return;
+    recorded.current = true;
+    const sc = scoreFlight(session.flight);
+    const names = useProgress.getState().recordFlight({ ok: sc.ok, mission: session.flight.mission, difficulty: session.difficulty, grade: sc.grade }, usePlayerStore.getState().profile.progression.level);
+    if (names.length) useUIStore.getState().toast(`Cosmetic unlocked: ${names.join(", ")}`, "success");
+  }, [s.phase, session]);
   const start = () => { primeVoice(); session.start(); setS(snap(session)); };
   const togglePause = useCallback(() => { if (session.flight.t > -LAUNCH.countdownS + 0.01 || session.running) session.toggleRun(); setS(snap(session)); }, [session]);
   const setWarp = useCallback((w: number) => { session.setWarp(w); setS(snap(session)); }, [session]);

@@ -57,7 +57,7 @@ export class RocketSound {
     // roar / hiss: band-passed white noise with a slow flutter
     this.hissBp = c.createBiquadFilter(); this.hissBp.type = "bandpass"; this.hissBp.frequency.value = 1400; this.hissBp.Q.value = 0.6;
     this.hiss = c.createGain(); white.connect(this.hissBp); this.hissBp.connect(this.hiss); this.hiss.connect(this.master);
-    const flutter = c.createOscillator(), flutterAmt = c.createGain(); flutter.frequency.value = 7; flutterAmt.gain.value = 0.25; flutter.connect(flutterAmt); flutterAmt.connect(this.hiss.gain);
+    const flutter = c.createOscillator(), flutterAmt = c.createGain(); flutter.frequency.value = 7; flutterAmt.gain.value = 0; flutter.connect(flutterAmt); flutterAmt.connect(this.hiss.gain);
     // sub-bass thump you feel more than hear
     const o1 = c.createOscillator(), o2 = c.createOscillator(); o1.frequency.value = 38; o2.frequency.value = 57; o2.type = "triangle";
     this.sub = c.createGain(); o1.connect(this.sub); o2.connect(this.sub); this.sub.connect(this.master);
@@ -83,15 +83,15 @@ export class RocketSound {
     // slow and steady: the sound builds gently and, when the engine cuts out, trails away over a few seconds (an outro) instead of stopping dead
     this.level += (target - this.level) * (target > this.level ? 0.12 : 0.045);
     const v = this.level;
-    this.master.gain.setTargetAtTime(Math.min(0.5, v * 0.5 * (0.45 + 0.55 * exterior) + 0.0005), t, 0.35);
+    this.master.gain.setTargetAtTime(Math.min(0.3, v * 0.3 * (0.45 + 0.55 * exterior) + 0.0005), t, 0.35);
     const synth = this.samp ? 0 : 1;
     if (this.samp) { this.samp.g.gain.setTargetAtTime(v, t, 0.4); this.samp.lp.frequency.setTargetAtTime(900 + 9000 * exterior, t, 0.3); }
-    this.rumble.gain.setTargetAtTime(0.7 * v * synth, t, 0.15);
-    this.rumbleLp.frequency.setTargetAtTime(110 + 380 * exterior * (0.4 + 0.6 * v), t, 0.25);
-    this.hiss.gain.setTargetAtTime(0.1 * v * exterior * synth, t, 0.2);
+    this.rumble.gain.setTargetAtTime(0.55 * v * synth, t, 0.3);
+    this.rumbleLp.frequency.setTargetAtTime(90 + 220 * exterior * (0.4 + 0.6 * v), t, 0.4);
+    this.hiss.gain.setTargetAtTime(0.02 * v * exterior * synth, t, 0.4);
     this.hissBp.frequency.setTargetAtTime(500 + 900 * v, t, 0.3);
-    this.sub.gain.setTargetAtTime(0.3 * v * synth, t, 0.2);
-    this.rattle.gain.setTargetAtTime(Math.min(0.25, (q / 30000) * 0.25) * (v > 0.05 ? 1 : 0), t, 0.3);
+    this.sub.gain.setTargetAtTime(0.4 * v * synth, t, 0.3);
+    this.rattle.gain.setTargetAtTime(Math.min(0.08, (q / 30000) * 0.08) * (v > 0.05 ? 1 : 0), t, 0.3);
   }
   silence() { this.master.gain.setTargetAtTime(0, this.c.currentTime, 0.1); this.level = 0; }
   dispose() { this.silence(); setTimeout(() => this.stops.forEach((s) => s()), 400); }
@@ -120,9 +120,9 @@ function sfxNow(c: AudioContext, kind: SfxKind) {
     g.gain.setValueAtTime(0.0001, seconds(c, delay)); g.gain.linearRampToValueAtTime(gain, seconds(c, delay + 0.01)); g.gain.exponentialRampToValueAtTime(0.0001, seconds(c, delay + dur));
     o.connect(g); g.connect(out); o.start(seconds(c, delay)); o.stop(seconds(c, delay + dur + 0.05));
   };
-  if (kind === "ignition") { out.gain.value = 0.5; burst("brown", 5, [90, 900], 1.0, 1.8, 5); burst("white", 4.5, [400, 1800], 0.08, 1.6, 4.5); tone("sine", 34, 30, 4, 0.45); }
-  else if (kind === "separation") { out.gain.value = 0.9; burst("white", 0.35, [6000, 400], 0.9, 0.002, 0.35); tone("sine", 95, 28, 0.5, 0.9); tone("square", 900, 300, 0.12, 0.12, 0.03); tone("triangle", 420, 180, 0.4, 0.2, 0.08); burst("white", 1.2, [3000, 800], 0.18, 0.05, 1.2); }
-  else if (kind === "ignite2") { out.gain.value = 0.6; burst("brown", 2.2, [100, 700], 0.8, 0.9, 2.2); tone("sine", 40, 55, 1.8, 0.35); }
+  if (kind === "ignition") { out.gain.value = 0.28; burst("brown", 5, [70, 420], 1.0, 2.2, 5); tone("sine", 34, 30, 4, 0.5); }
+  else if (kind === "separation") { out.gain.value = 0.5; burst("white", 0.25, [2500, 300], 0.5, 0.002, 0.25); tone("sine", 95, 28, 0.5, 0.9); tone("square", 900, 300, 0.12, 0.12, 0.03); tone("triangle", 420, 180, 0.4, 0.2, 0.08);  }
+  else if (kind === "ignite2") { out.gain.value = 0.3; burst("brown", 2.2, [80, 400], 0.8, 1.0, 2.2); tone("sine", 40, 55, 1.8, 0.35); }
   else if (kind === "explosion") { out.gain.value = 0.8; burst("white", 3.6, [5000, 90], 1, 0.003, 3.6); burst("brown", 4.5, [400, 60], 1, 0.01, 4.5); tone("sine", 80, 22, 2.5, 1); }
   else if (kind === "chime") { out.gain.value = 0.5; tone("sine", 880, 880, 0.9, 0.5); tone("sine", 1318, 1318, 1.1, 0.4, 0.18); }
   else if (kind === "click") { out.gain.value = 0.22; tone("sine", 820, 620, 0.05, 0.5); }

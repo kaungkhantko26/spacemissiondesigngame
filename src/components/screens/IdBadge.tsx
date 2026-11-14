@@ -5,7 +5,7 @@ import { useUIStore } from "@/stores";
 import type { PlayerProfile } from "@/types";
 
 /** Crew ID badge hanging from a lanyard. Idles with a slow pendulum swing; drag the card sideways and let go to make it swing back. */
-export function IdBadge({ profile }: { profile: PlayerProfile }) {
+export function IdBadge({ profile, patch, suit }: { profile: PlayerProfile; patch?: { name: string; color: string; accent: string } | null; suit?: string }) {
   const reduced = useUIStore((s) => s.reducedMotion);
   const [angle, setAngle] = useState(0);
   const [drag, setDrag] = useState(false);
@@ -34,6 +34,7 @@ export function IdBadge({ profile }: { profile: PlayerProfile }) {
           <div className="relative overflow-hidden rounded-2xl border border-white/20 shadow-[0_18px_40px_rgba(0,0,0,.55)]" style={{ background: "linear-gradient(160deg,#17233c 0%,#0d1526 55%,#1b2a48 100%)" }}>
             <div aria-hidden className="pointer-events-none absolute inset-0 opacity-40" style={{ background: "linear-gradient(115deg,transparent 30%,rgba(255,255,255,.16) 45%,transparent 60%)" }} />
             <div className="mx-auto mt-2.5 h-2 w-14 rounded-full bg-black/70 ring-1 ring-white/20" aria-hidden />
+            {patch && <span role="img" aria-label={`${patch.name} patch`} title={patch.name} className="absolute right-2.5 top-[104px] grid size-9 place-items-center rounded-full border-2 text-sm" style={{ background: patch.color, borderColor: patch.accent, color: patch.accent }}>★</span>}
             <div className="flex items-center justify-center gap-1.5 pt-2 text-[9px] font-semibold uppercase tracking-[.22em] text-orange"><span aria-hidden className="size-1.5 rotate-45 bg-orange" />Space Mission Design</div>
             <div className="mt-2.5 grid place-items-center">
               <div className="rounded-full p-1" style={{ background: "conic-gradient(from 200deg,#ff8a3d,#ffd27a,#4fc3f7,#ff8a3d)" }}><div className="rounded-full bg-[#0d1526] p-1"><PlayerAvatar player={profile} size={104} /></div></div>
@@ -50,7 +51,7 @@ export function IdBadge({ profile }: { profile: PlayerProfile }) {
               <div><p className="text-[9px] uppercase tracking-wider text-muted">Crew ID</p><p className="font-mono text-sm font-bold tracking-wider">{profile.playerCode}</p></div>
               <div aria-hidden className="flex h-7 items-end gap-[2px]">{bars.concat(bars).map((w, i) => <span key={i} className="bg-white/85" style={{ width: w, height: 14 + ((i * 7) % 14) }} />)}</div>
             </div>
-            <div aria-hidden className="mt-3 h-2.5 w-full" style={{ background: "repeating-linear-gradient(135deg,#ff8a3d 0 10px,#10182b 10px 20px)" }} />
+            <div aria-hidden className="mt-3 h-2.5 w-full" style={{ background: `repeating-linear-gradient(135deg,${suit ?? "#ff8a3d"} 0 10px,#10182b 10px 20px)` }} />
           </div>
         </div>
       </div>
