@@ -296,7 +296,7 @@ function LeftColumn({ s, ev }: { s: OpsState; ev: Evaluation }) {
       <GlassPanel className="p-3" aria-label="Alerts">
         <p className="hud-label mb-2">Alerts</p>
         {list.length === 0 ? <p className="flex items-center gap-2 text-sm text-ok"><CheckCircle2 className="size-4" aria-hidden />All systems nominal.</p> : (
-          <ul className="space-y-2">{list.map((a) => (
+          <ul className="max-h-52 space-y-2 overflow-y-auto">{list.map((a) => (
             <li key={a.id}><button type="button" onClick={() => select(a.resource)} className={cn("w-full rounded-md border p-2 text-left text-xs", LEVEL_COLOR[a.level])}>
               <span className="mr-1 font-display uppercase">{LEVEL_TEXT[a.level]}:</span><span className="text-ink">{a.text}</span></button></li>
           ))}</ul>

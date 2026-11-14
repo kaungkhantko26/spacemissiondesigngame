@@ -290,7 +290,7 @@ function ReviewPanel({ ev, onLaunch, needTargets }: { ev: Evaluation; onLaunch: 
         </tbody></table>
         <p className="mt-1 text-muted">Same model Mission Control uses: arrays derated for pointing and off in eclipse; RTGs constant. Architect&apos;s headline power figure is the nominal full-Sun output.</p></details>
       <details className="mt-3 text-xs text-ink2"><summary className="cursor-pointer">Assumptions and sources</summary>
-        <ul className="mt-1 space-y-1">
+        <ul className="mt-1 max-h-72 space-y-1 overflow-y-auto pr-1">
           <li><b className="text-ink">Real, from NASA or Launch Library 2:</b> instrument masses and powers as quoted, planetary constants, launch vehicle data. Launch Library 2 is not a NASA source.</li>
           <li><b className="text-ink">Game values:</b> prices other than launch, array and battery masses, reliability model, science points and the {ev.destination.id === "moon" ? "survey goals" : "mission goals"}. Where a source gives no power, a default is used (marked GAME).</li>
           <li><b className="text-ink">Simplifications:</b> {ev.electric ? "low-thrust transfer uses an approximate model; " : ""}coverage is a scalar progress counter, not a mapped survey; the survey does not use real NASA measurements yet.</li>

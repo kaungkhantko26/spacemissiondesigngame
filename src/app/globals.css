@@ -103,3 +103,10 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, te
 input:focus-visible, select:focus-visible, textarea:focus-visible { border-color: var(--orange) !important; outline: none; box-shadow: 0 0 0 3px rgba(255,122,51,.25); }
 @media (prefers-reduced-motion: reduce) { .enter { opacity: 1; transform: none; animation: none; } .lift:hover { transform: none; } }
 input[type="range"] { accent-color: var(--orange); }
+
+/* Responsive safety net: media never overflows its box, grid/flex children may shrink, long words wrap, wide tables scroll inside their panel */
+img, video, canvas, svg { max-width: 100%; }
+main, section, aside, article, li, dd { min-width: 0; }
+h1, h2, h3, p, li, dd, dt { overflow-wrap: anywhere; }
+table { display: block; max-width: 100%; overflow-x: auto; }
+@media (max-width: 480px) { h1 { word-break: normal; } }
