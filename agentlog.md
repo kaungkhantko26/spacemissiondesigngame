@@ -65,3 +65,10 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 
 ## Character portraits (ONI-style cards)
 - New `src/components/live/Portrait.tsx`: generated SVG astronaut portrait seeded from character id (skin/hair/style/suit colour by role). Character cards now show portrait beside name + stats. Placeholder until the UI teammate's art lands; swap the component internals only.
+
+## Pivot: the live game now IS the Mission Architect (real-data design), multiplayer
+- Backend engine replaced by a port of `src/game/engine.ts` + `physics.ts` (verified identical on 300 random designs). Missions are Moon + Mars with different 4-seat combos; crew traits / difficulty / modifiers scale his numbers server-side. Live ops phase removed (archived).
+- `src/live/types.ts`: new Design shape (`vehicleId, marginPct, propulsionId, thrusters, propellantKg, solarAreaM2, rtgUnits, antennaId, instrumentIds`), `Catalog.design` (dataset/antennas/destinations), `Result.phases`; removed ops + old hardware types. Store: `autofill` added, ops actions removed.
+- `src/components/live/Design.tsx`: rewritten on his DesignStudio look (exports `Section/Pick/Slider/GameChip` from DesignStudio.tsx). Sections are view-only unless your seat owns the field. Review panel is the server's preview.
+- `src/components/live/Report.tsx`: replays the flight on his `TrajectorySim`, then score/XP/objectives/lessons/real instruments/challenges.
+- Deleted `Ops.tsx`, `OpsScene.tsx`, `/mission/ops`. Frontend dataset.json must stay in sync with backend `server/data/mdesign.json`.

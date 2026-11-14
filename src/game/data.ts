@@ -11,10 +11,11 @@ export interface ElectricThruster { id: string; name: string; type: string; thru
 export type InstrumentTag = "radar" | "imager" | "fields" | "plasma" | "particles" | "spectrometer" | "other";
 export interface Instrument { id: string; name: string; mission: string; mass_kg: number; power_w: number | null; tag: InstrumentTag; source: string | null }
 
-export const DATASET = raw as unknown as {
+export interface DesignDataset {
   provenance: { dataset: string; note: string };
   bodies: Body[]; vehicles: Vehicle[]; electric_propulsion: ElectricThruster[]; instruments: Instrument[];
-};
+}
+export const DATASET = raw as unknown as DesignDataset;
 export const bodyById = (id: string): Body => {
   const b = DATASET.bodies.find((x) => x.id === id);
   if (!b) throw new Error(`Unknown body ${id}`);

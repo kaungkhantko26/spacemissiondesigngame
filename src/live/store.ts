@@ -12,7 +12,7 @@ interface GameState {
   setup: (missionId: string, difficulty: Difficulty) => Promise<void>;
   startRoles: () => Promise<void>; claim: (slot: string, characterId: string) => Promise<void>; release: () => Promise<void>;
   startDesign: () => Promise<void>; setDesign: (patch: DesignPatch) => Promise<void>; approve: (v: boolean) => Promise<void>;
-  launch: () => Promise<void>; opsSet: (patch: { duty?: number; downlink?: "normal" | "boost"; mode?: "nominal" | "safe" }) => Promise<void>; opsRespond: (option: string) => Promise<void>; opsRepair: () => Promise<void>; devAutodesign: () => Promise<void>; devAddBot: () => Promise<void>; devRemoveBot: () => Promise<void>; redesign: () => Promise<void>; toLobby: () => Promise<void>; chat: (text: string) => Promise<void>;
+  launch: () => Promise<void>; autofill: () => Promise<void>; devAutodesign: () => Promise<void>; devAddBot: () => Promise<void>; devRemoveBot: () => Promise<void>; redesign: () => Promise<void>; toLobby: () => Promise<void>; chat: (text: string) => Promise<void>;
   upgrade: (stat: StatId) => Promise<void>; rename: (name: string) => Promise<void>; equip: (item: string) => Promise<void>;
 }
 
@@ -58,9 +58,7 @@ export const useGame = create<GameState>((set) => {
     setDesign: (patch) => send({ t: "design.set", patch }),
     approve: (approved) => send({ t: "design.approve", approved }),
     launch: () => send({ t: "launch" }),
-    opsSet: (patch) => send({ t: "ops.set", patch }),
-    opsRespond: (option) => send({ t: "ops.respond", option }),
-    opsRepair: () => send({ t: "ops.repair" }),
+    autofill: () => send({ t: "design.autofill" }),
     devAutodesign: () => send({ t: "dev.autodesign" }),
     devAddBot: () => send({ t: "dev.addbot" }),
     devRemoveBot: () => send({ t: "dev.removebot" }),

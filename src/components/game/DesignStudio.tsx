@@ -13,7 +13,7 @@ import { TrajectorySim } from "./TrajectorySim";
 const fmt = (n: number, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d });
 const usd = (n: number) => (n >= 1e9 ? `$${fmt(n / 1e9, 2)}B` : `$${fmt(n / 1e6)}M`);
 
-function Section({ n, title, hint, children }: { n: number; title: string; hint?: string; children: ReactNode }) {
+export function Section({ n, title, hint, children }: { n: number; title: string; hint?: string; children: ReactNode }) {
   return (
     <GlassPanel as="section" className="p-4" aria-label={title}>
       <h2 className="mb-1 flex items-baseline gap-3 text-xl font-bold"><span className="hud-label !text-orange">0{n}</span>{title}</h2>
@@ -22,12 +22,12 @@ function Section({ n, title, hint, children }: { n: number; title: string; hint?
     </GlassPanel>
   );
 }
-const GameChip = () => <span className="ml-1 rounded-sm border border-white/15 px-1 text-[10px] uppercase tracking-wider text-muted" title="Not in the dataset — a game-balance value">game</span>;
-const Pick = ({ on, onClick, children, className }: { on: boolean; onClick: () => void; children: ReactNode; className?: string }) => (
+export const GameChip = () => <span className="ml-1 rounded-sm border border-white/15 px-1 text-[10px] uppercase tracking-wider text-muted" title="Not in the dataset — a game-balance value">game</span>;
+export const Pick = ({ on, onClick, children, className }: { on: boolean; onClick: () => void; children: ReactNode; className?: string }) => (
   <button type="button" aria-pressed={on} onClick={onClick}
     className={cn("lift rounded-lg border p-3 text-left transition", on ? "border-orange bg-orange/10" : "border-[var(--border)] bg-panel hover:border-[var(--border-strong)]", className)}>{children}</button>
 );
-const Slider = ({ label, value, min, max, step = 1, unit, onChange, note }: { label: string; value: number; min: number; max: number; step?: number; unit: string; onChange: (v: number) => void; note?: ReactNode }) => (
+export const Slider = ({ label, value, min, max, step = 1, unit, onChange, note }: { label: string; value: number; min: number; max: number; step?: number; unit: string; onChange: (v: number) => void; note?: ReactNode }) => (
   <label className="block">
     <span className="flex justify-between text-sm"><span>{label}{note}</span><span className="font-display tabular-nums text-ink">{fmt(value)} {unit}</span></span>
     <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="mt-1 w-full" />

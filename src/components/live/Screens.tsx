@@ -8,7 +8,6 @@ import { BackButton, GameButton, GlassPanel, PlayerAvatar, ScreenContainer, Stat
 import { useGame } from "@/live/store";
 import { Design } from "./Design";
 import { Report } from "./Report";
-import { Ops } from "./Ops";
 import { Portrait } from "./Portrait";
 import { cn } from "@/lib/mission";
 import type { Difficulty, Room } from "@/live/types";
@@ -18,7 +17,7 @@ const PALETTE = ["#4fc3f7", "#ff8c42", "#a78bfa", "#34d399", "#f472b6", "#fbbf24
 const colorOf = (s: string) => PALETTE[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTE.length];
 
 /** Which route each server state belongs to. Redirects so every player follows the room. */
-type Stage = "entry" | "lobby" | "setup" | "roles" | "design" | "ops" | "report";
+type Stage = "entry" | "lobby" | "setup" | "roles" | "design" | "report";
 function useGate(stage: Stage) {
   const router = useRouter(); const { boot, ready, room, profile } = useGame();
   useEffect(() => { void boot(); }, [boot]);
@@ -27,7 +26,6 @@ function useGate(stage: Stage) {
   if (ready) {
     if (!room) target = stage === "entry" ? null : "/team";
     else if (room.status === "design") target = stage === "design" ? null : "/mission/gameplay";
-    else if (room.status === "ops") target = stage === "ops" ? null : "/mission/ops";
     else if (room.status === "report") target = stage === "report" ? null : "/mission/results";
     else if (room.status === "roles") target = stage === "roles" ? null : "/mission/roles";
     else if (stage === "entry") target = "/team/lobby";
@@ -135,7 +133,7 @@ export function LiveMissionSelect() {
             <button key={x.id} disabled={!ok} onClick={() => setM(x.id)} className="text-left disabled:cursor-not-allowed">
               <GlassPanel active={m === x.id} className={cn("h-full p-4", !ok && "opacity-50")}>
                 <p className="font-display text-lg font-bold">{x.name}</p><p className="text-sm text-ink2">{x.tagline}</p>
-                <p className="mt-2 text-xs text-muted">{ok ? `Budget $${x.budgetM}M · ${x.baseXP} base XP` : `🔒 ${x.lockedReason[d] ?? "Not available on this difficulty"}`}</p>
+                <p className="mt-2 text-xs text-muted">{ok ? `Budget $${Math.round((cat.design.destinations.find((dd) => dd.id === x.destinationId)?.budgetUsd ?? 0) / 1e6)}M · ${x.baseXP} base XP` : `🔒 ${x.lockedReason[d] ?? "Not available on this difficulty"}`}</p>
               </GlassPanel></button>); })}
           {cat.comingSoon.map((x) => (
             <GlassPanel key={x.id} className="h-full p-4 opacity-50"><p className="font-display text-lg font-bold">{x.name}</p>
@@ -155,6 +153,8 @@ export function LiveBriefing() {
   if (!mission || !d) return <Wait>Pick a mission first…</Wait>;
   const mods = (mission.modifiers[d] ?? []).map((id) => cat.modifiers.find((x) => x.id === id)).filter(Boolean);
   const ch = mission.challenges.hard;
+  const dst = cat.design.destinations.find((x) => x.id === mission.destinationId);
+  const budget = (dst?.budgetUsd ?? 0) * cat.difficulties[d].budgetMult; const deadline = Math.round((dst?.deadlineDays ?? 0) * cat.difficulties[d].deadlineMult);
   return (
     <ScreenContainer step={3} title="Mission Briefing" subtitle={`${mission.name} · ${cat.difficulties[d].label} · ${cat.difficulties[d].xpMult}× XP`} actions={<BackButton href="/mission/select" />}>
       <ErrorBar />
@@ -162,7 +162,7 @@ export function LiveBriefing() {
         <GlassPanel className="space-y-3 p-5"><p className="text-ink2">{mission.brief}</p>
           <h2 className="text-xl font-bold">Objectives</h2>
           <ul className="list-disc pl-5 text-ink2">{mission.objectives.map((o) => <li key={o.id}>{o.label}{o.required ? " *" : ""}</li>)}</ul>
-          <p className="text-xs text-muted">Budget ${mission.budgetM}M · deadline {mission.deadlineMonths} months · * required</p></GlassPanel>
+          <p className="text-xs text-muted">Budget ${Math.round(budget / 1e6)}M · deadline {deadline} days · * required</p></GlassPanel>
         <div className="grid h-fit gap-3">
           {mods.length === 0 ? <GlassPanel className="p-5"><p className="font-bold text-ok">✓ No modifiers active</p></GlassPanel>
             : mods.map((x) => x && <GlassPanel key={x.id} className="p-4"><p className="font-bold text-orange">{x.name}</p><p className="text-sm text-ink2">{x.desc}</p></GlassPanel>)}
@@ -249,7 +249,6 @@ export function LiveConfirm() {
 }
 
 /* ---------- Design + results ---------- */
-export function LiveDesign() { const { ready } = useGate("design"); return ready ? <ScreenContainer title="Spacecraft Design"><ErrorBar /><Design /></ScreenContainer> : <Wait />; }
+export function LiveDesign() { const { ready } = useGate("design"); return ready ? <ScreenContainer title="Mission Architect" subtitle="Real orbital physics, real launch records, real NASA instruments. Balance them as a team."><ErrorBar /><Design /></ScreenContainer> : <Wait />; }
 export function LiveResults() { const { ready } = useGate("report"); return ready ? <ScreenContainer title="Mission Report"><ErrorBar /><Report /></ScreenContainer> : <Wait />; }
 
-export function LiveOps() { const { ready } = useGate("ops"); return ready ? <ScreenContainer title="Mission Operations"><ErrorBar /><Ops /></ScreenContainer> : <Wait />; }
