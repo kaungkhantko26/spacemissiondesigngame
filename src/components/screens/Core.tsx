@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Users, User, Shirt, BarChart3, Settings, Lock, Check } from "lucide-react";
+import { Rocket, Users, User, Shirt, BarChart3, Settings, Lock, Check } from "lucide-react";
 import {
   BackButton, GameButton, GlassPanel, LoadingBar, ScreenContainer, StatBar, XPProgressBar, LevelBadge, PlayerAvatar,
 } from "@/components/ui";
@@ -61,7 +61,8 @@ export function SplashScreen() {
 /* ---------- Main menu ---------- */
 const LIVE = !!process.env.NEXT_PUBLIC_API_URL; // live backend mode → route to /play/*
 const MENU = [
-  { href: LIVE ? "/play" : "/team", label: "Team Up", icon: Users, primary: true },
+  { href: "/design", label: "Design Mission", icon: Rocket, primary: true },
+  { href: LIVE ? "/play" : "/team", label: "Team Up", icon: Users },
   { href: LIVE ? "/play/profile" : "/profile", label: "Profile", icon: User },
   { href: LIVE ? "/play/cosmetics" : "/cosmetics", label: "Cosmetics", icon: Shirt },
   { href: LIVE ? "/play/stats" : "/stats", label: "Stats", icon: BarChart3 },
@@ -128,7 +129,7 @@ export function MenuScreen() {
               </Link>
             ))}
           </nav>
-          <p className="hud-label mt-4">Press 1–5 to jump</p>
+          <p className="hud-label mt-4">Press 1–{MENU.length} to jump</p>
         </div>
         <div className="h-[380px] md:h-[560px]">
           <Scene3D camera={[0, 1, 5]} label="Your astronaut"><Astronaut suit="#e8eef7" pose={pose} position={[0, -1.2, 0]} scale={1.2} /></Scene3D>

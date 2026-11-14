@@ -22,3 +22,11 @@ Matte mission-control look replacing glass/neon: solid panels + hairline borders
 
 ## Session 2 (cont.) — UX pass
 Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk, ≥4 s). Menu = mission-control status strip (live UTC clock; orbit/station/"crews online" are mock placeholders), 1–5 keyboard shortcuts, astronaut reacts to hovered/focused item (Cosmetics→moon_walk, Stats→floating). Staggered `.enter` entrances + `.lift` hover on menu/mission/cosmetic cards (disabled under reduced motion). Global input styling restyles the plain `/play` live screens' fields; their layouts are still unstyled.
+
+## Session 2 (cont.) — Mission Architect (game logic from space-mission-dataset)
+**Scope note:** AGENTS.md says "never implement simulation/scoring"; the user explicitly asked for game logic built on kaungkhantko26/space-mission-dataset, so it lives in an isolated, pure module `src/game/` (no UI/network/persistence) that can move to the backend later.
+- `scripts/build-game-data.py` → `src/game/dataset.json`: JPL/NSSDC body μ/radii/orbits/irradiance, 10 real launch vehicles (capacity, price, flight record), 3 NASA electric thrusters, 16 NASA instruments with quoted mass (+power where stated).
+- `physics.ts`: Hohmann/escape/capture Δv from dataset μ (Moon 3.9 km/s, Mars 4.4, Jupiter 8.0), rocket equation, link budget. `engine.ts`: mass/Δv/power/time/budget/link checks (go/no-go), reliability (Jeffreys estimate from real launch records), seeded 4-phase simulation, score + grade. `store.ts`: Zustand design state.
+- `/design` (DesignStudio): 7 build sections, sticky live design review, launch sequence + results (astronaut celebrates/waits). Menu primary action = Design Mission.
+- **Game values (not dataset):** chemical Isp/engine, component prices, solar/RTG specs, antenna models, destination budgets, science values — marked "game" in the UI. Mercury/Jupiter are impossible with chemical tanks (physics), needing ion thrusters + solar arrays (+RTG at Jupiter).
+- Tests: `src/__tests__/game.test.ts` (9 cases) — vitest can't run in this sandbox; the cases were run through a shim and pass 9/9. Data licence CC BY 4.0 — attribution footer on /design.

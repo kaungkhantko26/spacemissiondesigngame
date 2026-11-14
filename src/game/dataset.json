@@ -1,0 +1,371 @@
+{
+ "provenance": {
+  "dataset": "https://github.com/kaungkhantko26/space-mission-dataset",
+  "note": "Launch Library 2 capacities state no reference orbit; instrument masses are parsed from NASA NSSDC prose."
+ },
+ "bodies": [
+  {
+   "id": "sun",
+   "name": "Sun",
+   "mu": 1.32712440018e+20,
+   "radius_m": 695700000.0,
+   "gravity": 274.0,
+   "sma_m": null,
+   "parent": null
+  },
+  {
+   "id": "mercury",
+   "name": "Mercury",
+   "mu": 22031868550000.0,
+   "radius_m": 2439400.0,
+   "gravity": 3.7,
+   "sma_m": 57909226541.52438,
+   "parent": null,
+   "irradiance_w_m2": 9082.7
+  },
+  {
+   "id": "venus",
+   "name": "Venus",
+   "mu": 324858592000000.0,
+   "radius_m": 6051800.0,
+   "gravity": 8.87,
+   "sma_m": 108209474537.37917,
+   "parent": null,
+   "irradiance_w_m2": 2601.3
+  },
+  {
+   "id": "earth",
+   "name": "Earth",
+   "mu": 398600441800000.0,
+   "radius_m": 6371000.0,
+   "gravity": 9.80665,
+   "sma_m": 149598261150.4425,
+   "parent": null,
+   "irradiance_w_m2": 1361.0
+  },
+  {
+   "id": "mars",
+   "name": "Mars",
+   "mu": 42828375000000.0,
+   "radius_m": 3389500.0,
+   "gravity": 3.71,
+   "sma_m": 227943822427.57303,
+   "parent": null,
+   "irradiance_w_m2": 586.2
+  },
+  {
+   "id": "jupiter",
+   "name": "Jupiter",
+   "mu": 1.26686534e+17,
+   "radius_m": 69911000.0,
+   "gravity": 24.79,
+   "sma_m": 778340816692.7108,
+   "parent": null,
+   "irradiance_w_m2": 50.26
+  },
+  {
+   "id": "moon",
+   "name": "Moon",
+   "mu": 4902800000000.0,
+   "radius_m": 1737400.0,
+   "gravity": null,
+   "sma_m": 384400000.0,
+   "parent": "earth",
+   "irradiance_w_m2": 1361.0
+  }
+ ],
+ "vehicles": [
+  {
+   "id": "ll2_cfg_26",
+   "name": "Electron",
+   "manufacturer": "Rocket Lab",
+   "manufacturer_country": "USA",
+   "leo_capacity_kg": 300,
+   "gto_capacity_kg": null,
+   "launch_cost_usd": 6000000,
+   "total_launches": 99,
+   "successful_launches": 95,
+   "reusable": false
+  },
+  {
+   "id": "ll2_cfg_43",
+   "name": "PSLV",
+   "manufacturer": "Indian Space Research Organization",
+   "manufacturer_country": "IND",
+   "leo_capacity_kg": 3800,
+   "gto_capacity_kg": 1200,
+   "launch_cost_usd": 16000000,
+   "total_launches": 18,
+   "successful_launches": 18,
+   "reusable": false
+  },
+  {
+   "id": "ll2_cfg_127",
+   "name": "Vega-C",
+   "manufacturer": "Avio S.p.A",
+   "manufacturer_country": "ITA",
+   "leo_capacity_kg": 3300,
+   "gto_capacity_kg": null,
+   "launch_cost_usd": 48000000,
+   "total_launches": 8,
+   "successful_launches": 7,
+   "reusable": false
+  },
+  {
+   "id": "ll2_cfg_134",
+   "name": "Soyuz 2.1b/Fregat-M",
+   "manufacturer": "Progress Rocket Space Center",
+   "manufacturer_country": "RUS",
+   "leo_capacity_kg": 8200,
+   "gto_capacity_kg": 3250,
+   "launch_cost_usd": 48500000,
+   "total_launches": 36,
+   "successful_launches": 36,
+   "reusable": false
+  },
+  {
+   "id": "ll2_cfg_16",
+   "name": "Atlas V 401",
+   "manufacturer": "United Launch Alliance",
+   "manufacturer_country": "USA",
+   "leo_capacity_kg": 9050,
+   "gto_capacity_kg": 4950,
+   "launch_cost_usd": 115000000,
+   "total_launches": 41,
+   "successful_launches": 41,
+   "reusable": false
+  },
+  {
+   "id": "ll2_cfg_121",
+   "name": "Ariane 62",
+   "manufacturer": "ArianeGroup",
+   "manufacturer_country": "FRA",
+   "leo_capacity_kg": 10900,
+   "gto_capacity_kg": 5100,
+   "launch_cost_usd": 85000000,
+   "total_launches": 6,
+   "successful_launches": 6,
+   "reusable": false
+  },
+  {
+   "id": "ll2_cfg_50",
+   "name": "Long March 3B/E",
+   "manufacturer": "China Aerospace Science and Technology Corporation",
+   "manufacturer_country": "CHN",
+   "leo_capacity_kg": 12000,
+   "gto_capacity_kg": 5500,
+   "launch_cost_usd": 70000000,
+   "total_launches": 78,
+   "successful_launches": 76,
+   "reusable": false
+  },
+  {
+   "id": "ll2_cfg_164",
+   "name": "Falcon 9",
+   "manufacturer": "SpaceX",
+   "manufacturer_country": "USA",
+   "leo_capacity_kg": 22800,
+   "gto_capacity_kg": 8300,
+   "launch_cost_usd": 52000000,
+   "total_launches": 644,
+   "successful_launches": 643,
+   "reusable": true
+  },
+  {
+   "id": "ll2_cfg_21",
+   "name": "Delta IV Heavy",
+   "manufacturer": "United Launch Alliance",
+   "manufacturer_country": "USA",
+   "leo_capacity_kg": 28370,
+   "gto_capacity_kg": 14210,
+   "launch_cost_usd": 350000000,
+   "total_launches": 16,
+   "successful_launches": 15,
+   "reusable": false
+  },
+  {
+   "id": "ll2_cfg_161",
+   "name": "Falcon Heavy",
+   "manufacturer": "SpaceX",
+   "manufacturer_country": "USA",
+   "leo_capacity_kg": 63800,
+   "gto_capacity_kg": 26700,
+   "launch_cost_usd": 90000000,
+   "total_launches": 14,
+   "successful_launches": 14,
+   "reusable": true
+  }
+ ],
+ "electric_propulsion": [
+  {
+   "id": "nstar",
+   "name": "NSTAR ion thruster",
+   "type": "ion",
+   "thrust_n": 0.092,
+   "power_w": 2300,
+   "isp_s": 3300
+  },
+  {
+   "id": "next",
+   "name": "NEXT ion thruster",
+   "type": "ion",
+   "thrust_n": 0.236,
+   "power_w": 6900,
+   "isp_s": 4190
+  },
+  {
+   "id": "bpt4000",
+   "name": "BPT-4000 Hall thruster",
+   "type": "hall_effect",
+   "thrust_n": 0.254,
+   "power_w": 4500,
+   "isp_s": 2150
+  }
+ ],
+ "instruments": [
+  {
+   "id": "nmc_exp_1975_075a_01",
+   "name": "Orbiter Imaging",
+   "mission": "Viking 1 Orbiter",
+   "mass_kg": 40.0,
+   "power_w": null,
+   "tag": "imager",
+   "source": "The two cameras, including their housing, were 21.8 x 21.8 x 94.0 cm in size and had a mass of 40 kg."
+  },
+  {
+   "id": "nmc_exp_1978_051a_02",
+   "name": "Radar Mapper (ORAD)",
+   "mission": "Pioneer Venus Orbiter",
+   "mass_kg": 9.7,
+   "power_w": 20.0,
+   "tag": "radar",
+   "source": "The instrument had a mass of 9.7 kg and used 18 W power."
+  },
+  {
+   "id": "nmc_exp_1978_051a_05",
+   "name": "Gamma Ray Burst Detector (OGBD)",
+   "mission": "Pioneer Venus Orbiter",
+   "mass_kg": 2.8,
+   "power_w": 1.3,
+   "tag": "particles",
+   "source": "The instrument had a mass of 2.8 kg and used 1.3 W power."
+  },
+  {
+   "id": "nmc_exp_1978_051a_06",
+   "name": "Cloud Photopolarimeter (OCPP)",
+   "mission": "Pioneer Venus Orbiter",
+   "mass_kg": 5.0,
+   "power_w": 5.4,
+   "tag": "imager",
+   "source": "The instrument is 22 x 28 x 46 cm in size with a mass of 5 kg, and uses 5.4 W power."
+  },
+  {
+   "id": "nmc_exp_1978_051a_07",
+   "name": "Retarding Potential Analyzer (ORPA)",
+   "mission": "Pioneer Venus Orbiter",
+   "mass_kg": 2.8,
+   "power_w": 2.4,
+   "tag": "plasma",
+   "source": "The instrument had a mass of 2.8 kg and used 2.4 W power."
+  },
+  {
+   "id": "nmc_exp_1978_051a_12",
+   "name": "Magnetometer (OMAG)",
+   "mission": "Pioneer Venus Orbiter",
+   "mass_kg": 7.0,
+   "power_w": null,
+   "tag": "fields",
+   "source": "The electronics box is magnesium, 15 x 22 x 15 cm in size, and has a mass of 1,7 kg."
+  },
+  {
+   "id": "nmc_exp_1978_051a_13",
+   "name": "Electric Field Detector (OEFD)",
+   "mission": "Pioneer Venus Orbiter",
+   "mass_kg": 5.0,
+   "power_w": 0.5,
+   "tag": "fields",
+   "source": "The electronics box had two levels, the upper box was 12.2 x 6.6 x 5.5 cm, and the lower 19 x 6.6 x 2 cm, with a total mass of 5 kg."
+  },
+  {
+   "id": "nmc_exp_1978_051a_15",
+   "name": "Ultraviolet Spectrometer (OUVS)",
+   "mission": "Pioneer Venus Orbiter",
+   "mass_kg": 3.1,
+   "power_w": 1.7,
+   "tag": "spectrometer",
+   "source": "The instrument had a mass of 3.1 kg and required 1.7 W power."
+  },
+  {
+   "id": "nmc_exp_1978_051a_16",
+   "name": "Infrared Radiometer (OIR)",
+   "mission": "Pioneer Venus Orbiter",
+   "mass_kg": 5.9,
+   "power_w": 5.2,
+   "tag": "spectrometer",
+   "source": "OIR is 24.8 x 17.5 x 25.1 cm in size with a mass of 5.9 kg, and uses 5.2 W power."
+  },
+  {
+   "id": "nmc_exp_1978_051a_17",
+   "name": "Ion Mass Spectrometer (OIMS)",
+   "mission": "Pioneer Venus Orbiter",
+   "mass_kg": 3.0,
+   "power_w": 1.5,
+   "tag": "plasma",
+   "source": "Each spectrometer, with a mass of 3.0 kg, consisted of two parts, an analyzer tube and an electronics package."
+  },
+  {
+   "id": "nmc_exp_1978_051a_18",
+   "name": "Solar Wind Plasma Analyzer (OPA)",
+   "mission": "Pioneer Venus Orbiter",
+   "mass_kg": 3.9,
+   "power_w": 5.0,
+   "tag": "plasma",
+   "source": "The instrument had a mass of 3.9 kg and used 5 W power."
+  },
+  {
+   "id": "nmc_exp_1998_001a_05",
+   "name": "Lunar Prospector Magnetometer (MAG)",
+   "mission": "Lunar Prospector",
+   "mass_kg": 5.0,
+   "power_w": 4.5,
+   "tag": "fields",
+   "source": "The magnetometer and electron reflectometer instruments share a common electronics box, have a combined mass of 5 kg and use 4.5 watts of power."
+  },
+  {
+   "id": "nmc_exp_1998_001a_06",
+   "name": "Lunar Prospector Electron Reflectometer (ER)",
+   "mission": "Lunar Prospector",
+   "mass_kg": 5.0,
+   "power_w": 4.5,
+   "tag": "particles",
+   "source": "The electron reflectometer and magnetometer share a common electronics box and have a combined mass of 5 kg and use 4.5 watts of power."
+  },
+  {
+   "id": "nmc_exp_1999_003a_01",
+   "name": "Imaging and Navigation Camera",
+   "mission": "Stardust/NExT",
+   "mass_kg": 2.5,
+   "power_w": 18.0,
+   "tag": "imager",
+   "source": "The periscope has a mass of 2.5 kg, the rest of the camera including the scan mechanism has a mass of 9.5 kg."
+  },
+  {
+   "id": "nmc_exp_1999_003a_03",
+   "name": "Dust Flux Monitor Instrument (DFMI)",
+   "mission": "Stardust/NExT",
+   "mass_kg": 0.332,
+   "power_w": null,
+   "tag": "particles",
+   "source": "The sensor unit has a mass of 0.332 kg and is connected to an electronics box by a 1.5 m long cable."
+  },
+  {
+   "id": "nmc_exp_2003_027a_04",
+   "name": "Mossbauer Spectrometer (MB)",
+   "mission": "Spirit",
+   "mass_kg": 0.14,
+   "power_w": null,
+   "tag": "spectrometer",
+   "source": "The electronics board for the MB, with a mass of about 0.14 kg and a volume of 16 x 10 x 2.5 cm is contained in the warm electronics box in the body of the rover."
+  }
+ ]
+}
