@@ -49,6 +49,13 @@ export const useDesignStore = create<GameState>((set, get) => ({
     const diverse = byMeasure.length ? byMeasure : dest.wants.map((t) => wanted.find((i) => i.tag === t)).filter((i): i is (typeof wanted)[number] => !!i).map((i) => i.id);
     const sets: string[][] = [diverse.slice(0, 2), diverse.slice(0, 3), wanted.slice(0, 2).map((i) => i.id), wanted.slice(0, 3).map((i) => i.id)]
       .filter((x, i, a) => x.length > 0 && a.findIndex((y) => y.join() === x.join()) === i);
+    // Moon: start from the short-transfer chemical demonstration design (Falcon 9, 2.5 m dish, 30 m2 array, magnetometer + electron reflectometer,
+    // about 5 days). It is used when it is GO and meets the science goal; otherwise the optimiser below decides.
+    if (dest.id === "moon") {
+      const ids = requiredMeasures(dest).map((m) => DATASET.instruments.filter((i) => measuresOf(i).includes(m) && curationOf(i).deployment === "orbiter").sort((a, b) => a.mass_kg - b.mass_kg)[0]?.id).filter((x): x is string => !!x);
+      const demo = ids.length === 2 ? build("ll2_cfg_164", "chem", 1, 30, "high", ids) : null;
+      if (demo && demo.ev.goNoGo && demo.ev.science >= dest.scienceGoal) { set({ design: demo.d, result: null }); return true; }
+    }
     // Phase 1: coarse sweep over vehicle × propulsion (strong power/antenna, two instruments), keep the best few.
     const seeds: { v: string; pr: string; th: number; score: number }[] = [];
     for (const v of DATASET.vehicles) for (const pr of props) for (const th of pr === "chem" ? [1] : [2]) {

@@ -1,5 +1,6 @@
 import lines from "./voiceLines.json";
 import { asset } from "./asset";
+import { useCaptions } from "./captions";
 
 export type VoiceId = keyof typeof lines;
 
@@ -65,6 +66,7 @@ export async function playVoice(id: VoiceId, muted: boolean): Promise<boolean> {
   if (muted || typeof window === "undefined") return false;
   installVoiceUnlock();
   stopVoice();
+  useCaptions.getState().show(lines[id]);
   const me = gen, c = context();
   if (!c) { browserSpeech(lines[id]); return true; }
   if (c.state !== "running") { try { await c.resume(); } catch { /* needs a gesture */ } }
