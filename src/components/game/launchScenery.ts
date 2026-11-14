@@ -23,7 +23,7 @@ export const biomeFor = (siteId: string): Biome => BIOMES[siteId] ?? BIOMES.ll2_
 const rgb = (a: number[], al = 1) => `rgba(${Math.round(a[0])},${Math.round(a[1])},${Math.round(a[2])},${al})`;
 const mix = (a: number[], b: number[], t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const smooth = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
-const hash = (n: number) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+export const hash = (n: number) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const noise = (x: number, seed: number) => (Math.sin(x + seed) * 0.5 + Math.sin(x * 2.37 + seed * 1.7) * 0.3 + Math.sin(x * 5.11 + seed * 0.6) * 0.2 + 1) / 2;
 const SPACE: RGB = [3, 6, 16];
 
@@ -124,7 +124,7 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, s: Scene, b: Biome, a
 }
 
 /* ------------------------------------------------------------ clouds */
-function puff(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, a: number, shade = 0) {
+export function puff(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, a: number, shade = 0) {
   const g = ctx.createRadialGradient(x - r * 0.15, y - r * 0.2, r * 0.05, x, y, r);
   g.addColorStop(0, `rgba(255,255,255,${0.95 * a})`); g.addColorStop(0.55, `rgba(${240 - shade},${244 - shade},${250 - shade * 0.6},${0.7 * a})`); g.addColorStop(1, `rgba(${225 - shade},${232 - shade},${244 - shade * 0.5},0)`);
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
@@ -133,7 +133,9 @@ export function drawClouds(ctx: CanvasRenderingContext2D, s: Scene, b: Biome) {
   if (s.alpha <= 0.02) return;
   const { k } = s;
   const layer = (altM: number, spacingM: number, sizeM: number, p: number, puffs: number, a: number, flat: number, seed: number) => {
+    if (sizeM * k < 1.6) return; // clouds smaller than a couple of pixels: not worth thousands of gradients per frame
     const aX = s.W / 2 + (s.anchorX - s.W / 2) * p, n0 = Math.floor((-aX / k) / spacingM) - 1, n1 = Math.ceil(((s.W - aX) / k) / spacingM) + 1;
+    if (n1 - n0 > 90) return; // too many to draw while the camera is zoomed far out
     for (let i = n0; i <= n1; i++) {
       if (hash(i * 3.3 + seed) > b.cloudiness) continue;
       const cx = aX + (i * spacingM + (hash(i + seed) - 0.5) * spacingM * 0.8) * k, cy = s.gy - (altM + (hash(i * 5 + seed) - 0.5) * altM * 0.5) * k;
@@ -141,7 +143,9 @@ export function drawClouds(ctx: CanvasRenderingContext2D, s: Scene, b: Biome) {
     }
   };
   layer(9500, 14000, 2600, 0.95, 6, 0.3, 0.22, 90); // cirrus
+  layer(5200, 9000, 2100, 0.92, 6, 0.7, 0.8, 31);    // towering cumulus the rocket punches through
   layer(2400, 6500, 1100, 0.88, 11, 0.92, 1, 7);      // cumulus
+  layer(1100, 4200, 800, 0.84, 5, 0.6, 0.55, 51);   // low scud
 }
 
 /* ------------------------------------------------------------ launch complex (pad-local frame, metres) */

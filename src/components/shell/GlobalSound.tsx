@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useUIStore } from "@/stores";
 import { installVoiceUnlock, primeVoice } from "@/lib/voice";
-import { playSfx, setAmbientBed } from "@/lib/sfx";
+import { playSfx, preloadSfx, setAmbientBed } from "@/lib/sfx";
 
 /** App-wide UI sound: clicks and hover ticks on interactive elements, plus a quiet ambient bed outside the flight screens. Follows the mute switch. */
 export function GlobalSound() {
@@ -18,16 +18,9 @@ export function GlobalSound() {
     if (muted) return;
     const interactive = (t: EventTarget | null) => (t as HTMLElement | null)?.closest?.("button, a[href], select, [role=button], [role=radio], summary") as HTMLElement | null;
     const quiet = (el: HTMLElement) => el.closest("[data-nosound]") !== null || el.hasAttribute("disabled") || el.getAttribute("aria-disabled") === "true";
-    let lastTick = 0, lastEl: HTMLElement | null = null;
-    const click = (e: MouseEvent) => { primeVoice(); if (!flightRef.current) setAmbientBed(true); /* the context only exists after the first gesture */ const el = interactive(e.target); if (el && !quiet(el)) playSfx("click"); };
-    const over = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse") return;
-      const el = interactive(e.target); if (!el || el === lastEl || quiet(el)) { if (!el) lastEl = null; return; }
-      lastEl = el; const now = performance.now(); if (now - lastTick < 90) return; lastTick = now; playSfx("tick");
-    };
+    const click = (e: MouseEvent) => { primeVoice(); void preloadSfx(); if (!flightRef.current) setAmbientBed(true); /* the context only exists after the first gesture */ const el = interactive(e.target); if (el && !quiet(el)) playSfx("click"); };
     document.addEventListener("click", click, true);
-    document.addEventListener("pointerover", over, true);
-    return () => { document.removeEventListener("click", click, true); document.removeEventListener("pointerover", over, true); };
+    return () => { document.removeEventListener("click", click, true); };
   }, [muted]);
 
   useEffect(() => { setAmbientBed(!muted && !inFlight); return () => setAmbientBed(false); }, [muted, inFlight]);

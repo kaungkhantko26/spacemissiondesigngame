@@ -1,5 +1,5 @@
 import { LAUNCH, MOON_DIST_M, R_E, TLI, density, orbitElements, padPosition, thrustDir, type Flight } from "@/game/launch/core";
-import { biomeFor, drawClouds, drawComplex, drawSky, drawSmoke, drawTerrain, trailAlpha, updateSmoke, type Biome, type Puff, type Scene } from "./launchScenery";
+import { biomeFor, drawClouds, hash, puff, drawComplex, drawSky, drawSmoke, drawTerrain, trailAlpha, updateSmoke, type Biome, type Puff, type Scene } from "./launchScenery";
 import type { RocketSprite } from "./partThumbs";
 
 /** Camera + scene state for the launch canvas (a class so async loaders can attach textures without mutating React state). */
@@ -85,7 +85,22 @@ export function drawFlight(ctx: CanvasRenderingContext2D, W: number, H: number, 
 
   // ---- real-environment scenery near the ground
   drawTerrain(ctx, scene, b, Math.max(0, alt));
-  drawClouds(ctx, scene, b);
+  const cloudA = 1 - smooth((E - 40_000) / 70_000); // keep the cloud layers visible well past the lower atmosphere
+  drawClouds(ctx, { ...scene, alpha: Math.max(scene.alpha, cloudA) }, b);
+  // cloud deck seen from above while climbing out: a broken white band hugging the surface that thins out into the orbital view
+  const deckA = smooth((E - 12_000) / 30_000) * (1 - smooth((E - 300_000) / 600_000));
+  if (deckA > 0.02) { // soft puffs on a ring just above the ground, in two decks, so there are no hard edges at any zoom
+    const deck = (rad: number, count: number, size: number, alpha: number, seed: number) => {
+      const step = (a1 - a0) / count;
+      for (let i = 0; i < count; i++) {
+        const h = hash(i * 1.7 + seed); if (h < 0.4) continue; // gaps in the deck
+        const ang = a0 + step * (i + hash(i + seed) * 0.8), r = size * (0.7 + hash(i * 3 + seed) * 0.9), x = sx(rad * Math.cos(ang)), y = sy(rad * Math.sin(ang));
+        if (x < -r * k || x > W + r * k || y < -r * k || y > H + r * k) continue;
+        if (r * k < 2.5) continue; puff(ctx, x, y, r * k, alpha * deckA * (0.45 + 0.55 * h), 38);
+      }
+    };
+    deck(R + 3200, 240, 16_000, 0.26, 11); deck(R + 7600, 160, 12_000, 0.14, 23);
+  }
 
   // ---- reference rings + predicted orbit (orbit view)
   if (E > R * 0.15) {

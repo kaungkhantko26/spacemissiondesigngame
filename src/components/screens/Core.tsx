@@ -8,6 +8,7 @@ import {
   BackButton, GameButton, GlassPanel, LoadingBar, ScreenContainer, StatBar, XPProgressBar, LevelBadge, PlayerAvatar,
 } from "@/components/ui";
 import { Astronaut, Scene3D, PlanetModel } from "@/components/three/lazy";
+import { IdBadge } from "./IdBadge";
 import { AstronautGuide, TestVoiceButton, TutorialButton } from "./MenuGuide";
 import { ProfileWidget } from "@/components/shell/GameShell";
 import { usePlayerStore, useCosmeticsStore, useUIStore } from "@/stores";
@@ -195,7 +196,7 @@ export function ProfileScreen() {
   return (
     <ScreenContainer title="Profile" actions={<BackButton href="/menu" label="Main menu" />}>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <div className="grid gap-4">
+        <div className="grid content-start gap-4">
           <GlassPanel className="flex flex-wrap items-center gap-4 p-5">
             <PlayerAvatar player={profile} size={72} />
             <div className="flex-1">
@@ -224,11 +225,14 @@ export function ProfileScreen() {
             </ul>
           </GlassPanel>
         </div>
+        <div className="grid content-start gap-4">
+        <IdBadge profile={profile} />
         <GlassPanel className="flex min-h-[420px] flex-col p-3">
           <h2 className="px-2 pt-2 text-xl font-bold">Character preview</h2>
           <p className="px-2 text-xs text-muted">Drag to rotate · scroll to zoom</p>
           <div className="min-h-0 flex-1"><Scene3D controls camera={[0, 1, 5]} label="Interactive astronaut preview"><Astronaut {...look} position={[0, -1, 0]} /></Scene3D></div>
         </GlassPanel>
+        </div>
       </div>
     </ScreenContainer>
   );

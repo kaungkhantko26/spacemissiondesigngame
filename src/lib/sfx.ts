@@ -1,8 +1,31 @@
 import { audioContext } from "./voice";
+import { asset } from "./asset";
 
 /** Procedural launch sound design (Web Audio, no files): a rocket engine whose rumble, hiss and crackle follow throttle, altitude and dynamic pressure,
  *  plus one-shots for ignition, stage separation, upper-stage ignition, loss of vehicle and a success chime. */
 const seconds = (c: AudioContext, s: number) => c.currentTime + s;
+
+/** Recorded samples: drop mp3 files into public/sfx/<id>.mp3 (engine, ignition, separation, ignite2, explosion, chime, click, space) and they replace the synthesised sounds. */
+const SAMPLE_IDS = ["engine", "ignition", "separation", "ignite2", "explosion", "chime", "click", "space"] as const;
+type SampleId = (typeof SAMPLE_IDS)[number];
+const samples = new Map<SampleId, AudioBuffer | null>();
+let sampleLoad: Promise<void> | null = null;
+export function preloadSfx(): Promise<void> {
+  const c = audioContext(); if (!c) return Promise.resolve();
+  sampleLoad ??= Promise.all(SAMPLE_IDS.map(async (id) => {
+    try {
+      const res = await fetch(asset(`/sfx/${id}.mp3`)); if (!res.ok) { samples.set(id, null); return; }
+      const data = await res.arrayBuffer();
+      samples.set(id, await new Promise<AudioBuffer | null>((ok) => { c.decodeAudioData(data, ok, () => ok(null)); }));
+    } catch { samples.set(id, null); }
+  })).then(() => undefined);
+  return sampleLoad;
+}
+const sample = (id: SampleId) => samples.get(id) ?? null;
+function playSample(c: AudioContext, id: SampleId, gain = 1): boolean {
+  const b = sample(id); if (!b) return false;
+  const s = c.createBufferSource(), g = c.createGain(); s.buffer = b; g.gain.value = gain; s.connect(g); g.connect(c.destination); s.start(); return true;
+}
 function noise(c: AudioContext, kind: "white" | "brown", dur = 4): AudioBuffer {
   const b = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate), d = b.getChannelData(0);
   let last = 0;
@@ -23,6 +46,7 @@ export class RocketSound {
   private rattle: GainNode;
   private stops: (() => void)[] = [];
   private level = 0;
+  private samp: { g: GainNode; lp: BiquadFilterNode } | null = null;
   constructor(c: AudioContext) {
     this.c = c;
     this.master = c.createGain(); this.master.gain.value = 0; this.master.connect(c.destination);
@@ -42,6 +66,12 @@ export class RocketSound {
     this.rattle = c.createGain(); this.rattle.gain.value = 0;
     const chop = c.createOscillator(), chopAmt = c.createGain(); chop.frequency.value = 17; chopAmt.gain.value = 0.5; chop.connect(chopAmt); chopAmt.connect(this.rattle.gain);
     buf.connect(bp); bp.connect(this.rattle); this.rattle.connect(this.master);
+    void preloadSfx().then(() => { // a recorded engine loop, when provided, takes over from the synthesised layers
+      const b = sample("engine"); if (!b || this.samp) return;
+      const src = c.createBufferSource(); src.buffer = b; src.loop = true;
+      const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 6000; const g = c.createGain(); g.gain.value = 0;
+      src.connect(lp); lp.connect(g); g.connect(this.master); src.start(); this.samp = { g, lp }; this.stops.push(() => { try { src.stop(); } catch { /* stopped */ } });
+    });
     for (const n of [brown, white, flutter, o1, o2, buf, chop]) { n.start(); this.stops.push(() => { try { n.stop(); } catch { /* already stopped */ } }); }
   }
   /** Called ~10x a second. throttle 0..1 (0 = engine off), alt in metres, q in Pa. */
@@ -50,15 +80,18 @@ export class RocketSound {
     const thrust = on ? Math.max(0.12, throttle) : 0;
     const exterior = 0.22 + 0.78 * air; // in vacuum only the structure-borne rumble remains
     const target = thrust * (on ? 1 : 0);
-    this.level += (target - this.level) * 0.35;
+    // slow and steady: the sound builds gently and, when the engine cuts out, trails away over a few seconds (an outro) instead of stopping dead
+    this.level += (target - this.level) * (target > this.level ? 0.12 : 0.045);
     const v = this.level;
-    this.master.gain.setTargetAtTime(Math.min(0.5, v * 0.5 + 0.001), t, 0.12);
-    this.rumble.gain.setTargetAtTime(1.0 * v, t, 0.15);
-    this.rumbleLp.frequency.setTargetAtTime(160 + 700 * exterior * (0.4 + 0.6 * v), t, 0.2);
-    this.hiss.gain.setTargetAtTime(0.5 * v * exterior, t, 0.15);
-    this.hissBp.frequency.setTargetAtTime(700 + 1600 * v, t, 0.2);
-    this.sub.gain.setTargetAtTime(0.35 * v, t, 0.2);
-    this.rattle.gain.setTargetAtTime(Math.min(0.7, (q / 30000) * 0.7) * (v > 0.05 ? 1 : 0), t, 0.2);
+    this.master.gain.setTargetAtTime(Math.min(0.5, v * 0.5 * (0.45 + 0.55 * exterior) + 0.0005), t, 0.35);
+    const synth = this.samp ? 0 : 1;
+    if (this.samp) { this.samp.g.gain.setTargetAtTime(v, t, 0.4); this.samp.lp.frequency.setTargetAtTime(900 + 9000 * exterior, t, 0.3); }
+    this.rumble.gain.setTargetAtTime(0.7 * v * synth, t, 0.15);
+    this.rumbleLp.frequency.setTargetAtTime(110 + 380 * exterior * (0.4 + 0.6 * v), t, 0.25);
+    this.hiss.gain.setTargetAtTime(0.1 * v * exterior * synth, t, 0.2);
+    this.hissBp.frequency.setTargetAtTime(500 + 900 * v, t, 0.3);
+    this.sub.gain.setTargetAtTime(0.3 * v * synth, t, 0.2);
+    this.rattle.gain.setTargetAtTime(Math.min(0.25, (q / 30000) * 0.25) * (v > 0.05 ? 1 : 0), t, 0.3);
   }
   silence() { this.master.gain.setTargetAtTime(0, this.c.currentTime, 0.1); this.level = 0; }
   dispose() { this.silence(); setTimeout(() => this.stops.forEach((s) => s()), 400); }
@@ -72,6 +105,8 @@ export function playSfx(kind: SfxKind) {
   void c.resume().then(() => { if (c.state === "running") sfxNow(c, kind); }).catch(() => undefined); // locked until a click: stay silent
 }
 function sfxNow(c: AudioContext, kind: SfxKind) {
+  const SAMPLE_FOR: Partial<Record<SfxKind, SampleId>> = { ignition: "ignition", separation: "separation", ignite2: "ignite2", explosion: "explosion", chime: "chime", click: "click" };
+  const sid = SAMPLE_FOR[kind]; if (sid && playSample(c, sid, kind === "click" ? 0.6 : 0.9)) return;
   const out = c.createGain(); out.connect(c.destination);
   const burst = (type: "white" | "brown", dur: number, lp: [number, number], gain: number, attack = 0.005, decay = dur) => {
     const s = c.createBufferSource(); s.buffer = noise(c, type, Math.max(dur, 0.5));
@@ -85,7 +120,7 @@ function sfxNow(c: AudioContext, kind: SfxKind) {
     g.gain.setValueAtTime(0.0001, seconds(c, delay)); g.gain.linearRampToValueAtTime(gain, seconds(c, delay + 0.01)); g.gain.exponentialRampToValueAtTime(0.0001, seconds(c, delay + dur));
     o.connect(g); g.connect(out); o.start(seconds(c, delay)); o.stop(seconds(c, delay + dur + 0.05));
   };
-  if (kind === "ignition") { out.gain.value = 0.55; burst("brown", 5, [120, 1800], 1.0, 1.6, 5); burst("white", 4.5, [600, 3500], 0.35, 1.4, 4.5); tone("sine", 34, 30, 4, 0.5); }
+  if (kind === "ignition") { out.gain.value = 0.5; burst("brown", 5, [90, 900], 1.0, 1.8, 5); burst("white", 4.5, [400, 1800], 0.08, 1.6, 4.5); tone("sine", 34, 30, 4, 0.45); }
   else if (kind === "separation") { out.gain.value = 0.9; burst("white", 0.35, [6000, 400], 0.9, 0.002, 0.35); tone("sine", 95, 28, 0.5, 0.9); tone("square", 900, 300, 0.12, 0.12, 0.03); tone("triangle", 420, 180, 0.4, 0.2, 0.08); burst("white", 1.2, [3000, 800], 0.18, 0.05, 1.2); }
   else if (kind === "ignite2") { out.gain.value = 0.6; burst("brown", 2.2, [100, 700], 0.8, 0.9, 2.2); tone("sine", 40, 55, 1.8, 0.35); }
   else if (kind === "explosion") { out.gain.value = 0.8; burst("white", 3.6, [5000, 90], 1, 0.003, 3.6); burst("brown", 4.5, [400, 60], 1, 0.01, 4.5); tone("sine", 80, 22, 2.5, 1); }
@@ -100,7 +135,7 @@ function sfxNow(c: AudioContext, kind: SfxKind) {
 let bed: SpaceHum | null = null;
 export function setAmbientBed(on: boolean) {
   const c = audioContext(); if (!c) return;
-  if (on) { bed ??= new SpaceHum(c, 0.03); bed.set(true); void c.resume().catch(() => undefined); } else bed?.set(false);
+  if (on) { bed ??= new SpaceHum(c, 0.012); bed.set(true); void c.resume().catch(() => undefined); } else bed?.set(false);
 }
 
 /** Quiet spacecraft ambience for the coast: low electrical hum plus ventilation hiss. */
@@ -111,7 +146,7 @@ export class SpaceHum {
     const o1 = c.createOscillator(), o2 = c.createOscillator(); o1.frequency.value = 55; o2.frequency.value = 110.7; o2.type = "triangle";
     const og = c.createGain(); og.gain.value = 0.35; o1.connect(og); o2.connect(og); og.connect(this.g);
     const n = loop(c, noise(c, "white", 3)), f = c.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 900; f.Q.value = 0.4;
-    const ng = c.createGain(); ng.gain.value = 0.05; n.connect(f); f.connect(ng); ng.connect(this.g);
+    const ng = c.createGain(); ng.gain.value = 0.0; n.connect(f); f.connect(ng); ng.connect(this.g);
     for (const x of [o1, o2, n]) { x.start(); this.nodes.push(x); }
   }
   set(on: boolean) { this.g.gain.setTargetAtTime(on ? this.level : 0, this.c.currentTime, 0.4); }

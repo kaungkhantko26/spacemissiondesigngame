@@ -169,7 +169,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     const el = canvas.current, box = wrap.current; if (!el || !box) return;
     const ctx = el.getContext("2d"); if (!ctx) return;
     let raf = 0, last = performance.now(), dead = false, W = 0, H = 0;
-    const resize = () => { const r = box.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1); W = r.width; H = r.height; el.width = Math.round(W * dpr); el.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
+    const resize = () => { const r = box.getBoundingClientRect(), dpr = Math.min(1.5, window.devicePixelRatio || 1); W = r.width; H = r.height; el.width = Math.round(W * dpr); el.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
     resize(); const ro = new ResizeObserver(resize); ro.observe(box);
     // real Earth texture for the orbit view + the 3-D rocket model as the flight sprite (both load async; the scene works without them)
     const fl = session.flight;
@@ -177,7 +177,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     void loadRocketSprite(fl.rocket.vehicle.id).then((sp) => { if (!dead) view.setSprite(sp); });
     const frame = (now: number) => {
       if (dead) return;
-      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      const dt = Math.min(0.25, (now - last) / 1000); last = now; // a slow frame no longer slows the simulation down to a crawl
       session.tick(dt); updateView(view, session.flight, dt, reduced, session.running ? dt * session.warp : 0); drawFlight(ctx, W, H, session.flight, view);
       raf = requestAnimationFrame(frame);
     };
