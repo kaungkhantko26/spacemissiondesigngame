@@ -144,7 +144,7 @@ describe("Saturn V and the mission to the Moon", () => {
     const f = flyAuto(moonFlight());
     expect(f.phase, f.failure ?? "").toBe("translunar");
     expect(f.milestones.orbit).toBeLessThan(f.milestones.tliStart); expect(f.milestones.tliStart).toBeLessThan(f.milestones.tli);
-    expect(f.milestones.tliStart - f.milestones.orbit).toBeGreaterThan(1800); // you really wait for the window
+    expect(f.milestones.tliStart - f.milestones.orbit).toBeGreaterThan(1000); // you really wait for the window
     const apo = orbitElements(f.x, f.y, f.vx, f.vy).apo + 6.371e6;
     expect(apo / MOON_DIST_M()).toBeGreaterThan(TLI.tolLow); expect(apo / MOON_DIST_M()).toBeLessThan(TLI.tolHigh);
     expect(f.park!.fuel).toBeGreaterThan(0.4); // S-IVB still has most of its propellant for TLI

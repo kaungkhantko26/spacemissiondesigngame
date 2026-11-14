@@ -62,11 +62,14 @@ export function DesignStudio() {
 
   const [ascent, setAscent] = useState<{ session: LaunchSession; n: number } | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [fromTli, setFromTli] = useState(false);
   /** Every mission now starts with the real ground-to-orbit ascent (Launch Control) from the chosen spaceport. */
   const startAscent = (n: number) => {
     const setup = useLaunchSetup.getState();
+    // Full Moon mission (parking orbit → TLI burn) when asked for, the target is the Moon and the rocket has the performance.
+    const mission = setup.mission === "moon" && canFlyMoon(ev) ? "moon" : "orbit";
     setAttempt(n);
-    setAscent({ n, session: new LaunchSession(setup.difficulty, setup.siteId, ev.vehicle.id, 1000 + n * 7919, Math.min(ev.wetKg, ev.vehicle.leo_capacity_kg)) });
+    setAscent({ n, session: new LaunchSession(setup.difficulty, setup.siteId, ev.vehicle.id, 1000 + n * 7919, Math.min(ev.wetKg, ev.vehicle.leo_capacity_kg), mission) });
   };
   const onLaunch = () => startAscent(attempt + 1);
   const finishAscent = () => {
@@ -74,13 +77,16 @@ export function DesignStudio() {
     const f = ascent.session.flight, site = f.site.location.split(",")[0];
     // The ascent decided the launch phase; the remaining phases (cruise, insertion, science) still roll on the design's odds.
     const r = simulate({ ...ev, probabilities: { ...ev.probabilities, launch: 1 } }, seedFromDesign(design, ascent.n));
-    r.phases[0] = { ...r.phases[0], probability: 1, story: `Reached a ${f.tel.periKm.toFixed(0)} × ${f.tel.apoKm.toFixed(0)} km orbit — ${f.rules.name} launch from ${site}.` };
-    setFlight(r); setAscent(null);
+    const tli = f.mission === "moon";
+    r.phases[0] = { ...r.phases[0], probability: 1, story: tli
+      ? `${f.rocket.name} reached a ${(f.park?.periKm ?? 0).toFixed(0)} × ${(f.park?.apoKm ?? 0).toFixed(0)} km parking orbit and the upper stage completed translunar injection (apogee ${f.tel.apoKm.toFixed(0)} km) — ${f.rules.name} launch from ${site}.`
+      : `Reached a ${f.tel.periKm.toFixed(0)} × ${f.tel.apoKm.toFixed(0)} km orbit — ${f.rules.name} launch from ${site}.` };
+    setFromTli(tli); setFlight(r); setAscent(null);
   };
   if (ascent && !flight) {
     return <AscentFlight key={ascent.n} session={ascent.session} onExit={() => setAscent(null)} onAgain={() => startAscent(ascent.n + 1)} onContinue={finishAscent} continueLabel={`fly to the ${ev.destination.name}`} exitLabel="Back to design" />;
   }
-  if (flight) return <FlightView ev={ev} result={flight} onAgain={() => { setFlight(null); redesign(); }} onRetry={() => { setFlight(null); startAscent(attempt + 1); }} />;
+  if (flight) return <FlightView ev={ev} result={flight} fromTli={fromTli} onAgain={() => { setFlight(null); redesign(); }} onRetry={() => { setFlight(null); startAscent(attempt + 1); }} />;
 
   return (
     <ScreenContainer title="Mission Architect" subtitle="Real orbital physics, real launch records, real NASA instruments — balance them all." actions={<div className="flex gap-2"><GameButton variant="ghost" icon={<RotateCcw className="size-4" />} onClick={reset}>Reset</GameButton><BackButton href="/menu" label="Main menu" /></div>}>
@@ -191,10 +197,19 @@ export function DesignStudio() {
   );
 }
 
-function LaunchSetupFields() {
-  const { siteId, difficulty, set } = useLaunchSetup();
+/** The Moon contract can be flown end-to-end only with a rocket that has propellant left for translunar injection. */
+const canFlyMoon = (ev: Evaluation) => ev.destination.kind === "moon" && (!!ev.vehicle.tli_payload_kg || ev.vehicle.leo_capacity_kg >= 20000);
+function LaunchSetupFields({ ev }: { ev: Evaluation }) {
+  const { siteId, difficulty, mission, set } = useLaunchSetup();
+  const moonOk = canFlyMoon(ev);
   return (
     <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+      <label className="col-span-2 block"><span className="hud-label">Launch mission</span>
+        <select value={moonOk ? mission : "orbit"} disabled={!moonOk} onChange={(e) => set({ mission: e.target.value as "orbit" | "moon" })} aria-label="Launch mission" className="mt-1 w-full px-2 py-1.5">
+          <option value="orbit">Quick: ascent to orbit, then the flight view</option>
+          <option value="moon">Full Moon mission: parking orbit → TLI burn → Moon</option>
+        </select>
+        {!moonOk && <span className="mt-1 block text-muted">{ev.destination.kind !== "moon" ? "The full TLI mission is for the Moon contract." : "This rocket's upper stage is too small for translunar injection — pick the Saturn V (or another heavy lifter)."}</span>}</label>
       <label className="block"><span className="hud-label">Spaceport</span>
         <select value={siteId} onChange={(e) => set({ siteId: e.target.value })} aria-label="Spaceport" className="mt-1 w-full px-2 py-1.5">
           {DATASET.launch_sites.map((s) => <option key={s.id} value={s.id}>{s.location.split(",")[0]} (+{Math.round(s.rotation_boost_m_s)} m/s)</option>)}
@@ -240,7 +255,7 @@ function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void })
         <p className="mt-1 text-muted">Same model Mission Control uses: arrays derated for pointing and off in eclipse; RTGs constant. Architect&apos;s headline power figure is the nominal full-Sun output.</p></details>
       <details className="mt-3 text-xs text-ink2"><summary className="cursor-pointer">Cost breakdown</summary>
         <ul className="mt-1 space-y-0.5">{Object.entries(ev.costBreakdown).map(([k, v]) => <li key={k} className="flex justify-between"><span>{k}</span><span className="tabular-nums">{usd(v)}</span></li>)}</ul></details>
-      <LaunchSetupFields />
+      <LaunchSetupFields ev={ev} />
       <GameButton variant="primary" className="mt-4 w-full py-3 text-lg" disabled={!ev.goNoGo} icon={<Rocket className="size-5" />} onClick={onLaunch}>{ev.goNoGo ? "Go for launch" : "No-go"}</GameButton>
       {!ev.goNoGo && <p className="mt-2 text-center text-xs text-bad" role="status">Fix the failing checks to unlock launch.</p>}
       {ev.destination.id === "moon" && <Link href="/mission-control" className="mt-2 block rounded-lg border border-[var(--border)] px-4 py-2 text-center text-sm text-ink2 transition hover:border-orange hover:text-ink">Or fly it live in Mission Control →</Link>}
@@ -248,7 +263,7 @@ function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void })
   );
 }
 
-function FlightView({ ev, result, onAgain, onRetry }: { ev: Evaluation; result: MissionResult; onAgain: () => void; onRetry: () => void }) {
+function FlightView({ ev, result, fromTli, onAgain, onRetry }: { ev: Evaluation; result: MissionResult; fromTli: boolean; onAgain: () => void; onRetry: () => void }) {
   const failIndex = (() => { const i = result.phases.findIndex((p) => !p.passed); return i === -1 ? null : (i as 0 | 1 | 2 | 3); })();
   const traj = useMemo(() => buildTrajectory(ev.destination, failIndex), [ev.destination, failIndex]);
   const [u, setU] = useState(0);
@@ -296,7 +311,7 @@ function FlightView({ ev, result, onAgain, onRetry }: { ev: Evaluation; result: 
               <Astronaut suit="#e8eef7" pose={result.success ? "celebrate" : "idle"} position={[0, -1, 0]} />
             </Scene3D>
           ) : (
-            <TrajectorySim key={`${result.score}-${result.reached}-${ev.destination.id}`} traj={traj} onUpdate={onUpdate} startAtEnd={seenEnd} startU={traj.mode === "moon" ? traj.markers.seg1 * 0.35 : 0} className="h-full min-h-[520px]" />
+            <TrajectorySim key={`${result.score}-${result.reached}-${ev.destination.id}`} traj={traj} onUpdate={onUpdate} startAtEnd={seenEnd} startU={traj.mode === "moon" ? traj.markers.seg1 * (fromTli ? 1 : 0.35) : 0} className="h-full min-h-[520px]" />
           )}
         </GlassPanel>
       </div>

@@ -62,7 +62,7 @@ export function SplashScreen() {
 /** Sized from the canvas's visible height AND width: as tall as the panel allows (feet near the bottom edge) without clipping the waving arm. */
 function MenuAstronaut({ look, pose }: { look: ReturnType<typeof useLook>; pose: "idle" | "wave" | "ready" | "celebrate" }) {
   const { width, height } = useThree((st) => st.viewport);
-  const scale = Math.min(0.385 * height, width * 0.3, 3);
+  const scale = Math.min(0.34 * height, width * 0.3, 3); // leaves headroom: some clips (moon walk) lift the model
   const y = -height / 2 + 0.25 * scale + 0.03 * height; // the model's feet sit 0.25·scale below its origin
   return <Astronaut {...look} pose={pose} position={[Math.min(width * 0.12, 2.4), y, 0]} scale={scale} rotationY={-Math.PI / 4} />;
 }
@@ -81,7 +81,7 @@ const MENU = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 type Pose = "idle" | "wave" | "ready" | "celebrate";
-const HOVER_POSE: Record<string, Pose> = { Cosmetics: "celebrate", Stats: "ready", Profile: "idle", Settings: "idle" };
+const HOVER_POSE: Record<string, Pose> = { Cosmetics: "celebrate", Stats: "idle", Profile: "idle", Settings: "idle" };
 
 function MissionClock() {
   const [now, setNow] = useState<Date | null>(null);

@@ -99,7 +99,7 @@ function Briefing({ onStart }: { onStart: () => void }) {
                 <div key={k} className="rounded-md bg-white/5 p-2"><dt className="text-muted">{k}</dt><dd className="font-display text-base tabular-nums">{val}</dd></div>
               ))}
             </dl>
-            {mission === "moon" ? <p className="mt-3 text-sm text-ink2"><b className="text-ink">Goal:</b> reach a <b>{rules.minPerigeeKm}+ km</b> parking orbit, wait for the TLI window (~1 h), re-ignite the upper stage and burn prograde until apogee reaches the Moon (≈384,400 km), then coast to the Moon and enter lunar orbit.</p> : <p className="mt-3 text-sm text-ink2"><b className="text-ink">Goal:</b> reach a stable orbit — lowest point above <b>{rules.minPerigeeKm} km</b>, highest below <b>{rules.maxApogeeKm} km</b>. Cross the Kármán line (100 km) on the way.</p>}
+            {mission === "moon" ? <p className="mt-3 text-sm text-ink2"><b className="text-ink">Goal:</b> reach a <b>{rules.minPerigeeKm}+ km</b> parking orbit, wait for the TLI window (~30 min, auto-warped), re-ignite the upper stage and burn prograde until apogee reaches the Moon (≈384,400 km), then coast to the Moon and enter lunar orbit.</p> : <p className="mt-3 text-sm text-ink2"><b className="text-ink">Goal:</b> reach a stable orbit — lowest point above <b>{rules.minPerigeeKm} km</b>, highest below <b>{rules.maxApogeeKm} km</b>. Cross the Kármán line (100 km) on the way.</p>}
             <ol className="mt-2 list-decimal space-y-0.5 pl-5 text-xs text-ink2"><li>Countdown &amp; liftoff</li><li>Clear the tower, pitch over</li><li>Max-Q (peak air pressure)</li><li>Stage separation</li><li>Upper stage burn to orbital speed</li><li>Engine cutoff in orbit</li></ol>
             <div className="mt-3 rounded-md border border-[var(--border)] p-2 text-xs text-ink2">
               <p className="hud-label mb-1">Controls</p>
@@ -311,7 +311,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
             </dl>
             {!result.ok && <p className="mt-3 text-xs text-ink2">Tip: {f.rules.autopilot === "full" ? "turn the autopilot on and let it fly the climb." : f.rules.guideCue ? "follow the pitch cue, throttle down near max-Q, and cut the engine at orbital speed." : "ease the pitch over gradually, throttle through max-Q, and watch your fuel."}</p>}
             <div className="mt-5 flex flex-wrap gap-2">
-              {f.mission === "moon" && result.ok && <GameButton variant="primary" icon={<Rocket className="size-4" />} onClick={() => setLeg(true)}>Continue: coast to the Moon</GameButton>}
+              {f.mission === "moon" && result.ok && !onContinue && <GameButton variant="primary" icon={<Rocket className="size-4" />} onClick={() => setLeg(true)}>Continue: coast to the Moon</GameButton>}
               {onContinue && result.ok && <GameButton variant="primary" icon={<Rocket className="size-4" />} onClick={onContinue}>Continue: {continueLabel ?? "next phase"}</GameButton>}
               <GameButton variant={(onContinue || f.mission === "moon") && result.ok ? "outline" : "primary"} icon={<RotateCcw className="size-4" />} onClick={onAgain}>Fly again</GameButton>
               <GameButton variant="outline" onClick={onExit}>{exitLabel ?? "Change setup"}</GameButton>

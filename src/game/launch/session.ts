@@ -9,7 +9,7 @@ export function payloadFor(v: { leo_capacity_kg: number; tli_payload_kg?: number
 }
 /** Real-time wrapper around a Flight: input state, held keys and time warp. Lives outside React; the UI polls it. */
 export class LaunchSession {
-  flight: Flight; input: Input; warp = 1; running = false; private acc = 0; held = { up: false, down: false };
+  flight: Flight; input: Input; warp = 1; running = false; private acc = 0; private parkWarped = false; private tliSlowed = false; held = { up: false, down: false };
   constructor(public difficulty: Difficulty, siteId: string, vehicleId: string, seed: number, payloadKg?: number, public mission: MissionKind = "orbit") {
     const rules = RULES[difficulty];
     const v = vehicleById(vehicleId) ?? DATASET.vehicles[0];
@@ -21,6 +21,13 @@ export class LaunchSession {
   tick(dtReal: number) {
     if (!this.running || this.done) return;
     this.input.pitchRate = (this.held.up ? 1 : 0) - (this.held.down ? 1 : 0);
+    // Moon mission pacing: jump ahead to the TLI window automatically, slow down as it opens, and keep the burn at a sane warp.
+    const f = this.flight;
+    if (f.phase === "parking") {
+      if (!this.parkWarped) { this.parkWarped = true; this.warp = Math.max(this.warp, 50); }
+      if (this.warp > 1 && f.tel.tliRemainS !== null && f.tel.tliRemainS < 90) this.warp = 1;
+    }
+    if (f.phase === "tli" && !this.tliSlowed) { this.tliSlowed = true; this.warp = Math.min(this.warp, 10); }
     // Fixed-step accumulator: simulated time advances exactly dtReal × warp on any display refresh rate.
     this.acc = Math.min(this.acc + dtReal * this.warp, LAUNCH.dt * 600); // cap catch-up work (e.g. after a hidden tab)
     const steps = Math.floor(this.acc / LAUNCH.dt + 1e-9);

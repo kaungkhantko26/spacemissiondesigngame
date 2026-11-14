@@ -117,3 +117,11 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Balance (headless): autopilot completes the Saturn V Moon mission; Pilot/Commander test pilots 36/36 across all 6 sites; Falcon 9 / Delta IV Heavy / Falcon Heavy can do it with a light payload; smaller rockets run out of upper-stage propellant at TLI with a message pointing to the Saturn V.
 - Menu astronaut enlarged (scaled from the panel height, feet near the bottom, taller panel). Canvas guard for a not-yet-laid-out first frame (NaN gradient error).
 - Tests: `launch.test.ts` 23 (7 new Saturn V/TLI cases). All suites pass via the shim.
+
+## Session 5 (cont.) — Moon leg visuals, pacing, Architect Moon mission, menu astronaut
+- **Menu astronaut head cropped**: hovering Stats played the `floating` clip, which lifts the model out of the canvas. Stats now uses idle; scale reduced to 0.34×panel height for headroom.
+- **Moon mission pacing**: TLI window now opens ~0.3 orbit (~28 min) after insertion; `LaunchSession` auto-warps to 50× in parking orbit, drops to 1× when the window is <90 s away, and caps the TLI burn at 10×.
+- **Lunar arrival** (`trajectory.ts`): replaced the decaying spiral with a real hyperbolic approach (periapsis = 100 km capture radius, v∞ from the transfer) → insertion burn → circular orbit, drawn Moon-relative (`pathRel`, `seg3Index`, capture ring); the coast end blends into the approach start (no jump).
+- **Earth→Moon view** (`TrajectorySim.tsx`): default is now a cinematic chase camera (`CineRig`): starts close to a textured, lit Earth, keeps the craft in the foreground with the Moon growing ahead, then circles the textured Moon during capture; craft marker points along its velocity; the planned (dashed) path stops at arrival; toggle button for the old map view. Used by Launch Control's Moon leg and Mission Architect.
+- **Architect → full Moon mission**: "Launch mission" select (quick ascent, or parking orbit → TLI burn → Moon) in the review panel when the rocket can do it (Saturn V / ≥20 t); the Moon flight then starts at the coast.
+- Verified: typecheck, lint (0 errors), production build, all 6 test suites via the shim, browser checks of the Moon leg (start/coast/capture) and the menu astronaut at 1890×950.

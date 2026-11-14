@@ -208,7 +208,7 @@ const tliRemain = (f: Flight) => wrapPi(Math.atan2(f.y, f.x) - f.tliStartAngle);
 export const tliWindowRemain = tliRemain;
 /** Moon distance the TLI orbit must reach (centre-to-centre) and the accepted band. */
 export const MOON_DIST_M = () => bodyById("moon").sma_m as number;
-export const TLI = { tolLow: 0.93, tolHigh: 1.07, windowOkRad: 0.14, windowFailRad: 0.35, orbitsToWait: 0.6, leadRad: 0.17, maxRestarts: 4 } as const;
+export const TLI = { tolLow: 0.93, tolHigh: 1.07, windowOkRad: 0.14, windowFailRad: 0.35, orbitsToWait: 0.3, leadRad: 0.17, maxRestarts: 4 } as const;
 function fullThrust(f: Flight, h: number) {
   const s = stageSpec(f);
   const p = Math.exp(-Math.max(0, h) / LAUNCH.scaleHeightM);
