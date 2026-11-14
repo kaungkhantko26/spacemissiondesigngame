@@ -9,6 +9,7 @@ import { useGame } from "@/live/store";
 import { Design } from "./Design";
 import { Report } from "./Report";
 import { Portrait } from "./Portrait";
+import { Scene3D, PlanetModel } from "@/components/three/lazy";
 import { cn } from "@/lib/mission";
 import type { Difficulty, Room } from "@/live/types";
 
