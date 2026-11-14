@@ -9,6 +9,8 @@ import {
 } from "@/components/ui";
 import { Astronaut, Scene3D, PlanetModel } from "@/components/three/lazy";
 import { IdBadge } from "./IdBadge";
+import { AvatarEditor } from "./AvatarEditor";
+import { useProgress, withUnlocks } from "@/game/progress";
 import { AstronautGuide, TestVoiceButton, TutorialButton } from "./MenuGuide";
 import { ProfileWidget } from "@/components/shell/GameShell";
 import { usePlayerStore, useCosmeticsStore, useUIStore } from "@/stores";
@@ -105,11 +107,11 @@ function MissionClock() {
 
 const MAIN_COUNT = 4; // Launch Control, Design Mission, Mission Control and Team Up; the rest sit under "More options"
 type MenuItem = (typeof MENU)[number];
-function MenuLink({ m, i, setPose, compact }: { m: MenuItem; i: number; setPose: (p: Pose) => void; compact?: boolean }) {
+function MenuLink({ m, i, setPose, compact }: { m: MenuItem; i: number; setPose: (p: Pose | null) => void; compact?: boolean }) {
   return (
     <Link href={m.href} data-tour={TOUR_KEY[m.label]} style={{ animationDelay: `${i * 70}ms` }}
       onMouseEnter={() => setPose(HOVER_POSE[m.label] ?? "wave")} onFocus={() => setPose(HOVER_POSE[m.label] ?? "wave")}
-      onMouseLeave={() => setPose("wave")} onBlur={() => setPose("wave")}
+      onMouseLeave={() => setPose(null)} onBlur={() => setPose(null)}
       className={cn("enter group flex items-center gap-3 rounded-lg border font-display tracking-wide transition duration-150 hover:translate-x-1",
         compact ? "px-3 py-2 text-sm" : "px-5 py-3",
         m.primary ? "border-orange bg-orange py-4 text-lg font-bold text-[#1a0b00] shadow-[0_4px_0_#b4501a]" : "border-[var(--border)] bg-panel hover:border-[var(--border-strong)]")}>
@@ -123,7 +125,10 @@ export function MenuScreen() {
   const profile = usePlayerStore((s) => s.profile);
   const router = useRouter();
   const look = useLook();
-  const [pose, setPose] = useState<Pose>("wave");
+  const items = useItems(), emote = usePlayerStore((s) => s.profile.equipped.emote);
+  const home: Pose = emote === "emote-cheer" && items.find((c) => c.id === emote)?.unlocked ? "celebrate" : "wave"; // the equipped emote is the astronaut's resting pose
+  const [hover, setPose] = useState<Pose | null>(null);
+  const pose: Pose = hover ?? home;
   const [more, setMore] = useState(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -169,9 +174,16 @@ export function MenuScreen() {
 }
 
 /* ---------- helpers ---------- */
+/** Cosmetics with their unlocked state taken from what the player has actually achieved. */
+export function useItems() {
+  const level = usePlayerStore((s) => s.profile.progression.level);
+  const flights = useProgress((s) => s.flights), wins = useProgress((s) => s.wins), orbits = useProgress((s) => s.orbits), moons = useProgress((s) => s.moons), hardWins = useProgress((s) => s.hardWins);
+  const pilotWins = useProgress((s) => s.pilotWins), moonsPilot = useProgress((s) => s.moonsPilot), sGrades = useProgress((s) => s.sGrades), teamRuns = useProgress((s) => s.teamRuns);
+  return useMemo(() => withUnlocks({ flights, wins, orbits, moons, hardWins, pilotWins, moonsPilot, sGrades, teamRuns, equipped: {} }, level), [level, flights, wins, orbits, moons, hardWins, pilotWins, moonsPilot, sGrades, teamRuns]);
+}
 export function useLook() {
   const profile = usePlayerStore((s) => s.profile);
-  const items = useCosmeticsStore((s) => s.items);
+  const items = useItems();
   const previewId = useCosmeticsStore((s) => s.previewId);
   return useMemo(() => {
     const byId = (id: string | null) => items.find((c) => c.id === id);
@@ -192,10 +204,12 @@ export function useLook() {
 export function ProfileScreen() {
   const profile = usePlayerStore((s) => s.profile);
   const look = useLook();
+  const items = useItems();
+  const patchItem = items.find((c) => c.id === profile.equipped.patch && c.unlocked);
   const h = profile.history;
   return (
     <ScreenContainer title="Profile" actions={<BackButton href="/menu" label="Main menu" />}>
-      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
         <div className="grid content-start gap-4">
           <GlassPanel className="flex flex-wrap items-center gap-4 p-5">
             <PlayerAvatar player={profile} size={72} />
@@ -205,34 +219,37 @@ export function ProfileScreen() {
               <XPProgressBar className="mt-3 max-w-md" xp={profile.progression.xp} max={profile.progression.xpForNextLevel} />
             </div>
           </GlassPanel>
-          <GlassPanel className="p-5">
-            <h2 className="mb-3 text-xl font-bold">Mission history</h2>
-            <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {[["Attempted", h.attempted], ["Completed", h.completed], ["Best", h.bestPerformance], ["Highest difficulty", h.highestDifficulty ?? "—"]].map(([k, v]) => (
-                <div key={String(k)} className="rounded-lg bg-white/5 p-3"><dt className="text-xs text-muted">{k}</dt><dd className="font-semibold capitalize">{v}</dd></div>
-              ))}
-            </dl>
-          </GlassPanel>
-          <GlassPanel className="p-5">
-            <h2 className="mb-3 text-xl font-bold">Achievements</h2>
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {profile.achievements.map((a) => (
-                <li key={a.id} className={cn("flex items-start gap-3 rounded-lg border p-3", a.unlockedAt ? "border-gold/40" : "border-white/10 opacity-70")}>
-                  {a.unlockedAt ? <Check className="size-5 text-gold" aria-label="Unlocked" /> : <Lock className="size-5 text-muted" aria-label="Locked" />}
-                  <div><p className="font-semibold">{a.name}</p><p className="text-xs text-ink2">{a.description}</p><p className="text-xs text-muted">{a.unlockedAt ? `Unlocked ${a.unlockedAt}` : "Locked"}</p></div>
-                </li>
-              ))}
-            </ul>
-          </GlassPanel>
+          <AvatarEditor name={profile.username} />
+          <div className="grid items-start gap-4 md:grid-cols-[300px_1fr]">
+            <IdBadge profile={profile} patch={patchItem ? { name: patchItem.name, color: patchItem.color, accent: patchItem.accent } : null} suit={look.suit} />
+            <div className="grid content-start gap-4">
+              <GlassPanel className="p-5">
+                <h2 className="mb-3 text-xl font-bold">Mission history</h2>
+                <dl className="grid grid-cols-2 gap-3">
+                  {[["Attempted", h.attempted], ["Completed", h.completed], ["Best", h.bestPerformance], ["Highest difficulty", h.highestDifficulty ?? "—"]].map(([k, v]) => (
+                    <div key={String(k)} className="rounded-lg bg-white/5 p-3"><dt className="text-xs text-muted">{k}</dt><dd className="font-semibold capitalize">{v}</dd></div>
+                  ))}
+                </dl>
+              </GlassPanel>
+              <GlassPanel className="p-5">
+                <h2 className="mb-3 text-xl font-bold">Achievements</h2>
+                <ul className="grid gap-3">
+                  {profile.achievements.map((a) => (
+                    <li key={a.id} className={cn("flex items-start gap-3 rounded-lg border p-3", a.unlockedAt ? "border-gold/40" : "border-white/10 opacity-70")}>
+                      {a.unlockedAt ? <Check className="size-5 text-gold" aria-label="Unlocked" /> : <Lock className="size-5 text-muted" aria-label="Locked" />}
+                      <div><p className="font-semibold">{a.name}</p><p className="text-xs text-ink2">{a.description}</p><p className="text-xs text-muted">{a.unlockedAt ? `Unlocked ${a.unlockedAt}` : "Locked"}</p></div>
+                    </li>
+                  ))}
+                </ul>
+              </GlassPanel>
+            </div>
+          </div>
         </div>
-        <div className="grid content-start gap-4">
-        <IdBadge profile={profile} />
-        <GlassPanel className="flex min-h-[420px] flex-col p-3">
+        <GlassPanel className="flex h-[min(620px,calc(100vh-200px))] min-h-[420px] flex-col p-3 lg:sticky lg:top-4">
           <h2 className="px-2 pt-2 text-xl font-bold">Character preview</h2>
           <p className="px-2 text-xs text-muted">Drag to rotate · scroll to zoom</p>
           <div className="min-h-0 flex-1"><Scene3D controls camera={[0, 1, 5]} label="Interactive astronaut preview"><Astronaut {...look} position={[0, -1, 0]} /></Scene3D></div>
         </GlassPanel>
-        </div>
       </div>
     </ScreenContainer>
   );
@@ -247,18 +264,22 @@ const CATS: { id: CosmeticCategory; label: string }[] = [
 const rarityColor = { common: "text-ink2", rare: "text-cyan", epic: "text-[#c084fc]", legendary: "text-gold" } as const;
 
 export function CosmeticsScreen() {
-  const { items, category, previewId, setCategory, preview } = useCosmeticsStore();
+  const { category, previewId, setCategory, preview } = useCosmeticsStore();
+  const items = useItems();
   const { profile, equip } = usePlayerStore();
   const toast = useUIStore((s) => s.toast);
   const look = useLook();
   const list = items.filter((c) => c.category === category);
   const sel: CosmeticItem | undefined = items.find((c) => c.id === previewId);
   const equipped = sel && profile.equipped[sel.category] === sel.id;
+  const emoteId = sel?.category === "emote" ? sel.id : profile.equipped.emote;
+  const showPose: "idle" | "celebrate" = emoteId === "emote-cheer" && items.find((c) => c.id === emoteId)?.unlocked ? "celebrate" : "idle";
+  const have = items.filter((c) => c.unlocked).length;
   return (
-    <ScreenContainer title="Cosmetics" subtitle="Visual only — cosmetics never change gameplay." actions={<BackButton href="/menu" label="Main menu" />}>
+    <ScreenContainer title="Cosmetics" subtitle={`Visual only — cosmetics never change gameplay. Unlock them by flying: ${have} of ${items.length} earned.`} actions={<BackButton href="/menu" label="Main menu" />}>
       <div className="grid gap-4 lg:grid-cols-[minmax(300px,1fr)_1.4fr]">
         <GlassPanel className="flex min-h-[420px] flex-col p-3">
-          <div className="min-h-0 flex-1"><Scene3D controls camera={[0, 1, 5]} label="Cosmetic preview"><Astronaut {...look} position={[0, -1, 0]} /></Scene3D></div>
+          <div className="min-h-0 flex-1"><Scene3D controls camera={[0, 1, 5]} label="Cosmetic preview"><Astronaut {...look} pose={showPose} position={[0, -1, 0]} /></Scene3D></div>
           <p className="px-2 pb-2 text-sm text-ink2">{profile.username} · {sel ? `Previewing ${sel.name}` : "Equipped look"}</p>
         </GlassPanel>
         <div className="flex flex-col gap-3">
@@ -281,7 +302,7 @@ export function CosmeticsScreen() {
                     <p className="font-semibold">{c.name}</p>
                     <p className="text-xs text-muted capitalize">{c.category} · {c.collection}</p>
                     <p className={cn("text-xs capitalize", rarityColor[c.rarity])}>{c.rarity}{c.hardModeExclusive && <span className="ml-1 rounded bg-orange/20 px-1 text-orange">HARD ONLY</span>}</p>
-                    <p className="text-xs">{isEq ? "✓ Equipped" : c.unlocked ? "Unlocked" : "Locked"}</p>
+                    <p className="text-xs">{isEq ? "✓ Equipped" : c.unlocked ? "Unlocked" : c.unlockCondition}</p>
                   </button>
                 </li>
               );
@@ -291,7 +312,7 @@ export function CosmeticsScreen() {
             <GlassPanel className="flex flex-wrap items-center justify-between gap-3 p-4">
               <div>
                 <p className="font-display text-lg font-bold">{sel.name}</p>
-                <p className="text-sm text-ink2">{sel.unlocked ? "Unlocked (mock ownership)" : `Unlock: ${sel.unlockCondition}`}</p>
+                <p className="text-sm text-ink2">{sel.unlocked ? `Unlocked · ${sel.unlockCondition}` : `How to earn it: ${sel.unlockCondition}`}</p>
               </div>
               {sel.unlocked
                 ? <GameButton variant={equipped ? "outline" : "primary"} onClick={async () => { await equip(sel.category, equipped ? null : sel.id); toast(equipped ? `${sel.name} unequipped` : `${sel.name} equipped`, "success"); }}>{equipped ? "Unequip" : "Equip"}</GameButton>

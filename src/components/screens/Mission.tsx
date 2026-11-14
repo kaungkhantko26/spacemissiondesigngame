@@ -8,6 +8,7 @@ import {
 import { Astronaut, CrewLineup, MissionHangar, OrbitalVisualization, PlanetModel, Scene3D } from "@/components/three/lazy";
 import { hydrateTeamSetup, useCrewSelectionStore, useLobbyStore, useMissionSetupStore, useUIStore } from "@/stores";
 import { useLobby } from "./Team";
+import { useLook } from "./Core";
 import { cn, missionAvailability, roleCounts } from "@/lib/mission";
 import { characters, difficulties, missions, modifiers, players, traits, telemetrySeed } from "@/data/mock";
 import { lobbyService, missionTelemetryService } from "@/services/mocks";
@@ -17,6 +18,8 @@ import { AscentFlight } from "@/components/game/LaunchControl";
 import { LaunchSession } from "@/game/launch/session";
 import { scoreFlight, type Difficulty as LaunchDifficulty } from "@/game/launch/core";
 import { useTeamResult } from "@/game/launch/teamResult";
+import { useProgress } from "@/game/progress";
+import { usePlayerStore } from "@/stores";
 
 /* ---------- shared hooks ---------- */
 function useSetup() {
@@ -259,6 +262,7 @@ export function ConfirmScreen() {
   const router = useRouter();
   const { mission, difficulty } = useSetup();
   const lobby = useLobby();
+  const look = useLook(); // your own equipped cosmetics show on your crew member
   const assignments = useCrewSelectionStore((s) => s.assignments);
   if (!mission || !lobby) return null;
   const crew = lobby.members.map((m) => ({ m, p: players.find((x) => x.id === m.playerId)!, a: assignments[m.playerId], c: characters.find((x) => x.id === assignments[m.playerId]?.characterId) }));
@@ -270,7 +274,7 @@ export function ConfirmScreen() {
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <GlassPanel className="h-[380px] overflow-hidden p-0">
           <Scene3D light="hangar" camera={[0, 0.8, 6.5]} label="Crew lineup in hangar"><MissionHangar />
-            <CrewLineup crew={crew.map((x) => x.c ? { suit: x.c.suitColor, skin: x.c.skinTone, accent: x.c.accent, pose: x.m.ready ? "ready" : "idle" } : null)} /></Scene3D>
+            <CrewLineup crew={crew.map((x) => x.c ? { suit: x.p.id === ME ? look.suit : x.c.suitColor, skin: x.c.skinTone, accent: x.p.id === ME ? look.accent : x.c.accent, pose: x.m.ready ? "ready" : "idle" } : null)} /></Scene3D>
         </GlassPanel>
         <GlassPanel className="p-4 text-sm"><h2 className="font-display text-xl font-bold">{mission.name}</h2><p className="capitalize text-ink2">{difficulty.label} · {difficulty.xpMultiplier}× XP</p>
           <p className="mt-2 text-muted">Modifiers: {mods(mission, difficulty.id).map((m) => m.name).join(", ") || "None"}</p>
@@ -334,6 +338,8 @@ export function GameplayScreen() {
   const session = useMemo(() => (started ? new LaunchSession(difficulty.id as LaunchDifficulty, "ll2_pad_87", kind === "moon" ? MOON_VEHICLE : ORBIT_VEHICLE, seed, undefined, kind) : null), [started, difficulty.id, kind, seed]);
   if (!mission) return null;
   const finish = () => {
+    const names = useProgress.getState().recordTeamRun(usePlayerStore.getState().profile.progression.level);
+    if (names.length) useUIStore.getState().toast(`Cosmetic unlocked: ${names.join(", ")}`, "success");
     if (session) {
       const sc = scoreFlight(session.flight);
       useTeamResult.getState().set({ missionId: mission.id, ok: sc.ok, score: sc.score, max: sc.max, grade: sc.grade, rocket: session.flight.rocket.name, maxQ: session.flight.maxQ, maxG: session.flight.maxG, flightS: session.flight.t, kind });

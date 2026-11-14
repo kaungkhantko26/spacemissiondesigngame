@@ -6,6 +6,7 @@ import type {
   Id, Lobby, PlayerProfile, RoleId,
 } from "@/types";
 import { cosmetics as cosmeticSeed, profile as profileSeed } from "@/data/mock";
+import { useProgress } from "@/game/progress";
 import { lobbyService, playerService, progressionService } from "@/services/mocks";
 
 /* ---------- UI (transient) ---------- */
@@ -54,6 +55,7 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   equip: async (category, id) => {
     await playerService.equipCosmetic(id, category);
     set((s) => ({ profile: { ...s.profile, equipped: { ...s.profile.equipped, [category]: id } } }));
+    useProgress.getState().setEquipped(category, id);
   },
 }));
 
