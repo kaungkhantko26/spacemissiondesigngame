@@ -81,6 +81,7 @@ const MENU = [
   { href: "/demo", label: "Demo Hub", icon: FlaskConical },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+const TOUR_KEY: Record<string, string> = { "Launch Control": "menu-launch", "Design Mission": "menu-design", "Team Up": "menu-team", Cosmetics: "menu-cosmetics" };
 type Pose = "idle" | "wave" | "ready" | "celebrate";
 const HOVER_POSE: Record<string, Pose> = { Cosmetics: "celebrate", Stats: "idle", Profile: "idle", Settings: "idle" };
 
@@ -124,7 +125,7 @@ export function MenuScreen() {
         </Scene3D>
       </div>
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-bg/60 px-4 py-3 md:px-8">
-        <MissionClock /><ProfileWidget profile={profile} />
+        <MissionClock /><div data-tour="profile"><ProfileWidget profile={profile} /></div>
       </div>
       <div className="relative z-10 grid flex-1 items-center gap-6 px-6 pb-10 md:grid-cols-2 md:px-16">
         <div>
@@ -132,7 +133,7 @@ export function MenuScreen() {
           <h1 className="mt-2 text-5xl font-bold leading-tight md:text-7xl"><span className="text-orange">Space Mission</span><br />Design Game</h1>
           <nav aria-label="Main menu" className="mt-8 flex max-w-sm flex-col gap-3">
             {MENU.map((m, i) => (
-              <Link key={m.href} href={m.href} style={{ animationDelay: `${i * 70}ms` }}
+              <Link key={m.href} href={m.href} data-tour={TOUR_KEY[m.label]} style={{ animationDelay: `${i * 70}ms` }}
                 onMouseEnter={() => setPose(HOVER_POSE[m.label] ?? "wave")} onFocus={() => setPose(HOVER_POSE[m.label] ?? "wave")}
                 onMouseLeave={() => setPose("wave")} onBlur={() => setPose("wave")}
                 className={cn("enter group flex items-center gap-3 rounded-lg border px-5 py-3 font-display tracking-wide transition duration-150 hover:translate-x-1",

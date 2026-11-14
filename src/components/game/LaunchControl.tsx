@@ -8,6 +8,8 @@ import { cn } from "@/lib/mission";
 import { DATASET, vehicleById } from "@/game/data";
 import { LAUNCH, RULES, buildRocket, guidancePitch, scoreFlight, type Difficulty, type Flight } from "@/game/launch/core";
 import { MoonLeg } from "./MoonLeg";
+import { playVoice, stopVoice, type VoiceId } from "@/lib/voice";
+import { BRIEFING_TOUR, FLIGHT_TOUR, Tour, pendingTour, setPendingTour } from "./Tour";
 import { LaunchSession, payloadFor } from "@/game/launch/session";
 import { useLaunchSetup } from "@/game/launch/store";
 import { drawFlight, newView, updateView } from "./launchDraw";
@@ -23,7 +25,7 @@ const PIPS = { easy: 1, medium: 3, hard: 5 } as const;
 /* ============================== briefing ============================== */
 function Panel({ n, title, hint, children }: { n: number; title: string; hint?: string; children: ReactNode }) {
   return (
-    <GlassPanel as="section" className="p-4" aria-label={title}>
+    <GlassPanel as="section" className="p-4" aria-label={title} data-tour={`panel-${n}`}>
       <h2 className="mb-1 flex items-baseline gap-3 text-xl font-bold"><span className="hud-label !text-orange">0{n}</span>{title}</h2>
       {hint && <p className="mb-3 text-xs text-muted">{hint}</p>}
       {children}
@@ -41,7 +43,12 @@ function Briefing({ onStart }: { onStart: () => void }) {
   const site = DATASET.launch_sites.find((s) => s.id === siteId) ?? DATASET.launch_sites[0];
   const rocket = useMemo(() => buildRocket(v, payloadFor(v, rules.payloadFrac, mission)), [v, rules.payloadFrac, mission]);
   const canMoon = (x: { leo_capacity_kg: number; tli_payload_kg?: number }) => !!x.tli_payload_kg || x.leo_capacity_kg >= 20000;
+  const [tour, setTour] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage is only readable after mount
+  useEffect(() => { if (pendingTour() === "launch") setTour(true); }, []);
   return (
+    <>
+    {tour && <Tour steps={BRIEFING_TOUR} doneLabel="Got it" onDone={() => { setTour(false); setPendingTour("flight"); }} onSkip={() => { setTour(false); setPendingTour(null); }} />}
     <ScreenContainer title="Launch Control" subtitle="Roll out from a real spaceport and fly the ascent from the launch pad into orbit." actions={<BackButton href="/menu" label="Main menu" />}>
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
         <div className="space-y-4">
@@ -91,7 +98,7 @@ function Briefing({ onStart }: { onStart: () => void }) {
           </Panel>
         </div>
         <aside className="lg:sticky lg:top-4 lg:self-start">
-          <GlassPanel active className="p-4">
+          <GlassPanel active className="p-4" data-tour="briefing">
             <p className="hud-label">Mission briefing</p>
             <h2 className="mt-1 text-2xl font-bold">{rocket.name} · {rules.name}</h2>
             <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
@@ -105,12 +112,13 @@ function Briefing({ onStart }: { onStart: () => void }) {
               <p className="hud-label mb-1">Controls</p>
               <p><kbd>↑</kbd>/<kbd>↓</kbd> pitch · <kbd>W</kbd>/<kbd>S</kbd> throttle · <kbd>Space</kbd> stage · <kbd>X</kbd> cut engine · <kbd>R</kbd> restart · <kbd>A</kbd> autopilot · <kbd>P</kbd> pause · <kbd>1</kbd>–<kbd>5</kbd> time warp (5 = 50×, for the TLI wait)</p>
             </div>
-            <GameButton variant="primary" className="mt-4 w-full py-3 text-lg" icon={<Rocket className="size-5" />} onClick={onStart}>Roll out to the pad</GameButton>
+            <div data-tour="rollout" className="mt-4"><GameButton variant="primary" className="w-full py-3 text-lg" icon={<Rocket className="size-5" />} onClick={() => { if (pendingTour() === "launch") setPendingTour("flight"); onStart(); }}>Roll out to the pad</GameButton></div>
           </GlassPanel>
           <p className="mt-2 text-center text-[11px] text-muted">Data: <a className="underline" href={DATASET.provenance.dataset}>space-mission-dataset</a>. Simplified 2-D ascent physics; balance values are not real.</p>
         </aside>
       </div>
     </ScreenContainer>
+    </>
   );
 }
 
@@ -152,6 +160,9 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   const [s, setS] = useState<Snap>(() => snap(session));
   const [showResult, setShowResult] = useState(false);
   const [leg, setLeg] = useState(false); // Moon mission: coast to the Moon after TLI
+  const [tour, setTour] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage is only readable after mount
+  useEffect(() => { if (pendingTour() === "flight") setTour(true); }, []);
 
   useEffect(() => {
     const el = canvas.current, box = wrap.current; if (!el || !box) return;
@@ -194,16 +205,10 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     const n = Math.ceil(-t); // whole seconds to go
     if (n === spoken.current) return;
     spoken.current = n;
-    if (!voice || typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const say = n > 0 ? (n <= 10 ? String(n) : "") : "Liftoff";
-    if (!say) return;
-    try {
-      const u = new SpeechSynthesisUtterance(n === 10 ? "T minus 10" : n === 3 ? "3, main engine start" : say);
-      u.rate = 1.05; u.pitch = 0.9; u.volume = 1;
-      window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
-    } catch { /* speech unavailable: the on-screen count still works */ }
+    if (n > 10 || n < 0) return;
+    playVoice(`cd-${Math.max(0, n)}` as VoiceId, !voice);
   }, [s.t, s.running, s.phase, voice]);
-  useEffect(() => () => { try { window.speechSynthesis?.cancel(); } catch { /* ignore */ } }, []);
+  useEffect(() => () => stopVoice(), []);
   const start = () => { session.start(); setS(snap(session)); };
   const togglePause = useCallback(() => { if (session.flight.t > -LAUNCH.countdownS + 0.01 || session.running) session.toggleRun(); setS(snap(session)); }, [session]);
   const setWarp = useCallback((w: number) => { session.setWarp(w); setS(snap(session)); }, [session]);
@@ -240,10 +245,11 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   if (leg) return <MoonLeg flight={f} onAgain={onAgain} onExit={onExit} />;
   return (
     <main className="relative flex min-h-[calc(100vh-70px)] flex-1 flex-col">
+      {tour && <Tour steps={FLIGHT_TOUR} doneLabel="Let's fly" onDone={() => { setTour(false); setPendingTour(null); }} onSkip={() => { setTour(false); setPendingTour(null); }} />}
       <div ref={wrap} className="absolute inset-0"><canvas ref={canvas} className="h-full w-full" aria-label="Rocket flight view" role="img" /></div>
 
       {/* telemetry */}
-      <dl className="pointer-events-none relative z-10 m-3 w-52 space-y-1.5 rounded-md border border-[var(--border)] bg-bg/80 p-3 font-display text-sm tracking-wider" aria-label="Flight telemetry">
+      <dl className="pointer-events-none relative z-10 m-3 w-52 space-y-1.5 rounded-md border border-[var(--border)] bg-bg/80 p-3 font-display text-sm tracking-wider" aria-label="Flight telemetry" data-tour="telemetry">
         <div><dt className="hud-label">Mission clock</dt><dd className="text-xl tabular-nums text-orange">{clock(s.t)}</dd></div>
         <div className="grid grid-cols-2 gap-x-2">
           <div><dt className="hud-label">Altitude</dt><dd className="tabular-nums">{tel.alt >= 100_000 ? fmt(tel.alt / 1000, 1) + " km" : tel.alt >= 1000 ? fmt(tel.alt / 1000, 2) + " km" : fmt(tel.alt) + " m"}</dd></div>
@@ -269,7 +275,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
       </dl>
 
       {/* milestones */}
-      <ol className="pointer-events-none absolute right-3 top-3 z-10 w-64 space-y-1 rounded-md border border-[var(--border)] bg-bg/80 p-3 text-sm" aria-label="Mission milestones">
+      <ol className="pointer-events-none absolute right-3 top-3 z-10 w-64 space-y-1 rounded-md border border-[var(--border)] bg-bg/80 p-3 text-sm" data-tour="milestones" aria-label="Mission milestones">
         {milestonesFor(f).map(([key, label]) => (
           <li key={key} className={cn("flex items-center gap-2", s.ms[key] !== undefined ? "text-ok" : "text-muted")}>
             <span aria-hidden className="grid size-4 place-items-center rounded-sm border text-[10px]">{s.ms[key] !== undefined ? "✓" : ""}</span>{label}
@@ -280,7 +286,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
 
       {/* pad overlay */}
       {!s.running && s.t <= -LAUNCH.countdownS + 0.01 && s.phase === "countdown" && (
-        <div className="relative z-10 mx-auto mt-24 max-w-md rounded-lg border border-[var(--border-strong)] bg-bg/85 p-5 text-center">
+        <div data-tour="pad" className="relative z-10 mx-auto mt-24 max-w-md rounded-lg border border-[var(--border-strong)] bg-bg/85 p-5 text-center">
           <p className="hud-label !text-orange">{f.rocket.name} on the pad · {f.site.location.split(",")[0]}</p>
           <h2 className="mt-1 text-3xl font-bold">All systems go?</h2>
           <p className="mt-2 text-sm text-ink2">{rules.name}: {rules.tagline}. {f.mission === "moon" ? `Mission: parking orbit above ${rules.minPerigeeKm} km, then translunar injection to the Moon.` : `Orbit: lowest point above ${rules.minPerigeeKm} km.`}</p>
@@ -294,7 +300,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
         <ul className="pointer-events-none max-w-xl space-y-0.5 text-sm" aria-live="polite">
           {s.log.slice(-3).map((l, i) => <li key={`${l.t}-${i}`} className={cn("rounded-sm bg-bg/70 px-2 py-0.5", l.tone === "good" ? "text-ok" : l.tone === "bad" ? "text-bad" : l.tone === "warn" ? "text-warn" : "text-ink2")}><span className="mr-2 text-muted tabular-nums">{clock(l.t)}</span>{l.text}</li>)}
         </ul>
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--border)] bg-bg/85 p-2">
+        <div data-tour="controls" className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--border)] bg-bg/85 p-2">
           <B label={s.running ? "Pause (P)" : "Resume (P)"} onClick={togglePause} disabled={s.phase === "countdown" && !s.running && s.t <= -LAUNCH.countdownS + 0.01}>{s.running ? <Pause className="size-4" /> : <Play className="size-4" />}</B>
           <B label={voice ? "Mute countdown voice" : "Unmute countdown voice"} on={voice} onClick={() => setVoice((v) => !v)}>{voice ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}</B>
           {rules.autopilot !== "none" && <B label={rules.autopilot === "full" ? "Autopilot (A)" : "Upper-stage guidance (A)"} on={apActive} onClick={toggleAuto}><Bot className="size-4" />{rules.autopilot === "full" ? "Autopilot" : "Upper guidance"}</B>}
@@ -307,7 +313,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
           <B label="Stage separation / ignite (Space)" disabled={!stageReady} onClick={() => session.stage()}><Layers className="size-4" />{rules.autoStaging ? "Staging auto" : "Stage"}</B>
           <B label="Engine cutoff (X)" disabled={!canCut} onClick={() => session.cut()}><Octagon className="size-4" />Cut</B>
           <B label="Restart engine (R)" disabled={!canRestart} onClick={() => session.restart()}><Power className="size-4" />{s.phase === "parking" ? "Ignite TLI" : "Restart"}</B>
-          <label className="ml-auto flex items-center gap-1 text-xs text-ink2">Warp
+          <label data-tour="warp" className="ml-auto flex items-center gap-1 text-xs text-ink2">Warp
             <select aria-label="Time warp" value={s.warp} onChange={(e) => setWarp(Number(e.target.value))} className="px-1 py-0.5 text-xs">{[1, 2, 5, 10, 50].map((w) => <option key={w} value={w}>{w}×</option>)}</select></label>
         </div>
       </div>
