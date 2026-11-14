@@ -56,9 +56,11 @@ export const ANTENNAS: Antenna[] = [
 export interface Destination {
   id: string; bodyId: string; name: string; tagline: string; kind: "moon" | "planet";
   opsDays: number; deadlineDays: number; budgetUsd: number; scienceGoal: number; wants: InstrumentTag[]; difficulty: 1 | 2 | 3 | 4 | 5;
+  /** Mandatory payload type for the contract (launch is blocked without it). */
+  requires?: InstrumentTag;
 }
 export const DESTINATIONS: Destination[] = [
-  { id: "moon", bodyId: "moon", name: "Moon", tagline: "Low lunar orbit survey", kind: "moon", opsDays: 60, deadlineDays: 400, budgetUsd: 250e6, scienceGoal: 20, wants: ["fields", "particles"], difficulty: 1 },
+  { id: "moon", bodyId: "moon", name: "Moon", tagline: "Low lunar orbit survey", kind: "moon", opsDays: 60, deadlineDays: 400, budgetUsd: 250e6, scienceGoal: 20, wants: ["fields", "particles"], difficulty: 1, requires: "fields" },
   { id: "mars", bodyId: "mars", name: "Mars", tagline: "Orbiter to image candidate landing sites", kind: "planet", opsDays: 365, deadlineDays: 800, budgetUsd: 700e6, scienceGoal: 35, wants: ["imager", "spectrometer"], difficulty: 2 },
 ];
 export const destinationById = (id: string) => DESTINATIONS.find((d) => d.id === id);

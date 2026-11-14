@@ -4,7 +4,7 @@ import { DATASET, vehicleById } from "../data";
 
 /** Real-time wrapper around a Flight: input state, held keys and time warp. Lives outside React; the UI polls it. */
 export class LaunchSession {
-  flight: Flight; input: Input; warp = 1; running = false; held = { up: false, down: false };
+  flight: Flight; input: Input; warp = 1; running = false; private acc = 0; held = { up: false, down: false };
   constructor(public difficulty: Difficulty, siteId: string, vehicleId: string, seed: number, payloadKg?: number) {
     const rules = RULES[difficulty];
     const v = vehicleById(vehicleId) ?? DATASET.vehicles[0];
@@ -16,7 +16,10 @@ export class LaunchSession {
   tick(dtReal: number) {
     if (!this.running || this.done) return;
     this.input.pitchRate = (this.held.up ? 1 : 0) - (this.held.down ? 1 : 0);
-    const steps = Math.min(600, Math.ceil((dtReal * this.warp) / LAUNCH.dt));
+    // Fixed-step accumulator: simulated time advances exactly dtReal × warp on any display refresh rate.
+    this.acc = Math.min(this.acc + dtReal * this.warp, LAUNCH.dt * 600); // cap catch-up work (e.g. after a hidden tab)
+    const steps = Math.floor(this.acc / LAUNCH.dt + 1e-9);
+    this.acc -= steps * LAUNCH.dt;
     for (let i = 0; i < steps && !this.done; i++) {
       stepFlight(this.flight, this.input);
       this.input.stage = false; this.input.cut = false; this.input.restart = false;

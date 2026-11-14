@@ -39,7 +39,7 @@ function resources(s: OpsState, ev: Evaluation): Resource[] {
     {
       id: "power", label: "Power", icon: Zap, value: `${fmt(s.powerGenW)} W in`, sub: `${fmt(s.powerUseW)} W out`, frac: Math.min(1, s.powerUseW / Math.max(1, s.powerGenW || s.powerUseW)),
       level: net < 0 && !s.sunlit ? "warn" : net < 0 ? "crit" : "ok",
-      explain: `Generation: arrays (${fmt(ev.powerGenW)} W at full Sun, derated to ${OPS.arrayDerate * 100} % for pointing/dust/temperature) = ${fmt(s.powerGenW)} W now${s.sunlit ? "" : " — in eclipse the arrays make nothing"}. Consumption: bus ${fmt(80)} W + instruments (${fmt(instW)} W when observing, 10 % standby) + transmitter (${fmt(ev.antenna.txW / 0.35)} W while downlinking). Pointing at the Sun gives the most power; at the Moon or Earth about half.`,
+      explain: `Generation: arrays (${fmt(ev.solarGenW)} W at full Sun, plus ${fmt(ev.rtgGenW)} W of constant RTG power; derated to ${OPS.arrayDerate * 100} % for pointing/dust/temperature) = ${fmt(s.powerGenW)} W now${s.sunlit ? "" : " — in eclipse the arrays make nothing"}. Consumption: bus ${fmt(80)} W + instruments (${fmt(instW)} W when observing, 10 % standby) + transmitter (${fmt(ev.antenna.txW / 0.35)} W while downlinking). Pointing at the Sun gives the most power; at the Moon or Earth about half.`,
     },
     {
       id: "battery", label: "Battery", icon: Battery, value: `${fmt(pct)} %`, sub: `${fmt(s.batteryWh)} / ${OPS.batteryWh} Wh`, frac: pct / 100,

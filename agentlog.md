@@ -96,3 +96,15 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - User saw the deployed Mission Architect flight still using the old plain chase-camera launch. "Go for launch" now runs the full Launch Control ascent first (`AscentFlight`, exported from `LaunchControl.tsx`), with the design's rocket, payload = min(spacecraft wet mass, LEO capacity), and the Spaceport + Launch difficulty selectors added to the design-review panel (shared `useLaunchSetup`).
 - Ascent failure → stays in the ascent result overlay (mission lost at launch; Fly again / Back to design). Ascent success → "Continue: fly to the Moon" → `simulate()` with launch odds forced to 1 (the remaining phases still roll on the design's odds) → Earth→Moon trajectory view starting at the parking orbit (`TrajectorySim startU`), launch phase text reports the achieved orbit, difficulty and spaceport. The old pad/countdown gate in the trajectory view is no longer used from Mission Architect.
 - Redeployed to GitHub Pages (`npm run deploy:pages`).
+
+## Session 5 — review fixes (external review of the deployed game)
+- #1 launch sim speed was frame-rate dependent (`Math.ceil` per frame): `LaunchSession.tick` now uses a fixed-step accumulator (tested at 30/60/120/144 FPS and with warp).
+- #2 RTG power vanished in eclipse: `Evaluation` now exposes `solarGenW` / `rtgGenW`; Mission Control applies eclipse + pointing derating to solar only.
+- #3 readiness vs operations: new shared model `src/game/ops/model.ts` (orbit-average power by mode, eclipse battery, sustained-observing data balance). Architect gains checks `ops-power`, `ops-battery`, `ops-data` (Moon only, where Mission Control exists) and a "Power by operating mode" table in the review panel.
+- #4 mandatory payload: `Destination.requires` (Moon = fields instrument) → `contract` check blocks launch with an explanation.
+- #5 safe-mode scoring: new `stats.safeScienceS`; the report's safe-mode share uses science-phase safe time only.
+- #7 quick start now requires the contract's science goal first (then reliability, cost); search widened (arrays up to 60 m², 3-instrument sets).
+- #8 label "Mission success odds" → "Flight survival odds" with a tooltip saying what it does and does not mean.
+- #9 ion thrust is throttled by the average solar power over the transfer (`electricThrottle`), check text explains it.
+- Not done (needs product decisions): #6 one shared mission lifecycle across Launch Control / Architect / Mission Control, #10 persistence + XP (AGENTS.md says no persistence in the frontend).
+- Tests: `review.test.ts` (13) + updated `game.test.ts` designs; all 6 test files pass via the vitest shim.

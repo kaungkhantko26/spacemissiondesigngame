@@ -229,8 +229,15 @@ function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void })
         <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Dry / wet mass</dt><dd className="font-display text-base tabular-nums">{fmt(ev.dryKg)} / {fmt(ev.wetKg)} kg</dd></div>
         <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Total cost</dt><dd className="font-display text-base tabular-nums">{usd(ev.costUsd)}</dd></div>
         <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Science (goal {ev.destination.scienceGoal})</dt><dd className="font-display text-base tabular-nums">{fmt(ev.science, 1)}</dd></div>
-        <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Mission success odds</dt><dd className="font-display text-base tabular-nums">{fmt(p.mission * 100)} %</dd></div>
+        <div className="rounded-md bg-white/5 p-2"><dt className="text-muted" title="Chance the spacecraft survives launch, cruise, insertion and operations. It is NOT the chance of meeting the contract objective — that depends on science return (left) and, in Mission Control, on live events and your decisions.">Flight survival odds</dt><dd className="font-display text-base tabular-nums">{fmt(p.mission * 100)} %</dd></div>
       </dl>
+      <details className="mt-3 text-xs text-ink2"><summary className="cursor-pointer">Power by operating mode</summary>
+        <table className="mt-1 w-full"><thead><tr className="text-muted"><th className="text-left font-normal">Mode</th><th className="text-right font-normal">In</th><th className="text-right font-normal">Out</th></tr></thead><tbody className="tabular-nums">
+          <tr><td>Observing (sunlit)</td><td className="text-right">{fmt(ev.ops.science.gen)} W</td><td className="text-right">{fmt(ev.ops.science.load)} W</td></tr>
+          <tr><td>Downlink (sunlit)</td><td className="text-right">{fmt(ev.ops.downlink.gen)} W</td><td className="text-right">{fmt(ev.ops.downlink.load)} W</td></tr>
+          <tr><td>Orbit average (60/40 mix)</td><td className="text-right">{fmt(ev.ops.avgGen)} W</td><td className="text-right">{fmt(ev.ops.avgLoad)} W</td></tr>
+        </tbody></table>
+        <p className="mt-1 text-muted">Same model Mission Control uses: arrays derated for pointing and off in eclipse; RTGs constant. Architect&apos;s headline power figure is the nominal full-Sun output.</p></details>
       <details className="mt-3 text-xs text-ink2"><summary className="cursor-pointer">Cost breakdown</summary>
         <ul className="mt-1 space-y-0.5">{Object.entries(ev.costBreakdown).map(([k, v]) => <li key={k} className="flex justify-between"><span>{k}</span><span className="tabular-nums">{usd(v)}</span></li>)}</ul></details>
       <LaunchSetupFields />

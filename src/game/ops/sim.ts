@@ -18,7 +18,7 @@ export function createOps(ev: Evaluation, seed: number): OpsState {
       launchAnomaly: false, antennaRoll: false, navRoll: false, propRoll: false, targetRoll: false, navError: false, wheelBias: false,
       commsMult: 1, contactBlockedUntil: 0, loiRisk: 0, bonusTarget: false, stormObserved: false, targetWindow: false,
     },
-    stats: { generatedGb: 0, returnedGb: 0, usefulReturnedGb: 0, lostGb: 0, activeObsS: 0, downlinkS: 0, safeS: 0, blackouts: 0, scienceS: 0, decisions: [], spentUsd: 0, lossCause: null },
+    stats: { generatedGb: 0, returnedGb: 0, usefulReturnedGb: 0, lostGb: 0, activeObsS: 0, downlinkS: 0, safeS: 0, safeScienceS: 0, blackouts: 0, scienceS: 0, decisions: [], spentUsd: 0, lossCause: null },
     powerGenW: 0, powerUseW: 0, linkMbps: 0, sunlit: true, contact: false, observing: false, downlinking: false,
     queue: [], nextCmdId: 1, log: [], delayed: [], event: null, fired: {}, lastEventAt: -1e9, rng: seed >>> 0,
   };
@@ -88,7 +88,8 @@ function physics(n: OpsState, ev: Evaluation, dt: number) {
   n.downlinking = n.contact && ready && n.pointing === "earth" && n.health.comms > 0.1 && n.phase !== "ascent";
 
   const pf = n.pointing === "sun" ? 1 : n.pointing === "moon" ? 0.55 : 0.6;
-  n.powerGenW = n.sunlit ? ev.powerGenW * OPS.arrayDerate * pf * n.health.power : 0;
+  // Only the arrays depend on sunlight and pointing; RTGs deliver constant power (also in eclipse).
+  n.powerGenW = (n.sunlit ? ev.solarGenW * OPS.arrayDerate * pf : 0) * n.health.power + ev.rtgGenW * n.health.power;
   const instW = instrumentPowerW(ev);
   const heater = n.tempC < -15 ? 30 : 0;
   n.powerUseW = GAME.busPowerW + (n.observing ? instW : instW * 0.1) + (n.downlinking ? ev.antenna.txW / GAME.comms.amplifierEff : 5) + heater;
@@ -108,7 +109,7 @@ function physics(n: OpsState, ev: Evaluation, dt: number) {
   }
   if (n.tempC < OPS.coldC) n.health.comms = Math.max(0, n.health.comms - (0.004 * dt) / 3600);
 
-  if (n.safe) n.stats.safeS += dt;
+  if (n.safe) { n.stats.safeS += dt; if (science) n.stats.safeScienceS += dt; } // safe mode during cruise must not count against science scoring
   if (science) n.stats.scienceS += dt;
   if (n.observing) {
     const q = n.health.instruments * (n.flags.wheelBias ? 0.7 : 1);
@@ -264,8 +265,8 @@ export function buildReport(n: OpsState, ev: Evaluation): Report {
       `Average health ${pct(meanHealth)}; ${n.stats.blackouts} brownout${n.stats.blackouts === 1 ? "" : "s"}; antenna gain ${pct(n.flags.commsMult)}.`),
     cat("efficiency", "Efficiency", 40 * clamp(1 - budgetUsed, 0, 1) + 30 * clamp(n.dvLeft / Math.max(1, ev.dvAvailable * 0.1), 0, 1) + 30 * (1 - lostShare),
       `Budget used ${pct(budgetUsed)}; ${Math.round(n.dvLeft)} m/s of Δv left; ${pct(1 - lostShare)} of recorded data kept.`),
-    cat("operations", "Operations", opsQ * 70 + (1 - n.stats.safeS / totalSci) * 30,
-      `${dq.length} decision${dq.length === 1 ? "" : "s"} averaged ${pct(opsQ)} quality; safe mode ${pct(n.stats.safeS / totalSci)} of science time.`),
+    cat("operations", "Operations", opsQ * 70 + (1 - Math.min(1, n.stats.safeScienceS / totalSci)) * 30,
+      `${dq.length} decision${dq.length === 1 ? "" : "s"} averaged ${pct(opsQ)} quality; safe mode ${pct(Math.min(1, n.stats.safeScienceS / totalSci))} of science time.`),
     cat("safety", "Safety", dq.length ? (dq.filter((d) => d.quality >= 1).length / dq.length) * 100 : 80,
       `${dq.filter((d) => d.quality >= 1).length} of ${dq.length} anomalies handled safely.`),
     cat("bonus", "Bonus", (objectives.filter((o) => !o.required && o.met).length / 3) * 100, `${objectives.filter((o) => !o.required && o.met).length} of 3 optional objectives met.`),
