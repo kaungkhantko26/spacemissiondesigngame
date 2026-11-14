@@ -65,8 +65,13 @@ export class RocketSound {
 }
 
 /** Short one-shot effects. */
-export function playSfx(kind: "ignition" | "separation" | "ignite2" | "explosion" | "chime") {
-  const c = audioContext(); if (!c || c.state !== "running") return;
+export type SfxKind = "ignition" | "separation" | "ignite2" | "explosion" | "chime" | "click" | "tick" | "confirm" | "blip";
+export function playSfx(kind: SfxKind) {
+  const c = audioContext(); if (!c) return;
+  if (c.state === "running") { sfxNow(c, kind); return; }
+  void c.resume().then(() => { if (c.state === "running") sfxNow(c, kind); }).catch(() => undefined); // locked until a click: stay silent
+}
+function sfxNow(c: AudioContext, kind: SfxKind) {
   const out = c.createGain(); out.connect(c.destination);
   const burst = (type: "white" | "brown", dur: number, lp: [number, number], gain: number, attack = 0.005, decay = dur) => {
     const s = c.createBufferSource(); s.buffer = noise(c, type, Math.max(dur, 0.5));
@@ -84,13 +89,24 @@ export function playSfx(kind: "ignition" | "separation" | "ignite2" | "explosion
   else if (kind === "separation") { out.gain.value = 0.9; burst("white", 0.35, [6000, 400], 0.9, 0.002, 0.35); tone("sine", 95, 28, 0.5, 0.9); tone("square", 900, 300, 0.12, 0.12, 0.03); tone("triangle", 420, 180, 0.4, 0.2, 0.08); burst("white", 1.2, [3000, 800], 0.18, 0.05, 1.2); }
   else if (kind === "ignite2") { out.gain.value = 0.6; burst("brown", 2.2, [100, 700], 0.8, 0.9, 2.2); tone("sine", 40, 55, 1.8, 0.35); }
   else if (kind === "explosion") { out.gain.value = 0.8; burst("white", 3.6, [5000, 90], 1, 0.003, 3.6); burst("brown", 4.5, [400, 60], 1, 0.01, 4.5); tone("sine", 80, 22, 2.5, 1); }
-  else { out.gain.value = 0.5; tone("sine", 880, 880, 0.9, 0.5); tone("sine", 1318, 1318, 1.1, 0.4, 0.18); }
+  else if (kind === "chime") { out.gain.value = 0.5; tone("sine", 880, 880, 0.9, 0.5); tone("sine", 1318, 1318, 1.1, 0.4, 0.18); }
+  else if (kind === "click") { out.gain.value = 0.9; tone("sine", 1500, 700, 0.07, 0.5); burst("white", 0.03, [5000, 1500], 0.15, 0.001, 0.03); }
+  else if (kind === "tick") { out.gain.value = 0.35; tone("sine", 2400, 2000, 0.03, 0.4); }
+  else if (kind === "confirm") { out.gain.value = 0.45; tone("sine", 660, 660, 0.12, 0.5); tone("sine", 990, 990, 0.2, 0.5, 0.09); }
+  else { out.gain.value = 0.5; tone("sine", 1200, 1200, 0.25, 0.5); tone("sine", 1800, 1800, 0.25, 0.3, 0.05); } // blip: sound check
+}
+
+/** Shared quiet bed for menus and design screens (the flight and Moon views have their own sound). */
+let bed: SpaceHum | null = null;
+export function setAmbientBed(on: boolean) {
+  const c = audioContext(); if (!c) return;
+  if (on) { bed ??= new SpaceHum(c, 0.03); bed.set(true); void c.resume().catch(() => undefined); } else bed?.set(false);
 }
 
 /** Quiet spacecraft ambience for the coast: low electrical hum plus ventilation hiss. */
 export class SpaceHum {
   private g: GainNode; private nodes: { stop(): void }[] = [];
-  constructor(private c: AudioContext) {
+  constructor(private c: AudioContext, private level = 0.06) {
     this.g = c.createGain(); this.g.gain.value = 0; this.g.connect(c.destination);
     const o1 = c.createOscillator(), o2 = c.createOscillator(); o1.frequency.value = 55; o2.frequency.value = 110.7; o2.type = "triangle";
     const og = c.createGain(); og.gain.value = 0.35; o1.connect(og); o2.connect(og); og.connect(this.g);
@@ -98,6 +114,6 @@ export class SpaceHum {
     const ng = c.createGain(); ng.gain.value = 0.05; n.connect(f); f.connect(ng); ng.connect(this.g);
     for (const x of [o1, o2, n]) { x.start(); this.nodes.push(x); }
   }
-  set(on: boolean) { this.g.gain.setTargetAtTime(on ? 0.06 : 0, this.c.currentTime, 0.4); }
+  set(on: boolean) { this.g.gain.setTargetAtTime(on ? this.level : 0, this.c.currentTime, 0.4); }
   dispose() { this.set(false); setTimeout(() => this.nodes.forEach((n) => { try { n.stop(); } catch { /* stopped */ } }), 1200); }
 }

@@ -146,3 +146,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Menu simplified: 4 main choices + collapsible More options; Test voice moved to Settings; tour points at More options.
 - Sound design: procedural Web Audio rocket engine (src/lib/sfx.ts) follows throttle/altitude/max-Q; one-shots for ignition, separation, upper-stage ignition, explosion, chime. ElevenLabs key lacks sound_generation permission so effects are synthesised, not generated.
 - Moon coast sound: cabin hum throughout, engine during mid-course correction and the LOI burn, chime or explosion at the end; shares the mute button with the voice.
+- App-wide sound: GlobalSound (UI clicks/hover ticks, ambient bed outside /launch), playSfx self-resumes the AudioContext, Test sound in Settings, flight sound follows the global mute. Moon coast engine + hum.

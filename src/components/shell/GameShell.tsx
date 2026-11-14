@@ -7,6 +7,7 @@ import { useUIStore, usePlayerStore } from "@/stores";
 import { GlassPanel, GameButton, IconButton, LevelBadge, PlayerAvatar, XPProgressBar } from "@/components/ui";
 import Link from "next/link";
 import { cn } from "@/lib/mission";
+import { GlobalSound } from "./GlobalSound";
 
 const BARE = ["/", "/splash", "/menu", "/mission/gameplay", "/mission/loading"];
 
@@ -30,6 +31,7 @@ export function GameShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="starfield relative flex min-h-screen flex-col">
       <div className="stars" aria-hidden />
+      <GlobalSound />
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-gold focus:p-2 focus:text-black">Skip to content</a>
 
       {showHeader && (

@@ -356,7 +356,7 @@ export function SettingsScreen() {
     <ScreenContainer title="Settings" actions={<BackButton href="/menu" label="Main menu" />}>
       <GlassPanel className="grid max-w-xl gap-3 p-5">
         <Row label="Mute audio" on={ui.muted} onClick={() => ui.set({ muted: !ui.muted })} />
-        <div className="flex items-center justify-between rounded-lg bg-white/5 p-3">Voice check<TestVoiceButton /></div>
+        <div className="flex items-center justify-between rounded-lg bg-white/5 p-3">Sound check<TestVoiceButton /></div>
         <Row label="Reduce motion" on={ui.reducedMotion} onClick={() => ui.set({ reducedMotion: !ui.reducedMotion })} />
         <Row label="High contrast" on={ui.highContrast} onClick={() => ui.set({ highContrast: !ui.highContrast })} />
         <div role="radiogroup" aria-label="3D quality" className="flex items-center justify-between rounded-lg bg-white/5 p-3">
