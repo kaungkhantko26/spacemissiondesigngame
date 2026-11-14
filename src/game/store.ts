@@ -42,22 +42,29 @@ export const useDesignStore = create<GameState>((set, get) => ({
       const d = { ...base, propellantKg: Math.ceil(prop * 1.15) };
       return { d, ev: evaluate(d) };
     };
-    // Phase 1: coarse sweep over vehicle × propulsion (fixed mid-size power/antenna), keep the best few.
-    const one = wanted.slice(0, 1).map((i) => i.id);
+    // Candidate payloads: the destination's wanted tags first (diverse = one per wanted tag), then lighter/heavier mixes.
+    const diverse = dest.wants.map((t) => wanted.find((i) => i.tag === t)).filter((i): i is (typeof wanted)[number] => !!i).map((i) => i.id);
+    const sets: string[][] = [diverse.slice(0, 2), diverse.slice(0, 3), wanted.slice(0, 2).map((i) => i.id), wanted.slice(0, 3).map((i) => i.id)]
+      .filter((x, i, a) => x.length > 0 && a.findIndex((y) => y.join() === x.join()) === i);
+    // Phase 1: coarse sweep over vehicle × propulsion (strong power/antenna, two instruments), keep the best few.
     const seeds: { v: string; pr: string; th: number; score: number }[] = [];
     for (const v of DATASET.vehicles) for (const pr of props) for (const th of pr === "chem" ? [1] : [2]) {
-      const r = build(v.id, pr, th, 20, "medium", one);
+      const r = build(v.id, pr, th, 30, "high", sets[0]);
       if (r) seeds.push({ v: v.id, pr, th, score: r.ev.probabilities.mission * (r.ev.goNoGo ? 1 : 0.01) });
     }
     seeds.sort((x, y) => y.score - x.score);
-    // Phase 2: refine power, antenna and instruments for the leading candidates.
-    let best: { d: Design; p: number; c: number } | null = null;
-    for (const sd of seeds.slice(0, 6)) for (const solar of [6, 12, 20, 30]) for (const ant of ANTENNAS) for (const ins of [one, wanted.slice(0, 2).map((i) => i.id)]) {
+    // Phase 2: refine power, antenna and payload. The contract's science target comes FIRST; only then rank by reliability
+    // and cost (otherwise the optimiser is rewarded for dropping instruments, which lower flight reliability).
+    interface Cand { d: Design; p: number; c: number; sci: number }
+    const cands: Cand[] = [];
+    for (const sd of seeds.slice(0, 6)) for (const solar of [6, 12, 20, 30, 45, 60]) for (const ant of ANTENNAS) for (const ins of sets) {
       const r = build(sd.v, sd.pr, sd.th, solar, ant.id, ins);
-      if (!r || !r.ev.goNoGo) continue;
-      const p = r.ev.probabilities.mission;
-      if (!best || p > best.p + 1e-9 || (Math.abs(p - best.p) <= 1e-9 && r.ev.costUsd < best.c)) best = { d: r.d, p, c: r.ev.costUsd };
+      if (r && r.ev.goNoGo) cands.push({ d: r.d, p: r.ev.probabilities.mission, c: r.ev.costUsd, sci: r.ev.science });
     }
+    const meets = cands.filter((c) => c.sci >= dest.scienceGoal);
+    const best = meets.length
+      ? meets.reduce((a, c) => (c.p > a.p + 1e-9 || (Math.abs(c.p - a.p) <= 1e-9 && c.c < a.c) ? c : a))
+      : cands.reduce<Cand | null>((a, c) => (!a || c.sci * c.p > a.sci * a.p ? c : a), null);
     if (!best) return false;
     set({ design: best.d, result: null });
     return true;

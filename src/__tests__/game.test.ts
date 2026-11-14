@@ -4,7 +4,7 @@ import { DATASET, DESTINATIONS } from "@/game/data";
 import { planTransfer } from "@/game/physics";
 
 const inst = (tag: string) => DATASET.instruments.find((i) => i.tag === tag)!.id;
-const moonDesign = (): Design => ({ ...DEFAULT_DESIGN, instrumentIds: [inst("fields"), inst("particles")], propellantKg: 1 });
+const moonDesign = (): Design => ({ ...DEFAULT_DESIGN, instrumentIds: [inst("fields"), inst("particles")], propellantKg: 1, solarAreaM2: 30, antennaId: "high" });
 const filled = (d: Design): Design => {
   const probe = evaluate({ ...d, propellantKg: 0 });
   return { ...d, propellantKg: Math.ceil(solvePropellant(probe.dryKg, probe.dvRequired, probe.isp)! * 1.2) };

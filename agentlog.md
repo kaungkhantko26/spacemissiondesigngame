@@ -83,3 +83,48 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Thumbnails (`partThumbs.ts`): ALL part pictures are rendered once by a single temporary WebGL context (released with `forceContextLoss`), cached as PNG data URLs — no WebGL context per card (AGENTS.md). Cards in /design show them (vehicles, propulsion, power, antennas, instruments); dishes share one scale reference so sizes are comparable.
 - Live preview (`CraftPreview.tsx`): the one Canvas on /design, in the sticky review column, with Spacecraft / Rocket tabs; model rebuilt (and disposed) from the current design; auto-rotates unless reduced motion, drag to orbit. Aside is now scrollable (`max-h-[calc(100vh-2rem)]`).
 - Not done: glTF/GLB parts (all procedural), per-component hover zoom, part animation (thruster plume flicker), parts on the Launch Control rocket sprite.
+
+## Session 4 (cont.) — Real environment for Launch Control + 3-D rocket on the pad
+- Merged `main` (PR #1) first; branch is current.
+- **Scenery** (`components/game/launchScenery.ts`, procedural 2-D canvas, pad-local metres): per-spaceport `BIOMES` (Florida coast, California coast range, Guiana rainforest, Bay-of-Bengal sand spit, Kazakh steppe, Gobi) with their own terrain colours, hill layers with aerial perspective, vegetation (palms/jungle/scrub/dunes) in perspective rows with parallax, sea + shoreline + sun glitter where the site is coastal, golden-hour sun and horizon haze, a sky that follows `skyAt(h)` (pale horizon → blue → black above ~100 km), cumulus/cirrus layers the rocket flies through, launch complex (masts, tanks, buildings, apron, flame trench), ground glare + billowing exhaust smoke at liftoff, vapour trail that fades with air density (trail is stored as x,y,t triplets and drawn in the Earth-fixed frame). Landscape LOD fades out between 30 and 100 km camera height.
+- **Real Earth from orbit** (`earthDisc.ts`): the repo's `public/textures/earth.jpg` + `earth_clouds.png` projected orthographically, looking down the launch-orbit normal so the pad sits on the rim and eastward flight is clockwise (matches the 2-D sim); rotates with Earth; sun-side shading.
+- **3-D rocket as sprite** (`partThumbs.ts: loadRocketSprite`): the vehicle's `makeRocket` model rendered side-on (orthographic, transparent, one short-lived WebGL context) and drawn on the pad and in flight; stage 2 = top 38 %, the spent stage = lower 62 % tumbling. Falls back to the vector rocket if WebGL is unavailable.
+- Tests: `launch.test.ts` now 16 (biome per site, coastal vs inland, sky darkening) — via vitest shim (real vitest still can't run in this sandbox). Lint 0 errors/warnings; production build OK.
+- Not done: 3-D terrain/heightmap, per-site time of day or weather, day/night terminator following the rocket, city lights, real coastline shapes (coast side is stylised), biome art for orbit-view atmosphere haze.
+
+## Session 4 (cont.) — Mission Architect launch now uses the real ascent
+- User saw the deployed Mission Architect flight still using the old plain chase-camera launch. "Go for launch" now runs the full Launch Control ascent first (`AscentFlight`, exported from `LaunchControl.tsx`), with the design's rocket, payload = min(spacecraft wet mass, LEO capacity), and the Spaceport + Launch difficulty selectors added to the design-review panel (shared `useLaunchSetup`).
+- Ascent failure → stays in the ascent result overlay (mission lost at launch; Fly again / Back to design). Ascent success → "Continue: fly to the Moon" → `simulate()` with launch odds forced to 1 (the remaining phases still roll on the design's odds) → Earth→Moon trajectory view starting at the parking orbit (`TrajectorySim startU`), launch phase text reports the achieved orbit, difficulty and spaceport. The old pad/countdown gate in the trajectory view is no longer used from Mission Architect.
+- Redeployed to GitHub Pages (`npm run deploy:pages`).
+
+## Session 5 — review fixes (external review of the deployed game)
+- #1 launch sim speed was frame-rate dependent (`Math.ceil` per frame): `LaunchSession.tick` now uses a fixed-step accumulator (tested at 30/60/120/144 FPS and with warp).
+- #2 RTG power vanished in eclipse: `Evaluation` now exposes `solarGenW` / `rtgGenW`; Mission Control applies eclipse + pointing derating to solar only.
+- #3 readiness vs operations: new shared model `src/game/ops/model.ts` (orbit-average power by mode, eclipse battery, sustained-observing data balance). Architect gains checks `ops-power`, `ops-battery`, `ops-data` (Moon only, where Mission Control exists) and a "Power by operating mode" table in the review panel.
+- #4 mandatory payload: `Destination.requires` (Moon = fields instrument) → `contract` check blocks launch with an explanation.
+- #5 safe-mode scoring: new `stats.safeScienceS`; the report's safe-mode share uses science-phase safe time only.
+- #7 quick start now requires the contract's science goal first (then reliability, cost); search widened (arrays up to 60 m², 3-instrument sets).
+- #8 label "Mission success odds" → "Flight survival odds" with a tooltip saying what it does and does not mean.
+- #9 ion thrust is throttled by the average solar power over the transfer (`electricThrottle`), check text explains it.
+- Not done (needs product decisions): #6 one shared mission lifecycle across Launch Control / Architect / Mission Control, #10 persistence + XP (AGENTS.md says no persistence in the frontend).
+- Tests: `review.test.ts` (13) + updated `game.test.ts` designs; all 6 test files pass via the vitest shim.
+
+## Session 5 (cont.) — Saturn V and the mission to the Moon
+- **Saturn V** (`ll2_cfg_93`) added to the dataset slice with its verified three stages (S-IC/S-II/S-IVB dry + propellant masses, F-1/J-2 thrust, 2,970 t / 35.1 MN liftoff, 140 t LEO) and the Apollo 11 spacecraft mass (43,904 kg) as the TLI payload. LL2 has no price → 185 M$ game value (flagged `launch_cost_is_game`). Isp values are game values (F-1 263/304 s, J-2 421 s). Appears in Launch Control and Mission Architect lists; 3-D model `makeSaturnV()` (true proportions, escape tower, fins) used for thumbnails, preview and the flight sprite.
+- **3-stage ascent** in `launch/core.ts`: `Rocket.s3/stageNames/stageFrac`, `Flight.stage 1|2|3`, `prop3`, separation sprite crops, 3 fuel gauges + milestones in the HUD.
+- **Moon mission** (`MissionKind "moon"`, selectable in the Launch Control briefing; Saturn V pre-selected): parking orbit (phase `parking`) → TLI window ~0.6 orbit later (`tliStartAngle`, indicator + warp 50×) → upper stage re-ignition (autopilot at the window, or **Ignite TLI**) → prograde burn (`tli`) → judged on apogee vs the Moon's distance (band 0.93–1.07) and window error (fail beyond 20°) → `translunar`. Camera pulls back to frame the transfer ellipse; Moon + TLI-window marker drawn. Score: up to 1300 base (+TLI window/apogee accuracy).
+- **Lunar leg** (`MoonLeg.tsx`): after TLI → Earth→Moon trajectory view (coast 5 d, LOI) with dice (99 % coast, ~93–97 % insertion, better with a centred TLI); final score/grade up to 1650 base × difficulty.
+- Balance (headless): autopilot completes the Saturn V Moon mission; Pilot/Commander test pilots 36/36 across all 6 sites; Falcon 9 / Delta IV Heavy / Falcon Heavy can do it with a light payload; smaller rockets run out of upper-stage propellant at TLI with a message pointing to the Saturn V.
+- Menu astronaut enlarged (scaled from the panel height, feet near the bottom, taller panel). Canvas guard for a not-yet-laid-out first frame (NaN gradient error).
+- Tests: `launch.test.ts` 23 (7 new Saturn V/TLI cases). All suites pass via the shim.
+
+## Session 5 (cont.) — Moon leg visuals, pacing, Architect Moon mission, menu astronaut
+- **Menu astronaut head cropped**: hovering Stats played the `floating` clip, which lifts the model out of the canvas. Stats now uses idle; scale reduced to 0.34×panel height for headroom.
+- **Moon mission pacing**: TLI window now opens ~0.3 orbit (~28 min) after insertion; `LaunchSession` auto-warps to 50× in parking orbit, drops to 1× when the window is <90 s away, and caps the TLI burn at 10×.
+- **Lunar arrival** (`trajectory.ts`): replaced the decaying spiral with a real hyperbolic approach (periapsis = 100 km capture radius, v∞ from the transfer) → insertion burn → circular orbit, drawn Moon-relative (`pathRel`, `seg3Index`, capture ring); the coast end blends into the approach start (no jump).
+- **Earth→Moon view** (`TrajectorySim.tsx`): default is now a cinematic chase camera (`CineRig`): starts close to a textured, lit Earth, keeps the craft in the foreground with the Moon growing ahead, then circles the textured Moon during capture; craft marker points along its velocity; the planned (dashed) path stops at arrival; toggle button for the old map view. Used by Launch Control's Moon leg and Mission Architect.
+- **Architect → full Moon mission**: "Launch mission" select (quick ascent, or parking orbit → TLI burn → Moon) in the review panel when the rocket can do it (Saturn V / ≥20 t); the Moon flight then starts at the coast.
+- Verified: typecheck, lint (0 errors), production build, all 6 test suites via the shim, browser checks of the Moon leg (start/coast/capture) and the menu astronaut at 1890×950.
+
+## Session: Team Up gameplay
+- /mission/gameplay now runs the real launch sim (Saturn V + Moon leg for Lunar Landing, Falcon-class orbit otherwise) using the chosen difficulty; results screen shows the real score (src/game/launch/teamResult.ts). Mock telemetry removed.

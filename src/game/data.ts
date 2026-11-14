@@ -7,6 +7,8 @@ import raw from "./dataset.json";
  */
 export interface Body { id: string; name: string; mu: number; radius_m: number; gravity: number | null; sma_m: number | null; parent: string | null; irradiance_w_m2?: number }
 export interface Vehicle { id: string; name: string; manufacturer: string; manufacturer_country: string; leo_capacity_kg: number; gto_capacity_kg: number | null; launch_cost_usd: number; total_launches: number; successful_launches: number; reusable: boolean;
+  /** Saturn V only: verified stage data + the Apollo 11 spacecraft mass; price is a game value */
+  stages?: { stage: string; dry_kg: number; prop_kg: number; engines: number; engine: string; engine_thrust_n: number }[]; tli_payload_kg?: number; launch_cost_is_game?: boolean;
   launch_mass_t: number | null; liftoff_thrust_kn: number | null; diameter_m: number | null; length_m: number | null; min_stage: number | null; max_stage: number | null }
 export interface LaunchSite { id: string; name: string; location: string; country: string; lat: number; lon: number; launches: number; rotation_boost_m_s: number }
 export interface ElectricThruster { id: string; name: string; type: string; thrust_n: number; power_w: number; isp_s: number }
@@ -56,9 +58,11 @@ export const ANTENNAS: Antenna[] = [
 export interface Destination {
   id: string; bodyId: string; name: string; tagline: string; kind: "moon" | "planet";
   opsDays: number; deadlineDays: number; budgetUsd: number; scienceGoal: number; wants: InstrumentTag[]; difficulty: 1 | 2 | 3 | 4 | 5;
+  /** Mandatory payload type for the contract (launch is blocked without it). */
+  requires?: InstrumentTag;
 }
 export const DESTINATIONS: Destination[] = [
-  { id: "moon", bodyId: "moon", name: "Moon", tagline: "Low lunar orbit survey", kind: "moon", opsDays: 60, deadlineDays: 400, budgetUsd: 250e6, scienceGoal: 20, wants: ["fields", "particles"], difficulty: 1 },
+  { id: "moon", bodyId: "moon", name: "Moon", tagline: "Low lunar orbit survey", kind: "moon", opsDays: 60, deadlineDays: 400, budgetUsd: 250e6, scienceGoal: 20, wants: ["fields", "particles"], difficulty: 1, requires: "fields" },
   { id: "mars", bodyId: "mars", name: "Mars", tagline: "Orbiter to image candidate landing sites", kind: "planet", opsDays: 365, deadlineDays: 800, budgetUsd: 700e6, scienceGoal: 35, wants: ["imager", "spectrometer"], difficulty: 2 },
 ];
 export const destinationById = (id: string) => DESTINATIONS.find((d) => d.id === id);

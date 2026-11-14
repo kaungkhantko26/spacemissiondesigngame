@@ -59,11 +59,12 @@ export function SplashScreen() {
   );
 }
 
-/** Sized from the canvas's visible width so the waving arm is never clipped, whatever the window shape. */
+/** Sized from the canvas's visible height AND width: as tall as the panel allows (feet near the bottom edge) without clipping the waving arm. */
 function MenuAstronaut({ look, pose }: { look: ReturnType<typeof useLook>; pose: "idle" | "wave" | "ready" | "celebrate" }) {
-  const width = useThree((st) => st.viewport.width);
-  const scale = Math.min(1.6, width * 0.24);
-  return <Astronaut {...look} pose={pose} position={[Math.min(1.9, width * 0.1), -2.1 * (scale / 1.6) - 0.1, 0]} scale={scale} rotationY={-Math.PI / 4} />;
+  const { width, height } = useThree((st) => st.viewport);
+  const scale = Math.min(0.34 * height, width * 0.3, 3); // leaves headroom: some clips (moon walk) lift the model
+  const y = -height / 2 + 0.25 * scale + 0.03 * height; // the model's feet sit 0.25·scale below its origin
+  return <Astronaut {...look} pose={pose} position={[Math.min(width * 0.12, 2.4), y, 0]} scale={scale} rotationY={-Math.PI / 4} />;
 }
 
 /* ---------- Main menu ---------- */
@@ -80,7 +81,7 @@ const MENU = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 type Pose = "idle" | "wave" | "ready" | "celebrate";
-const HOVER_POSE: Record<string, Pose> = { Cosmetics: "celebrate", Stats: "ready", Profile: "idle", Settings: "idle" };
+const HOVER_POSE: Record<string, Pose> = { Cosmetics: "celebrate", Stats: "idle", Profile: "idle", Settings: "idle" };
 
 function MissionClock() {
   const [now, setNow] = useState<Date | null>(null);
@@ -143,8 +144,8 @@ export function MenuScreen() {
           </nav>
           <p className="hud-label mt-4">Press 1–{MENU.length} to jump</p>
         </div>
-        <div className="h-[380px] md:h-[560px]">
-          <Scene3D camera={[0, 0.6, 7]} label="Your astronaut"><MenuAstronaut look={look} pose={pose} /></Scene3D>
+        <div className="h-[460px] md:h-[min(80vh,860px)]">
+          <Scene3D camera={[0, 0, 7]} label="Your astronaut"><MenuAstronaut look={look} pose={pose} /></Scene3D>
         </div>
       </div>
     </main>

@@ -76,6 +76,52 @@
  ],
  "vehicles": [
   {
+   "id": "ll2_cfg_93",
+   "name": "Saturn V",
+   "manufacturer": "National Aeronautics and Space Administration",
+   "manufacturer_country": "USA",
+   "leo_capacity_kg": 140000,
+   "gto_capacity_kg": null,
+   "launch_cost_usd": 185000000,
+   "total_launches": 13,
+   "successful_launches": 12,
+   "reusable": false,
+   "launch_mass_t": 2970,
+   "liftoff_thrust_kn": 35100,
+   "diameter_m": 10.1,
+   "length_m": 110.6,
+   "min_stage": 3,
+   "max_stage": 3,
+   "stages": [
+    {
+     "stage": "S-IC",
+     "dry_kg": 130974.7968375,
+     "prop_kg": 2147271.8065598803,
+     "engines": 5,
+     "engine": "f1",
+     "engine_thrust_n": 6770000
+    },
+    {
+     "stage": "S-II",
+     "dry_kg": 36200,
+     "prop_kg": 444177.15317591,
+     "engines": 5,
+     "engine": "j2",
+     "engine_thrust_n": 1033000
+    },
+    {
+     "stage": "S-IVB",
+     "dry_kg": 11339.80925,
+     "prop_kg": 106831.43575951,
+     "engines": 1,
+     "engine": "j2",
+     "engine_thrust_n": 1033000
+    }
+   ],
+   "tli_payload_kg": 43904,
+   "launch_cost_is_game": true
+  },
+  {
    "id": "ll2_cfg_26",
    "name": "Electron",
    "manufacturer": "Rocket Lab",

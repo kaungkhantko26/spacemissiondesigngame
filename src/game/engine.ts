@@ -1,5 +1,8 @@
+import { OPS } from "./ops/core";
+import { OPS_DUTY } from "./ops/model";
 import { ANTENNAS, DATASET, GAME, destinationById, instrumentById, launchReliability, vehicleById, type Antenna, type Destination, type Instrument, type Vehicle, type ElectricThruster } from "./data";
 import { deltaV, linkRate, planTransfer, type TransferPlan } from "./physics";
+import { opsPower, requiredObserveFrac, sustainableObserveFrac, type OpsPower } from "./ops/model";
 
 export type PropulsionId = "chem" | string; // "chem" or an electric thruster id from the dataset
 export interface Design {
@@ -13,7 +16,7 @@ export interface Evaluation {
   design: Design; destination: Destination; vehicle: Vehicle; plan: TransferPlan; antenna: Antenna; instruments: Instrument[];
   electric: ElectricThruster | null; isp: number;
   dryKg: number; wetKg: number; dvRequired: number; dvAvailable: number; propellantNeededKg: number;
-  powerGenW: number; powerLoadW: number; linkBps: number; requiredBps: number; dataFraction: number;
+  powerGenW: number; solarGenW: number; rtgGenW: number; powerLoadW: number; ops: OpsPower; observeFrac: number; electricThrottle: number; linkBps: number; requiredBps: number; dataFraction: number;
   cruiseDays: number; costUsd: number; costBreakdown: Record<string, number>; science: number;
   probabilities: { launch: number; cruise: number; insertion: number; ops: number; mission: number };
   checks: Check[]; goNoGo: boolean;
@@ -71,12 +74,16 @@ export function evaluate(d: Design): Evaluation {
   const commsDrawW = (antenna.txW / GAME.comms.amplifierEff) * GAME.comms.duty;
   const powerLoadW = GAME.busPowerW + instruments.reduce((s, i) => s + instrumentPower(i), 0) + commsDrawW;
   const solarEff = GAME.solar.efficiency * GAME.solar.degradation;
-  const powerGenW = plan.irradiance * d.solarAreaM2 * solarEff + d.rtgUnits * GAME.rtg.watts;
+  const solarGenW = plan.irradiance * d.solarAreaM2 * solarEff, rtgGenW = d.rtgUnits * GAME.rtg.watts;
+  const powerGenW = solarGenW + rtgGenW;
   const solarAt1AuW = 1361 * d.solarAreaM2 * solarEff;
   const thrusterPowerW = electric ? n * electric.power_w : 0;
 
   // ---- Time ----
-  const thrust = electric ? n * electric.thrust_n : GAME.chemical.thrust_n;
+  // Ion thrusters are power-limited: average the solar power over the transfer (1 AU at departure → destination at arrival).
+  const arrivalSolarW = plan.irradiance * d.solarAreaM2 * solarEff;
+  const electricThrottle = electric ? Math.max(0.05, Math.min(1, ((solarAt1AuW + arrivalSolarW) / 2) / Math.max(1, thrusterPowerW + GAME.busPowerW))) : 1;
+  const thrust = electric ? n * electric.thrust_n * electricThrottle : GAME.chemical.thrust_n;
   const burnDays = electric ? (dvRequired * ((wetKg + dryKg) / 2)) / thrust / 86400 : 0;
   const cruiseDays = plan.transferDays + burnDays * 0.5 + (electric ? 0 : 0);
 
@@ -93,6 +100,12 @@ export function evaluate(d: Design): Evaluation {
     rawScience += GAME.tagValue[i.tag] * wanted * Math.pow(GAME.duplicateTagFactor, k);
   }
   const science = rawScience * dataFraction;
+
+  // ---- Operations readiness (same model Mission Control uses)
+  const instKbps = instruments.reduce((a, i) => a + instrumentKbps(i), 0);
+  const opsModel = opsPower({ solarW: solarGenW, rtgW: rtgGenW, instW: instruments.reduce((a, i) => a + instrumentPower(i), 0) * OPS.loadScale, txW: antenna.txW });
+  const observeFrac = sustainableObserveFrac(instKbps, linkBps);
+  const hasFieldsInst = instruments.some((i) => i.tag === "fields");
 
   // ---- Cost (launch price = dataset; the rest = game values) ----
   const dryNoTanks = dryKg - tankKg;
@@ -126,12 +139,27 @@ export function evaluate(d: Design): Evaluation {
   add("power", "Power", `${fmt(powerGenW)} W`, `≥ ${fmt(powerLoadW * 1.1)} W`, powerGenW < powerLoadW ? "bad" : powerGenW < powerLoadW * 1.1 ? "warn" : "ok",
     powerGenW < powerLoadW ? `Blackout at ${destination.name} (${fmt(plan.irradiance)} W/m² sunlight) — more array area or RTGs.` : "Generation covers the load at the destination.");
   if (electric) add("thruster-power", "Thruster power (at 1 AU)", `${fmt(solarAt1AuW)} W`, `≥ ${fmt(thrusterPowerW + GAME.busPowerW)} W`, solarAt1AuW < thrusterPowerW + GAME.busPowerW ? "bad" : "ok",
-    solarAt1AuW < thrusterPowerW + GAME.busPowerW ? "Ion thrusters need solar arrays; RTGs are too weak." : "Arrays can drive the thrusters.");
+    solarAt1AuW < thrusterPowerW + GAME.busPowerW ? "Ion thrusters need solar arrays; RTGs are too weak." : electricThrottle < 0.999 ? `Thrust is power-limited along the transfer (average ${fmt(electricThrottle * 100)} % of rated; arrival sunlight ${fmt(plan.irradiance)} W/m²) — cruise time already accounts for it.` : "Arrays can drive the thrusters the whole way.");
   add("time", "Cruise time", `${fmt(cruiseDays)} d`, `≤ ${fmt(destination.deadlineDays)} d`, cruiseDays > destination.deadlineDays ? "bad" : cruiseDays > destination.deadlineDays * 0.85 ? "warn" : "ok",
     cruiseDays > destination.deadlineDays ? "Misses the mission deadline — add thrusters or use chemical propulsion." : "Arrives inside the mission window.");
   add("budget", "Budget", usd(costUsd), `≤ ${usd(destination.budgetUsd)}`, costUsd > destination.budgetUsd ? "bad" : costUsd > destination.budgetUsd * 0.95 ? "warn" : "ok",
     costUsd > destination.budgetUsd ? "Over budget — launch price is real data; other prices are game values." : "Funded.");
   add("payload", "Instruments", `${instruments.length}`, "≥ 1", instruments.length === 0 ? "bad" : "ok", instruments.length === 0 ? "A mission with no science is just expensive space junk." : `${instruments.length} real NASA instrument(s) aboard.`);
+  if (destination.requires) {
+    const has = instruments.some((i) => i.tag === destination.requires);
+    add("contract", "Required payload", has ? `${destination.requires} instrument` : "missing", `${destination.requires} instrument`, has ? "ok" : "bad",
+      has ? "Contract payload aboard." : `The ${destination.name} contract requires a ${destination.requires} instrument (e.g. a magnetometer); without one the survey cannot be completed.`);
+  }
+  if (instruments.length > 0 && destination.kind === "moon") { // the operations model (Mission Control) exists for the Moon
+    const ratio = opsModel.avgLoad > 0 ? opsModel.avgGen / opsModel.avgLoad : 9;
+    add("ops-power", "Sustained power (orbit avg)", `${fmt(opsModel.avgGen)} W in`, `≥ ${fmt(opsModel.avgLoad)} W out`, ratio < 1 ? "bad" : ratio < 1.15 ? "warn" : "ok",
+      `Operating mix ${Math.round(OPS_DUTY.observe * 100)} % observing / ${Math.round(OPS_DUTY.downlink * 100)} % downlink, solar derated ${Math.round(OPS.arrayDerate * 100)} % for pointing, off in eclipse, RTG constant. Observing: ${fmt(opsModel.science.gen)} W in / ${fmt(opsModel.science.load)} W out · downlink: ${fmt(opsModel.downlink.gen)} W in / ${fmt(opsModel.downlink.load)} W out.${ratio < 1 ? " Add array area or RTGs." : ""}`);
+    add("ops-battery", "Eclipse battery", `${fmt(opsModel.eclipseWh)} Wh`, `≤ ${fmt(opsModel.batteryUsableWh)} Wh`, opsModel.eclipseWh > opsModel.batteryUsableWh ? "bad" : opsModel.eclipseWh > opsModel.batteryUsableWh * 0.8 ? "warn" : "ok",
+      opsModel.eclipseWh > opsModel.batteryUsableWh ? "The battery cannot carry the observing load through an eclipse — cut instrument power or add RTGs." : "Battery carries the load through the lunar eclipse.");
+    const need = requiredObserveFrac(hasFieldsInst);
+    add("ops-data", "Sustained observing (data)", `${fmt(observeFrac * 100)} %`, `≥ ${fmt(need * 100)} %`, observeFrac < need ? "bad" : observeFrac < need * 1.15 ? "warn" : "ok",
+      observeFrac < need ? "The link cannot return the data the instruments record, so the survey cannot finish — bigger antenna or fewer/lower-rate instruments." : "Downlink keeps up with the survey data rate (counting ground-station windows).");
+  }
   add("link", "Science data link", `${fmt(linkBps / 1000, 1)} kbps`, `${fmt(requiredBps / 1000, 1)} kbps wanted`, requiredBps > 0 && dataFraction < 0.5 ? "warn" : "ok",
     dataFraction < 1 && requiredBps > 0 ? `Only ${fmt(dataFraction * 100)} % of instrument data reaches Earth — bigger antenna or fewer instruments.` : "All instrument data can be downlinked.");
   if (prop <= 0) add("prop", "Propellant", "0 kg", "> 0", "bad", "No propellant loaded.");
@@ -139,7 +167,7 @@ export function evaluate(d: Design): Evaluation {
 
   return {
     design: d, destination, vehicle, plan, antenna, instruments, electric, isp, dryKg, wetKg, dvRequired, dvAvailable, propellantNeededKg,
-    powerGenW, powerLoadW, linkBps, requiredBps, dataFraction, cruiseDays, costUsd, costBreakdown, science, probabilities, checks, goNoGo,
+    powerGenW, solarGenW, rtgGenW, powerLoadW, ops: opsModel, observeFrac, electricThrottle, linkBps, requiredBps, dataFraction, cruiseDays, costUsd, costBreakdown, science, probabilities, checks, goNoGo,
   };
 }
 

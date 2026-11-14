@@ -63,3 +63,37 @@ export function usePartThumbs(): Record<string, string> {
   }, []);
   return t;
 }
+
+/* ---------- side-view sprite of the real 3-D rocket for the Launch Control canvas ---------- */
+import { OrthographicCamera } from "three";
+export interface RocketSprite { img: HTMLImageElement; aspect: number }
+const sprites = new Map<string, Promise<RocketSprite | null>>();
+/** Orthographic side view of makeRocket(), transparent background, cropped exactly to the model. One short-lived WebGL context. */
+export function loadRocketSprite(vehicleId: string): Promise<RocketSprite | null> {
+  const hit = sprites.get(vehicleId); if (hit) return hit;
+  const p = new Promise<RocketSprite | null>((resolve) => {
+    setTimeout(() => {
+      let renderer: WebGLRenderer | null = null;
+      try {
+        const v = DATASET.vehicles.find((x) => x.id === vehicleId);
+        const model = makeRocket(vehicleId, v?.length_m ?? 40, v?.diameter_m ?? 3.5);
+        const box = new Box3().setFromObject(model), size = box.getSize(new Vector3()), c = box.getCenter(new Vector3());
+        const h = 640, w = Math.max(28, Math.round((h * Math.max(size.x, size.z)) / size.y * 1.06));
+        const canvas = document.createElement("canvas");
+        renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+        renderer.setClearColor(0x000000, 0); renderer.outputColorSpace = SRGBColorSpace; renderer.setSize(w, h, false);
+        const scene = new Scene(); scene.add(model, new HemisphereLight(0xe6efff, 0x3a3f4c, 1.9), new AmbientLight(0xffffff, 0.45));
+        const key = new DirectionalLight(0xfff0d8, 2.4); key.position.set(4, 3, 6); scene.add(key);
+        const cam = new OrthographicCamera((-size.y * (w / h)) / 2, (size.y * (w / h)) / 2, size.y / 2, -size.y / 2, 0.1, 5000);
+        cam.position.set(c.x, c.y, c.z + 400); cam.lookAt(c);
+        renderer.render(scene, cam);
+        const url = canvas.toDataURL("image/png"); disposeModel(model);
+        const img = new Image();
+        img.onload = () => resolve({ img, aspect: w / h }); img.onerror = () => resolve(null); img.src = url;
+      } catch { resolve(null); }
+      finally { if (renderer) { renderer.dispose(); renderer.forceContextLoss(); } }
+    }, 0);
+  });
+  sprites.set(vehicleId, p);
+  return p;
+}

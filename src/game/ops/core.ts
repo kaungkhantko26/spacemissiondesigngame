@@ -50,7 +50,7 @@ export interface Flags {
 }
 export interface Stats {
   generatedGb: number; returnedGb: number; usefulReturnedGb: number; lostGb: number;
-  activeObsS: number; downlinkS: number; safeS: number; blackouts: number; scienceS: number;
+  activeObsS: number; downlinkS: number; safeS: number; safeScienceS: number; blackouts: number; scienceS: number;
   decisions: Decision[]; spentUsd: number; lossCause: string | null;
 }
 export interface OpsState {

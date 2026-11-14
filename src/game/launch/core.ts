@@ -49,7 +49,7 @@ export const RULES: Record<Difficulty, Rules> = {
 
 /* ---------- Rocket model built from a dataset vehicle ---------- */
 export interface StageSpec { propKg: number; dryKg: number; thrustSlN: number; thrustVacN: number; ispSl: number; ispVac: number; minThrottle: number }
-export interface Rocket { name: string; diameterM: number; lengthM: number; m0: number; payloadKg: number; capacityKg: number; s1: StageSpec; s2: StageSpec; dvIdeal: number; twr0: number; vehicle: Vehicle }
+export interface Rocket { name: string; diameterM: number; lengthM: number; m0: number; payloadKg: number; capacityKg: number; s1: StageSpec; s2: StageSpec; s3?: StageSpec; stageNames: string[]; /** share of the full height still flying after stage 1 / stage 2 separate (for the sprite) */ stageFrac: [number, number]; dvIdeal: number; twr0: number; vehicle: Vehicle }
 
 const ln = Math.log;
 function dvOf(m0: number, payload: number, a: number, k: number): { dv1: number; dv2: number; s1prop: number; s1dry: number; s2prop: number; s2dry: number } {
@@ -64,7 +64,27 @@ function dvOf(m0: number, payload: number, a: number, k: number): { dv1: number;
   return { dv1, dv2, s1prop, s1dry, s2prop, s2dry };
 }
 
+/** The real Saturn V from the dataset: verified stage masses + F-1/J-2 thrust (Isp values are game values: F-1 263/304 s, J-2 421 s). */
+function buildSaturn(v: Vehicle, payloadKg: number): Rocket {
+  const [ic, ii, ivb] = v.stages!, g0 = LAUNCH.g0;
+  const refPayload = v.tli_payload_kg ?? 43_904, m0Ref = (v.launch_mass_t ?? 2970) * 1000;
+  const extra = Math.max(0, m0Ref - (ic.dry_kg + ic.prop_kg + ii.dry_kg + ii.prop_kg + ivb.dry_kg + ivb.prop_kg + refPayload)); // interstages, escape tower
+  const m0 = ic.dry_kg + ic.prop_kg + ii.dry_kg + ii.prop_kg + ivb.dry_kg + ivb.prop_kg + payloadKg + extra;
+  const t1 = (v.liftoff_thrust_kn ?? ic.engines * ic.engine_thrust_n / 1000) * 1000;
+  const iiVac = ii.engines * ii.engine_thrust_n, ivbVac = ivb.engines * ivb.engine_thrust_n;
+  const s1: StageSpec = { propKg: ic.prop_kg, dryKg: ic.dry_kg + extra, thrustSlN: t1, thrustVacN: t1 * (304 / 263), ispSl: 263, ispVac: 304, minThrottle: 0.8 };
+  const s2: StageSpec = { propKg: ii.prop_kg, dryKg: ii.dry_kg, thrustSlN: iiVac * 0.92, thrustVacN: iiVac, ispSl: 360, ispVac: 421, minThrottle: 0.6 };
+  const s3: StageSpec = { propKg: ivb.prop_kg, dryKg: ivb.dry_kg, thrustSlN: ivbVac * 0.9, thrustVacN: ivbVac, ispSl: 360, ispVac: 421, minThrottle: 0.35 };
+  const m2 = m0 - ic.prop_kg - s1.dryKg, m3 = ivb.dry_kg + ivb.prop_kg + payloadKg;
+  const dv = ((263 + 304) / 2) * g0 * ln(m0 / (m0 - ic.prop_kg)) + 421 * g0 * ln(m2 / (m2 - ii.prop_kg)) + 421 * g0 * ln(m3 / (m3 - ivb.prop_kg));
+  return {
+    name: v.name, diameterM: v.diameter_m ?? 10.1, lengthM: v.length_m ?? 110.6, m0, payloadKg, capacityKg: v.leo_capacity_kg, vehicle: v, s1, s2, s3,
+    stageNames: ["S-IC", "S-II", "S-IVB"], stageFrac: [0.62, 0.39], dvIdeal: dv, twr0: t1 / (m0 * g0),
+  };
+}
+
 export function buildRocket(v: Vehicle, payloadKg: number): Rocket {
+  if (v.stages?.length === 3) return buildSaturn(v, payloadKg);
   let m0 = (v.launch_mass_t ?? v.leo_capacity_kg / 0.04 / 1000) * 1000;
   const cap = v.leo_capacity_kg;
   // The dataset's liftoff mass/thrust pairs are not always self-consistent (e.g. strap-on variants); clamp to a flyable T/W.
@@ -83,27 +103,32 @@ export function buildRocket(v: Vehicle, payloadKg: number): Rocket {
     name: v.name, diameterM: v.diameter_m ?? 3, lengthM: v.length_m ?? 40, m0, payloadKg, capacityKg: cap, vehicle: v,
     s1: { propKg: split.s1prop, dryKg: split.s1dry, thrustSlN: t1, thrustVacN: t1 * (stage1.ispVac / stage1.ispSl), ispSl: stage1.ispSl, ispVac: stage1.ispVac, minThrottle: stage1.minThrottle },
     s2: { propKg: split.s2prop, dryKg: split.s2dry, thrustSlN: t2 * 0.9, thrustVacN: t2, ispSl: stage2.ispVac * 0.85, ispVac: stage2.ispVac, minThrottle: stage2.minThrottle },
-    dvIdeal: split.dv1 + split.dv2, twr0: t1 / (m0 * g0),
+    stageNames: ["Stage 1", "Stage 2"], stageFrac: [0.38, 0.38], dvIdeal: split.dv1 + split.dv2, twr0: t1 / (m0 * g0),
   };
 }
 
 /* ---------- Flight state ---------- */
-export type FlightPhase = "countdown" | "stage1" | "coast" | "stage2" | "orbit" | "failed";
+export type FlightPhase = "countdown" | "stage1" | "coast" | "stage2" | "orbit" | "parking" | "tli" | "translunar" | "failed";
+export type MissionKind = "orbit" | "moon";
 export interface Input { throttle: number; pitchRate: number; stage: boolean; cut: boolean; restart: boolean; autopilot: boolean; upperGuidance: boolean }
 export interface LogLine { t: number; text: string; tone: "info" | "good" | "warn" | "bad" }
 export interface Telemetry {
   alt: number; speed: number; surfSpeed: number; vr: number; vt: number; downrangeKm: number; q: number; aoa: number; g: number; pitch: number;
-  apoKm: number; periKm: number; ecc: number; mass: number; thrust: number; prop1: number; prop2: number; qAlpha: number;
+  apoKm: number; periKm: number; ecc: number; mass: number; thrust: number; prop1: number; prop2: number; prop3: number; propUpper: number; qAlpha: number;
+  /** Moon mission: seconds until the TLI window (parking orbit only) and the window error in degrees when burning */
+  tliRemainS: number | null; tliErrDeg: number | null;
 }
 export interface Flight {
   rocket: Rocket; rules: Rules; site: LaunchSite; seed: number; rng: number;
-  t: number; phase: FlightPhase; stage: 1 | 2; x: number; y: number; vx: number; vy: number; theta0: number;
-  m: number; prop1: number; prop2: number; pitch: number; throttle: number; engineOn: boolean; ignited: boolean; liftedOff: boolean;
+  t: number; phase: FlightPhase; stage: 1 | 2 | 3; mission: MissionKind; sepFrom: 1 | 2; tliStartAngle: number; tliErr: number | null; x: number; y: number; vx: number; vy: number; theta0: number;
+  m: number; prop1: number; prop2: number; prop3: number; pitch: number; throttle: number; engineOn: boolean; ignited: boolean; liftedOff: boolean;
   coastLeft: number; fairing: boolean; thrustMult: number; thrustMultUntil: number; guidanceDownUntil: number;
   omega: number; maxQ: number; maxQt: number; maxG: number; maxQAlpha: number;
   anomalies: { at: number; kind: "minor" | "major" | "none"; done: boolean };
-  milestones: Record<string, number>; log: LogLine[]; tel: Telemetry; failure: string | null; trail: number[]; debris: { x: number; y: number; vx: number; vy: number }[];
+  milestones: Record<string, number>; log: LogLine[]; tel: Telemetry; failure: string | null; trail: number[]; debris: { x: number; y: number; vx: number; vy: number; /** sprite rows (fraction from the top) of the spent part */ top: number; bot: number }[];
   cutoffs: number; kickDone: boolean; manualOverride: boolean; gOver: number;
+  /** orbit reached (insertion): numbers frozen for scoring; TLI apogee accuracy */
+  park: { periKm: number; apoKm: number; fuel: number } | null; tliRatio: number | null;
 }
 
 export const R_E = () => bodyById("earth").radius_m;
@@ -114,19 +139,19 @@ function mulberry(n: { rng: number }) { n.rng = (n.rng + 0x6d2b79f5) >>> 0; let 
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
 const deg = (r: number) => (r * 180) / Math.PI, rad = (d: number) => (d * Math.PI) / 180;
 
-export function createFlight(rocket: Rocket, rules: Rules, site: LaunchSite, seed: number): Flight {
+export function createFlight(rocket: Rocket, rules: Rules, site: LaunchSite, seed: number, mission: MissionKind = "orbit"): Flight {
   const f: Flight = {
-    rocket, rules, site, seed, rng: seed >>> 0, t: -LAUNCH.countdownS, phase: "countdown", stage: 1,
-    x: 0, y: earthRadius, vx: site.rotation_boost_m_s, vy: 0, theta0: 0, m: rocket.m0, prop1: rocket.s1.propKg, prop2: rocket.s2.propKg,
+    rocket, rules, site, seed, rng: seed >>> 0, t: -LAUNCH.countdownS, phase: "countdown", stage: 1, mission, sepFrom: 1, tliStartAngle: 0, tliErr: null,
+    x: 0, y: earthRadius, vx: site.rotation_boost_m_s, vy: 0, theta0: 0, m: rocket.m0, prop1: rocket.s1.propKg, prop2: rocket.s2.propKg, prop3: rocket.s3?.propKg ?? 0,
     pitch: 90, throttle: 1, engineOn: false, ignited: false, liftedOff: false, coastLeft: 0, fairing: true, thrustMult: 1, thrustMultUntil: 0, guidanceDownUntil: 0,
     omega: site.rotation_boost_m_s / earthRadius, maxQ: 0, maxQt: 0, maxG: 0, maxQAlpha: 0, anomalies: { at: 0, kind: "none", done: false },
-    milestones: {}, log: [], tel: undefined as unknown as Telemetry, failure: null, trail: [], debris: [], cutoffs: 0, kickDone: false, manualOverride: false, gOver: 0,
+    milestones: {}, log: [], tel: undefined as unknown as Telemetry, failure: null, trail: [], debris: [], cutoffs: 0, kickDone: false, manualOverride: false, gOver: 0, park: null, tliRatio: null,
   };
   const rnd = () => mulberry(f);
   const major = rnd() < rules.majorAnomalyChance, minor = rnd() < rules.minorAnomalyChance;
   f.anomalies = { at: 45 + rnd() * 60, kind: major ? "major" : minor ? "minor" : "none", done: false };
   f.tel = telemetry(f, 0, 0, 0);
-  log(f, "Launch director: all stations go. Countdown started.", "info");
+  log(f, mission === "moon" ? "Launch director: all stations go for the lunar mission. Countdown started." : "Launch director: all stations go. Countdown started.", "info");
   return f;
 }
 const log = (f: Flight, text: string, tone: LogLine["tone"] = "info") => { f.log = [...f.log.slice(-39), { t: f.t, text, tone }]; };
@@ -166,11 +191,24 @@ function telemetry(f: Flight, q: number, aoa: number, g: number): Telemetry {
   return {
     alt: r - earthRadius, speed: Math.hypot(f.vx, f.vy), surfSpeed: Math.hypot(vr, vt - vatm), vr, vt,
     downrangeKm: Math.max(0, (theta - f.omega * Math.max(0, f.t)) * earthRadius / 1000), q, aoa, g, pitch: f.pitch,
-    apoKm: el.bound ? el.apo / 1000 : Infinity, periKm: el.peri / 1000, ecc: el.e, mass: f.m, thrust, prop1: f.prop1 / f.rocket.s1.propKg, prop2: f.prop2 / f.rocket.s2.propKg, qAlpha: q * Math.abs(aoa) / 1000,
+    apoKm: el.bound ? el.apo / 1000 : Infinity, periKm: el.peri / 1000, ecc: el.e, mass: f.m, thrust, prop1: f.prop1 / f.rocket.s1.propKg, prop2: f.prop2 / f.rocket.s2.propKg, prop3: f.rocket.s3 ? f.prop3 / f.rocket.s3.propKg : 0,
+    propUpper: f.rocket.s3 ? f.prop3 / f.rocket.s3.propKg : f.prop2 / f.rocket.s2.propKg, qAlpha: q * Math.abs(aoa) / 1000,
+    tliRemainS: f.phase === "parking" ? Math.max(0, tliRemain(f) / Math.sqrt(muEarth / r ** 3)) : null, tliErrDeg: f.tliErr === null ? null : deg(f.tliErr),
   };
 }
 
-const stageSpec = (f: Flight) => (f.stage === 1 ? f.rocket.s1 : f.rocket.s2);
+const stageSpec = (f: Flight) => (f.stage === 1 ? f.rocket.s1 : f.stage === 2 ? f.rocket.s2 : f.rocket.s3!);
+const lastStage = (f: Flight): 2 | 3 => (f.rocket.s3 ? 3 : 2);
+const isUpper = (f: Flight) => f.stage === lastStage(f);
+const propOf = (f: Flight) => (f.stage === 1 ? f.prop1 : f.stage === 2 ? f.prop2 : f.prop3);
+const burnPropellant = (f: Flight, d: number) => { if (f.stage === 1) f.prop1 -= d; else if (f.stage === 2) f.prop2 -= d; else f.prop3 -= d; };
+const wrapPi = (a: number) => { const t = (a + Math.PI) % (2 * Math.PI); return (t < 0 ? t + 2 * Math.PI : t) - Math.PI; };
+/** Angle still to fly (rad, clockwise) before the TLI window opens; ≤ 0 once the craft has passed the window start. */
+const tliRemain = (f: Flight) => wrapPi(Math.atan2(f.y, f.x) - f.tliStartAngle);
+export const tliWindowRemain = tliRemain;
+/** Moon distance the TLI orbit must reach (centre-to-centre) and the accepted band. */
+export const MOON_DIST_M = () => bodyById("moon").sma_m as number;
+export const TLI = { tolLow: 0.93, tolHigh: 1.07, windowOkRad: 0.14, windowFailRad: 0.35, orbitsToWait: 0.3, leadRad: 0.17, maxRestarts: 4 } as const;
 function fullThrust(f: Flight, h: number) {
   const s = stageSpec(f);
   const p = Math.exp(-Math.max(0, h) / LAUNCH.scaleHeightM);
@@ -188,6 +226,7 @@ export const profilePitch = (h: number) => 90 - 90 * Math.pow(clamp(h / PROFILE_
 export function guidancePitch(f: Flight): number {
   const r = Math.hypot(f.x, f.y), rx = f.x / r, ry = f.y / r, hx = ry, hy = -rx;
   const h = r - earthRadius, vr = f.vx * rx + f.vy * ry, vt = f.vx * hx + f.vy * hy;
+  if (f.phase === "tli") return deg(Math.atan2(vr, Math.max(1, vt))); // burn prograde (along the velocity vector)
   if (f.stage === 1) {
     if (h < CLEAR_TOWER_M) return 90;
     const vatm = f.omega * r + windAt(f, h);
@@ -214,7 +253,7 @@ export function guidancePitch(f: Flight): number {
 
 /* ---------- Step ---------- */
 export function stepFlight(f: Flight, input: Input, dt = LAUNCH.dt): void {
-  if (f.phase === "orbit" || f.phase === "failed") return;
+  if (f.phase === "orbit" || f.phase === "failed" || f.phase === "translunar") return;
   f.t += dt;
   if (f.phase === "countdown") {
     const left = -f.t;
@@ -227,21 +266,35 @@ export function stepFlight(f: Flight, input: Input, dt = LAUNCH.dt): void {
 
   // ---- controls
   const rules = f.rules;
-  const apAllowed = rules.autopilot === "full" || (rules.autopilot === "upper" && f.stage === 2 && input.upperGuidance);
+  const apAllowed = rules.autopilot === "full" || (rules.autopilot === "upper" && f.stage >= 2 && input.upperGuidance);
   const apOn = apAllowed && (rules.autopilot === "upper" ? true : input.autopilot) && f.t >= f.guidanceDownUntil;
   const s = stageSpec(f);
   if (f.milestones.kick === undefined && h0 >= CLEAR_TOWER_M) mark(f, "kick", "Tower cleared — pitch program started.", "info");
   if (apOn && rules.autopilot === "full" && f.stage === 1) f.throttle = maxQBucket(f, h0);
-  else if (apOn && f.stage === 2) f.throttle = f.engineOn ? clamp((LAUNCH.upperMaxG * LAUNCH.g0 * f.m) / Math.max(1, fullThrust(f, h0)), s.minThrottle, 1) : f.throttle;
+  else if (apOn && f.stage >= 2) f.throttle = f.engineOn ? clamp((LAUNCH.upperMaxG * LAUNCH.g0 * f.m) / Math.max(1, fullThrust(f, h0)), s.minThrottle, 1) : f.throttle;
   else f.throttle = clamp(input.throttle, 0, 1);
   if (f.engineOn && f.stage === 1) f.throttle = clamp(f.throttle, s.minThrottle, 1);
-  if (f.engineOn && f.stage === 2 && f.throttle > 0) f.throttle = clamp(f.throttle, s.minThrottle, 1);
+  if (f.engineOn && f.stage >= 2 && f.throttle > 0) f.throttle = clamp(f.throttle, s.minThrottle, 1);
 
-  if (apOn && f.stage === 2 && f.engineOn) { // guided cutoff: circular enough at the target altitude
+  if (apOn && isUpper(f) && f.engineOn && f.phase === "stage2") { // guided cutoff: circular enough at the target altitude
     const el = orbitElements(f.x, f.y, f.vx, f.vy);
     const vcirc = Math.sqrt(muEarth / Math.hypot(f.x, f.y)), rr = Math.hypot(f.x, f.y), vtt = (f.vx * f.y - f.vy * f.x) / rr;
     const circ = el.bound && el.peri / 1000 >= LAUNCH.targetOrbitKm - 25 && (el.apo - el.peri) / 1000 < 120;
     if (circ || (vtt >= vcirc && Math.abs((f.vx * f.x + f.vy * f.y) / rr) < 60)) { f.engineOn = false; f.cutoffs++; mark(f, "seco" + f.cutoffs, "Guided engine cutoff (SECO)."); }
+  }
+  // ---- Moon mission: wait in parking orbit for the TLI window, then re-ignite the upper stage and burn prograde
+  if (f.phase === "parking") {
+    const rem = tliRemain(f);
+    const auto = rules.autopilot === "full" && input.autopilot;
+    const go = auto ? rem <= 0 && rem > -1 : input.restart;
+    if (go && propOf(f) > 0 && f.cutoffs < TLI.maxRestarts) {
+      f.phase = "tli"; f.engineOn = true; f.tliErr = rem; f.throttle = 1;
+      mark(f, "tliStart", `TLI ignition — ${Math.abs(deg(rem)) <= deg(TLI.windowOkRad) ? "inside the window." : Math.abs(rem) < TLI.windowFailRad ? "window error " + deg(rem).toFixed(0) + "°, the Moon will be off-axis." : "OUTSIDE the window."}`, Math.abs(rem) <= TLI.windowOkRad ? "good" : "warn");
+    }
+  }
+  if (f.phase === "tli" && f.engineOn) {
+    const el = orbitElements(f.x, f.y, f.vx, f.vy), apoTarget = MOON_DIST_M() - earthRadius;
+    if (apOn && (!el.bound || el.apo >= apoTarget)) { f.engineOn = false; f.cutoffs++; mark(f, "tliCut", "Guided TLI cutoff — apogee at lunar distance."); }
   }
   if (apOn) {
     const target = guidancePitch(f);
@@ -256,21 +309,29 @@ export function stepFlight(f: Flight, input: Input, dt = LAUNCH.dt): void {
     f.engineOn = false; mark(f, "meco", "Main engine cutoff (MECO).");
     if (rules.autoStaging) { stageSeparation(f); } else { log(f, "Stage 1 is spent — press STAGE to separate.", "warn"); }
   }
+  if (f.stage === 2 && f.rocket.s3 && f.phase === "stage2" && f.prop2 <= 0 && f.engineOn) {
+    f.engineOn = false; mark(f, "meco2", `${f.rocket.stageNames[1]} cutoff.`);
+    if (rules.autoStaging) stageSeparation(f); else log(f, `${f.rocket.stageNames[1]} is spent — press STAGE to separate.`, "warn");
+  }
   if (f.stage === 1 && f.prop1 <= 0 && !rules.autoStaging && input.stage && f.phase === "stage1") stageSeparation(f);
+  if (f.stage === 2 && f.rocket.s3 && f.prop2 <= 0 && !rules.autoStaging && input.stage && f.phase === "stage2" && !f.engineOn) stageSeparation(f);
   if (f.phase === "coast") {
     f.coastLeft -= dt;
     const ready = f.coastLeft <= 0;
-    if (rules.autoStaging ? ready : input.stage) { f.phase = "stage2"; f.stage = 2; f.engineOn = true; f.throttle = Math.max(0.35, input.throttle); mark(f, "ignition2", "Second stage ignition."); }
+    if (rules.autoStaging ? ready : input.stage) {
+      f.phase = "stage2"; f.stage = (f.sepFrom + 1) as 2 | 3; f.engineOn = true; f.throttle = Math.max(0.35, input.throttle);
+      mark(f, f.stage === 2 ? "ignition2" : "ignition3", `${f.rocket.stageNames[f.stage - 1]} ignition.`);
+    }
   }
   // restart / cutoff
-  if (f.stage === 2 && f.phase === "stage2") {
-    if (input.cut && f.engineOn) { f.engineOn = false; f.cutoffs++; mark(f, "seco" + f.cutoffs, "Second engine cutoff (SECO)."); }
-    else if (!f.engineOn && f.prop2 > 0 && input.restart && f.cutoffs > 0 && f.cutoffs < 4) { f.engineOn = true; f.throttle = Math.max(0.35, input.throttle); log(f, "Engine restart.", "info"); }
+  if (isUpper(f) && (f.phase === "stage2" || f.phase === "tli")) {
+    if (input.cut && f.engineOn) { f.engineOn = false; f.cutoffs++; mark(f, f.phase === "tli" ? "tliCut" : "seco" + f.cutoffs, f.phase === "tli" ? "TLI engine cutoff." : "Second engine cutoff (SECO)."); }
+    else if (f.phase === "stage2" && !f.engineOn && propOf(f) > 0 && input.restart && f.cutoffs > 0 && f.cutoffs < TLI.maxRestarts) { f.engineOn = true; f.throttle = Math.max(0.35, input.throttle); log(f, "Engine restart.", "info"); }
   }
 
   // ---- forces
   const r = Math.hypot(f.x, f.y), h = r - earthRadius, rx = f.x / r, ry = f.y / r, hx = ry, hy = -rx;
-  const thrust = f.engineOn && ((f.stage === 1 && f.prop1 > 0) || (f.stage === 2 && f.prop2 > 0)) ? currentThrust(f, h) : 0;
+  const thrust = f.engineOn && propOf(f) > 0 ? currentThrust(f, h) : 0;
   const pr = rad(f.pitch);
   const tdx = Math.cos(pr) * hx + Math.sin(pr) * rx, tdy = Math.cos(pr) * hy + Math.sin(pr) * ry;
   const vatm = f.omega * r + windAt(f, h);
@@ -290,7 +351,8 @@ export function stepFlight(f: Flight, input: Input, dt = LAUNCH.dt): void {
   // mass flow
   if (thrust > 0) {
     const dm = (thrust / (ispNow(f, h) * LAUNCH.g0)) * dt;
-    if (f.stage === 1) { const d = Math.min(dm, f.prop1); f.prop1 -= d; f.m -= d; } else { const d = Math.min(dm, f.prop2); f.prop2 -= d; f.m -= d; if (f.prop2 <= 0) { f.engineOn = false; log(f, "Second stage propellant depleted.", "warn"); } }
+    const d = Math.min(dm, propOf(f)); burnPropellant(f, d); f.m -= d;
+    if (f.stage >= 2 && propOf(f) <= 0 && (isUpper(f) || f.stage === 2 && !f.rocket.s3)) { f.engineOn = false; log(f, f.phase === "tli" ? "Upper stage propellant depleted during TLI." : "Upper stage propellant depleted.", "warn"); }
   }
   // debris (cosmetic)
   for (const d of f.debris) { const dr = Math.hypot(d.x, d.y); d.vx -= (muEarth * d.x) / dr ** 3 * dt; d.vy -= (muEarth * d.y) / dr ** 3 * dt; d.x += d.vx * dt; d.y += d.vy * dt; }
@@ -320,10 +382,10 @@ export function stepFlight(f: Flight, input: Input, dt = LAUNCH.dt): void {
   if (f.liftedOff && h < -50 && radialSpeed(f) < 0) fail(f, "The vehicle fell back and crashed.");
 
   // ---- milestones
-  if (f.stage === 2 && f.fairing && h > 110_000 && q < 50) { f.fairing = false; mark(f, "fairing", "Payload fairing jettisoned."); }
+  if (f.stage >= 2 && f.fairing && h > (f.rocket.s3 ? 90_000 : 110_000) && q < 50) { f.fairing = false; mark(f, "fairing", f.rocket.s3 ? "Launch escape tower jettisoned." : "Payload fairing jettisoned."); }
   if (h >= LAUNCH.karmanM) mark(f, "karman", "Kármán line crossed — you are in space!");
   // trail
-  if (Math.floor(f.t * 2) !== Math.floor((f.t - dt) * 2)) f.trail.push(f.x, f.y);
+  if (Math.floor(f.t * 2) !== Math.floor((f.t - dt) * 2)) f.trail.push(f.x, f.y, f.t); // x, y, time (triplets)
 
   f.tel = telemetry(f, q, aoa, g);
   evaluateOutcome(f);
@@ -336,57 +398,84 @@ function maxQBucket(f: Flight, h: number) {
   return 1;
 }
 function stageSeparation(f: Flight) {
-  if (f.stage !== 1 || f.phase === "coast") return;
-  f.phase = "coast"; f.coastLeft = 2.5; f.m -= f.rocket.s1.dryKg;
-  f.debris.push({ x: f.x, y: f.y, vx: f.vx * 0.995, vy: f.vy * 0.995 });
-  mark(f, "sep", "Stage separation confirmed.");
+  if (f.phase === "coast" || (f.stage === 1 && false)) return;
+  const [after1, after2] = f.rocket.stageFrac, before = f.stage === 1 ? 1 : after1, after = f.stage === 1 ? after1 : after2;
+  f.phase = "coast"; f.coastLeft = 2.5; f.sepFrom = f.stage as 1 | 2; f.m -= stageSpec(f).dryKg;
+  f.debris.push({ x: f.x, y: f.y, vx: f.vx * 0.995, vy: f.vy * 0.995, top: after, bot: before });
+  mark(f, f.stage === 1 ? "sep" : "sep2", `${f.rocket.stageNames[f.stage - 1]} separation confirmed.`);
 }
 function fail(f: Flight, reason: string) { if (f.phase === "failed") return; f.phase = "failed"; f.failure = reason; f.engineOn = false; log(f, reason, "bad"); }
 
 /** Success / failure after each step (orbit needs engine off, above the atmosphere, perigee over the difficulty threshold). */
 function evaluateOutcome(f: Flight) {
-  if (f.phase === "failed" || f.phase === "orbit") return;
+  if (f.phase === "failed" || f.phase === "orbit" || f.phase === "translunar") return;
   const el = orbitElements(f.x, f.y, f.vx, f.vy), alt = Math.hypot(f.x, f.y) - earthRadius;
-  const periKm = el.peri / 1000, apoKm = el.apo / 1000;
-  if (f.t > 3600) return fail(f, "Mission time exceeded without reaching orbit.");
-  if (f.stage === 2 && !f.engineOn && alt >= LAUNCH.atmosphereTopM * 0.8 && el.bound) {
+  const periKm = el.peri / 1000, apoKm = el.apo / 1000, moon = f.mission === "moon";
+  if (f.t > (moon ? 9000 : 3600)) return fail(f, "Mission time exceeded without completing the objective.");
+  if (f.phase === "parking") return; // coasting in parking orbit until the TLI window
+  if (f.phase === "tli") return tliOutcome(f, el.bound, el.apo);
+  if (isUpper(f) && f.phase === "stage2" && !f.engineOn && alt >= LAUNCH.atmosphereTopM * 0.8 && el.bound) {
     if (periKm >= f.rules.minPerigeeKm) {
       if (apoKm > f.rules.maxApogeeKm) return fail(f, `Orbit too high and elongated (apogee ${apoKm.toFixed(0)} km > ${f.rules.maxApogeeKm} km). Cut the engine sooner.`);
-      f.phase = "orbit"; mark(f, "orbit", `Orbit achieved: ${periKm.toFixed(0)} × ${apoKm.toFixed(0)} km.`);
+      f.park = { periKm, apoKm, fuel: f.tel.propUpper };
+      if (moon) {
+        f.phase = "parking"; f.tliStartAngle = Math.atan2(f.y, f.x) - TLI.orbitsToWait * 2 * Math.PI + TLI.leadRad;
+        mark(f, "orbit", `Parking orbit: ${periKm.toFixed(0)} × ${apoKm.toFixed(0)} km. TLI window opens in about ${(TLI.orbitsToWait * 2 * Math.PI / Math.sqrt(muEarth / Math.hypot(f.x, f.y) ** 3) / 60).toFixed(0)} min.`);
+      } else { f.phase = "orbit"; mark(f, "orbit", `Orbit achieved: ${periKm.toFixed(0)} × ${apoKm.toFixed(0)} km.`); }
       return;
     }
   }
-  if (f.stage === 2 && f.prop2 <= 0 && !f.engineOn && periKm < f.rules.minPerigeeKm) {
+  if (isUpper(f) && f.phase === "stage2" && propOf(f) <= 0 && !f.engineOn && periKm < f.rules.minPerigeeKm) {
     return fail(f, `Out of propellant in a ${periKm.toFixed(0)} × ${apoKm.toFixed(0)} km path — perigee must clear ${f.rules.minPerigeeKm} km. Fly the gravity turn more efficiently.`);
   }
-  if (f.stage === 2 && !f.engineOn && f.prop2 > 0 && f.milestones.karman !== undefined && radialSpeed(f) < 0 && alt < 70_000 && periKm < 0) {
+  if (isUpper(f) && f.phase === "stage2" && !f.engineOn && propOf(f) > 0 && f.milestones.karman !== undefined && radialSpeed(f) < 0 && alt < 70_000 && periKm < 0) {
     return fail(f, "The stage re-entered the atmosphere — you cut the engine before reaching a safe orbit.");
   }
-  if (f.stage === 1 && f.phase === "coast" && alt < 20_000 && radialSpeed(f) < -100) fail(f, "Stage separation too early — the upper stage fell back to Earth.");
+  if (f.phase === "coast" && alt < 20_000 && radialSpeed(f) < -100) fail(f, "Stage separation too early — the upper stage fell back to Earth.");
+}
+
+/** Translunar injection: judged on the orbit the burn leaves behind (apogee vs the Moon's distance) and the window error. */
+function tliOutcome(f: Flight, bound: boolean, apoAlt: number) {
+  const target = MOON_DIST_M() - earthRadius, moonKm = MOON_DIST_M() / 1000;
+  if (!bound) return fail(f, "Overspeed: the burn pushed the stage onto an Earth-escape path — you would fly far past the Moon. Cut the engine when apogee reaches the Moon's distance.");
+  if (f.engineOn) { if (apoAlt > target * TLI.tolHigh) fail(f, `TLI burn ran too long: apogee ${(apoAlt / 1000).toFixed(0)} km is beyond the Moon (${moonKm.toFixed(0)} km). Cut the engine sooner.`); return; }
+  const ratio = apoAlt / target;
+  if (ratio < TLI.tolLow) return fail(f, f.prop3 <= 0 && f.rocket.s3 || (!f.rocket.s3 && f.prop2 <= 0)
+    ? `Upper stage ran out of propellant during TLI: apogee only ${(apoAlt / 1000).toFixed(0)} km, the Moon is ${moonKm.toFixed(0)} km away. This rocket cannot send this payload to the Moon — try the Saturn V.`
+    : `TLI cutoff too early: apogee ${(apoAlt / 1000).toFixed(0)} km does not reach the Moon (${moonKm.toFixed(0)} km).`);
+  if (ratio > TLI.tolHigh) return fail(f, `TLI overshoot: apogee ${(apoAlt / 1000).toFixed(0)} km is far beyond the Moon.`);
+  if (Math.abs(f.tliErr ?? 0) > TLI.windowFailRad) return fail(f, `The burn started ${Math.abs(deg(f.tliErr ?? 0)).toFixed(0)}° off the TLI window — the Moon will not be at the end of this transfer. Ignite when the window indicator reads 0.`);
+  f.tliRatio = ratio; f.phase = "translunar";
+  mark(f, "tli", `Translunar injection complete: apogee ${(apoAlt / 1000).toFixed(0)} km — on course for the Moon.`);
 }
 
 /** Score a finished flight (0–1000 × difficulty multiplier). */
 export function scoreFlight(f: Flight) {
-  const t = f.tel;
-  const ok = f.phase === "orbit";
+  const t = f.tel, moon = f.mission === "moon";
+  const ok = moon ? f.phase === "translunar" : f.phase === "orbit";
+  const reachedOrbit = f.park !== null;
   const karman = f.milestones.karman !== undefined;
+  const park = f.park ?? { periKm: t.periKm, apoKm: t.apoKm, fuel: t.propUpper };
   let base = 0;
   if (f.milestones.liftoff !== undefined) base += 60;
   if (f.milestones.maxq !== undefined) base += 40;
   if (f.milestones.sep !== undefined) base += 80;
   if (karman) base += 120;
-  if (ok) {
+  if (reachedOrbit) {
     base += 300;
-    base += 150 * clamp(1 - Math.abs(t.periKm - LAUNCH.targetOrbitKm) / 200, 0, 1);
-    base += 100 * clamp(t.prop2, 0, 1) * 2;
+    base += 150 * clamp(1 - Math.abs(park.periKm - LAUNCH.targetOrbitKm) / 200, 0, 1);
+    base += 100 * clamp(park.fuel, 0, 1) * (moon ? 1 : 2);
     base += 70 * clamp(1 - f.maxQ / (LAUNCH.qDesignPa * f.rules.qLimitFactor), 0, 1);
-    base += 80 * clamp(1 - Math.max(0, t.ecc - 0.005) / 0.1, 0, 1);
+    base += 80 * clamp(1 - Math.max(0, (isFinite(park.apoKm) ? (park.apoKm - park.periKm) / (park.apoKm + park.periKm + 2 * 6371) : 1) - 0.005) / 0.1, 0, 1);
   }
+  if (moon && ok) { // TLI: reward a centred window and an apogee close to the Moon's distance
+    base += 150 * clamp(1 - Math.abs(f.tliErr ?? 0) / TLI.windowFailRad, 0, 1) + 150 * clamp(1 - Math.abs((f.tliRatio ?? 1) - 1) / (TLI.tolHigh - 1), 0, 1);
+  }
+  const maxBase = moon ? 1300 : 1000;
   const total = Math.round(base * f.rules.scoreMult);
-  const max = 1000 * f.rules.scoreMult;
-  const frac = total / max;
+  const frac = base / maxBase;
   const grade = ok ? (frac >= 0.85 ? "S" : frac >= 0.7 ? "A" : frac >= 0.55 ? "B" : "C") : (karman ? "D" : "F");
-  return { score: total, grade, base: Math.round(base), ok, karman };
+  return { score: total, grade, base: Math.round(base), ok, karman, max: Math.round(maxBase * f.rules.scoreMult) };
 }
 
 /** World-space unit vector the engine is pointing along (x east at the pad, y up at the pad). */
