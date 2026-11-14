@@ -151,7 +151,12 @@ export function useLook() {
     const p = byId(previewId);
     if (p) eq[p.category] = p.id;
     const suit = byId(eq.suit), helmet = byId(eq.helmet), pack = byId(eq.backpack);
-    return { suit: suit?.color ?? "#e8eef7", accent: suit?.accent ?? "#168bff", helmet: helmet?.color ?? "#4fc3f7", pack: pack?.color ?? "#9fb3c8" };
+    const pat = byId(eq.pattern), head = byId(eq.headgear), sh = byId(eq.shoulder), bt = byId(eq.boots);
+    return {
+      suit: suit?.color ?? "#e8eef7", accent: suit?.accent ?? "#168bff", helmet: helmet?.color ?? "#4fc3f7", pack: pack?.color ?? "#9fb3c8",
+      pattern: pat?.id, patternColor: pat?.color, headgear: head?.id, headgearColor: head?.color,
+      shoulder: sh?.id, shoulderColor: sh?.color, boots: bt?.id, bootsColor: bt?.color,
+    };
   }, [profile.equipped, items, previewId]);
 }
 
@@ -204,8 +209,9 @@ export function ProfileScreen() {
 
 /* ---------- Cosmetics ---------- */
 const CATS: { id: CosmeticCategory; label: string }[] = [
-  { id: "suit", label: "Suits" }, { id: "helmet", label: "Helmets" }, { id: "backpack", label: "Backpacks" },
-  { id: "patch", label: "Patches" }, { id: "emote", label: "Emotes" },
+  { id: "suit", label: "Suits" }, { id: "pattern", label: "Patterns" }, { id: "helmet", label: "Helmets" },
+  { id: "headgear", label: "Headgear" }, { id: "shoulder", label: "Shoulder" }, { id: "boots", label: "Boots" },
+  { id: "backpack", label: "Backpacks" }, { id: "patch", label: "Patches" }, { id: "emote", label: "Emotes" },
 ];
 const rarityColor = { common: "text-ink2", rare: "text-cyan", epic: "text-[#c084fc]", legendary: "text-gold" } as const;
 

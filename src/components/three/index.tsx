@@ -3,7 +3,8 @@ import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Stars, useAnimations, useGLTF, useTexture } from "@react-three/drei";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { SRGBColorSpace, type Group, type Mesh, type MeshStandardMaterial } from "three";
+import { SRGBColorSpace, Vector3, type Group, type Mesh, type MeshStandardMaterial, type Object3D } from "three";
+import { BootGear, Headgear, ShoulderGear, patternTexture } from "./Gear";
 import { useUIStore } from "@/stores";
 
 /** Error boundary: 3D must never block navigation. */
@@ -61,6 +62,9 @@ function Lights({ preset }: { preset: LightPreset }) {
 /* ---------- Astronaut (rigged GLB, recolourable skins) ---------- */
 export interface AstronautLook {
   suit: string; skin?: string; helmet?: string; accent?: string; pack?: string;
+  /** Cosmetic ids + colours (see data/mock cosmetics): pattern decal, headgear, shoulder gear, boots. */
+  pattern?: string; patternColor?: string; headgear?: string; headgearColor?: string;
+  shoulder?: string; shoulderColor?: string; boots?: string; bootsColor?: string;
   pose?: "idle" | "wave" | "ready" | "celebrate";
 }
 export const ASTRONAUT_URL = "/models/astronaut.glb";
@@ -68,7 +72,7 @@ const POSE_CLIP = { idle: "idle", wave: "wave", ready: "floating", celebrate: "m
 const MODEL_HEIGHT = 3.1165; // native height of the GLB in its own units
 const TARGET_HEIGHT = 2.4; // world units, feet resting on y=-0.25
 
-export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = [0, 0, 0], scale = 1 }:
+export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = [0, 0, 0], scale = 1, pattern, patternColor, headgear, headgearColor, shoulder, shoulderColor, boots, bootsColor }:
   AstronautLook & { position?: [number, number, number]; scale?: number }) {
   const { scene, animations } = useGLTF(ASTRONAUT_URL);
   // Per-instance clone so skins and animation state never leak between crew members.
@@ -93,10 +97,32 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
       const m = o as Mesh;
       if (!m.isMesh) return;
       const mat = m.material as MeshStandardMaterial;
-      if (mat.name === "material_1") mat.color.set(helmet).multiplyScalar(0.25);
-      else mat.color.set(suit);
+      if (mat.name === "material_1") { mat.color.set(helmet).multiplyScalar(0.25); return; }
+      mat.color.set(suit);
+      // Pattern decal = glowing emissive mask in the pattern colour (keeps the suit's baked detail underneath).
+      const tex = pattern ? patternTexture(pattern) : null;
+      mat.emissiveMap = tex; mat.emissive.set(tex ? patternColor ?? "#ffffff" : "#000000"); mat.emissiveIntensity = tex ? 0.9 : 0;
+      mat.needsUpdate = true;
     });
-  }, [model, suit, helmet]);
+  }, [model, suit, helmet, pattern, patternColor]);
+
+  // Accessories follow their bones (position only) so they stay attached through every animation clip.
+  const bones = useMemo(() => {
+    const by: Record<string, Object3D | undefined> = {};
+    const want: [string, RegExp][] = [["head", /^head\d/], ["lSh", /^L_Clevicle/], ["rSh", /^R_Clevicle/], ["lFoot", /^L_Ankle/], ["rFoot", /^R_Ankle/]];
+    model.traverse((o) => { for (const [k, re] of want) if (re.test(o.name)) by[k] = o; });
+    return by;
+  }, [model]);
+  const headG = useRef<Group>(null), lShG = useRef<Group>(null), rShG = useRef<Group>(null), lFootG = useRef<Group>(null), rFootG = useRef<Group>(null);
+  const tmp = useMemo(() => new Vector3(), []);
+  useFrame(() => {
+    const r = root.current; if (!r) return;
+    const pairs: [string, Group | null][] = [["head", headG.current], ["lSh", lShG.current], ["rSh", rShG.current], ["lFoot", lFootG.current], ["rFoot", rFootG.current]];
+    for (const [key, g] of pairs) {
+      const b = bones[key]; if (!b || !g) continue;
+      b.getWorldPosition(tmp); r.worldToLocal(tmp); g.position.copy(tmp);
+    }
+  });
 
   useEffect(() => {
     const action = actions[POSE_CLIP[pose]] ?? actions.idle;
@@ -109,6 +135,9 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
   return (
     <group ref={root} position={position} scale={scale}>
       <primitive object={model} scale={k} position={offset} />
+      {headgear && <group ref={headG}><Headgear kind={headgear} color={headgearColor ?? "#ffc857"} /></group>}
+      {shoulder && <><group ref={lShG}><ShoulderGear kind={shoulder} color={shoulderColor ?? "#9fb3c8"} side={1} /></group><group ref={rShG}><ShoulderGear kind={shoulder} color={shoulderColor ?? "#9fb3c8"} side={-1} /></group></>}
+      {boots && <><group ref={lFootG}><BootGear kind={boots} color={bootsColor ?? "#4fc3f7"} /></group><group ref={rFootG}><BootGear kind={boots} color={bootsColor ?? "#4fc3f7"} /></group></>}
     </group>
   );
 }

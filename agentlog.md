@@ -50,3 +50,6 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Perf: evaluation memoized (`useEvaluation`), default quality `medium`, high-performance GL hint. Still open: `astronaut.glb` is 32 MB — compress textures (gltf-transform) for faster loads.
 - Menu astronaut re-framed (head no longer cropped). Flight view: close chase camera from the pad, auto switch to system overview after LEO; explosion flash/fireball when a phase is lost (not yet seen live: needs a failing seed).
 - Menu astronaut re-framed (head no longer cropped). Flight view: close chase camera from the pad, auto switch to overview after LEO; explosion flash/fireball when a phase is lost (not yet seen live).
+
+## Session 3 (cont.) — Cosmetics beyond colour
+- New categories: pattern, headgear, shoulder, boots (13 new items in mock data). Patterns = glowing emissive decal masks (canvas textures, `three/Gear.tsx`); accessories are procedural meshes that follow GLB bones (head/clavicles/ankles; note three strips dots from bone names). `useLook` passes ids+colours to `Astronaut`. Verified on /cosmetics (patterns, halo, flag, thruster boots); other items not all eyeballed.
