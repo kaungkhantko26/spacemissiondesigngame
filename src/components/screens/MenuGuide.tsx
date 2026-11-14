@@ -15,7 +15,7 @@ const MENU_TOUR: TourStep[] = [
   { target: "[data-tour=menu-launch]", title: "Launch Control", body: "The main game. Pick a rocket and a spaceport, then fly the real ascent yourself, all the way to orbit or the Moon." },
   { target: "[data-tour=menu-design]", title: "Design Mission", body: "Build a spacecraft for a destination: choose the rocket, instruments, power and antenna, then check it closes on mass, power, data and budget." },
   { target: "[data-tour=menu-team]", title: "Team Up", body: "Pick a mission and a difficulty, give each crew member a role and a character, then fly it together." },
-  { target: "[data-tour=menu-cosmetics]", title: "Cosmetics and profile", body: "Customise your astronaut's suit and look. Press 1 to 9 to jump to any screen." },
+  { target: "[data-tour=menu-more]", title: "More options", body: "Profile, Cosmetics for your astronaut's suit, Stats and Settings are in here. Keys 1 to 9 jump to any screen." },
   { title: "Ready for your first flight?", body: "Press the button to open Launch Control. A second short tour there explains the setup and the flight screen." },
 ];
 
