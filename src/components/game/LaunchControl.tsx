@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, Pause, Play, Rocket, RotateCcw, Power, Layers, Bot, Octagon } from "lucide-react";
+import { ArrowDown, ArrowUp, Pause, Play, Rocket, RotateCcw, Power, Layers, Bot, Octagon, Volume2, VolumeX } from "lucide-react";
 import { BackButton, GameButton, GlassPanel, ScreenContainer } from "@/components/ui";
 import { useUIStore } from "@/stores";
 import { cn } from "@/lib/mission";
@@ -186,6 +186,24 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   const apActive = rules.autopilot === "full" ? s.autopilot : rules.autopilot === "upper" ? s.upper && s.stage >= 2 : false;
   const manualPitch = !apActive, manualThrottle = !apActive || (rules.autopilot === "upper" && s.stage === 1);
   const toggleAuto = useCallback(() => { session.toggleAssist(); setS(snap(session)); }, [session]);
+  const [voice, setVoice] = useState(true); // launch-director voice (browser speech synthesis)
+  const spoken = useRef(Number.POSITIVE_INFINITY);
+  useEffect(() => {
+    const t = s.t, running = s.running && s.phase !== "failed";
+    if (!running || t >= 1.5) return;
+    const n = Math.ceil(-t); // whole seconds to go
+    if (n === spoken.current) return;
+    spoken.current = n;
+    if (!voice || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const say = n > 0 ? (n <= 10 ? String(n) : "") : "Liftoff";
+    if (!say) return;
+    try {
+      const u = new SpeechSynthesisUtterance(n === 10 ? "T minus 10" : n === 3 ? "3, main engine start" : say);
+      u.rate = 1.05; u.pitch = 0.9; u.volume = 1;
+      window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+    } catch { /* speech unavailable: the on-screen count still works */ }
+  }, [s.t, s.running, s.phase, voice]);
+  useEffect(() => () => { try { window.speechSynthesis?.cancel(); } catch { /* ignore */ } }, []);
   const start = () => { session.start(); setS(snap(session)); };
   const togglePause = useCallback(() => { if (session.flight.t > -LAUNCH.countdownS + 0.01 || session.running) session.toggleRun(); setS(snap(session)); }, [session]);
   const setWarp = useCallback((w: number) => { session.setWarp(w); setS(snap(session)); }, [session]);
@@ -278,6 +296,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
         </ul>
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--border)] bg-bg/85 p-2">
           <B label={s.running ? "Pause (P)" : "Resume (P)"} onClick={togglePause} disabled={s.phase === "countdown" && !s.running && s.t <= -LAUNCH.countdownS + 0.01}>{s.running ? <Pause className="size-4" /> : <Play className="size-4" />}</B>
+          <B label={voice ? "Mute countdown voice" : "Unmute countdown voice"} on={voice} onClick={() => setVoice((v) => !v)}>{voice ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}</B>
           {rules.autopilot !== "none" && <B label={rules.autopilot === "full" ? "Autopilot (A)" : "Upper-stage guidance (A)"} on={apActive} onClick={toggleAuto}><Bot className="size-4" />{rules.autopilot === "full" ? "Autopilot" : "Upper guidance"}</B>}
           <span className="hud-label px-1">Pitch</span>
           <B label="Raise nose (↑)" disabled={!manualPitch} {...held("up")}><ArrowUp className="size-4" /></B>

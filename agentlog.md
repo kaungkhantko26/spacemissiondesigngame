@@ -128,3 +128,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 
 ## Session: Team Up gameplay
 - /mission/gameplay now runs the real launch sim (Saturn V + Moon leg for Lunar Landing, Falcon-class orbit otherwise) using the chosen difficulty; results screen shows the real score (src/game/launch/teamResult.ts). Mock telemetry removed.
+- Fix: Team Up setup/crew now persist in sessionStorage (refresh no longer bounces to mission select). Launch countdown has launch-director voice (speechSynthesis) with mute toggle.
