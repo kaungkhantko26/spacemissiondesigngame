@@ -65,3 +65,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Design link: Moon review panel has "fly it live"; menu has Mission Control. `quickStart` now prefers the destination's primary instrument tag (magnetometer for the Moon).
 - Balance (headless perfect-play autopilot): patch antenna → partial (~22 GB), 1 m / 2.5 m dish → success. Tuning knobs live in `OPS`. Not done: save/resume, Mars scenario, wizard mode, ten-minute playtest with real humans.
 - Tests: `ops.test.ts` (event shape, determinism, resource invariants, report, eclipse, antenna comparison); vitest timeout raised to 60 s.
+- Fix: shell header path check strips the trailing slash (GitHub Pages serves /menu/), so the menu no longer shows two profile bars. Menu astronaut is sized from the canvas width (useThree viewport) so it is never clipped.

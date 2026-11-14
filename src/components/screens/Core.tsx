@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useThree } from "@react-three/fiber";
 import { Rocket, Users, User, Shirt, BarChart3, Settings, FlaskConical, Radar, Lock, Check } from "lucide-react";
 import {
   BackButton, GameButton, GlassPanel, LoadingBar, ScreenContainer, StatBar, XPProgressBar, LevelBadge, PlayerAvatar,
@@ -56,6 +57,13 @@ export function SplashScreen() {
       </div>
     </main>
   );
+}
+
+/** Sized from the canvas's visible width so the waving arm is never clipped, whatever the window shape. */
+function MenuAstronaut({ look, pose }: { look: ReturnType<typeof useLook>; pose: "idle" | "wave" | "ready" | "celebrate" }) {
+  const width = useThree((st) => st.viewport.width);
+  const scale = Math.min(1.6, width * 0.24);
+  return <Astronaut {...look} pose={pose} position={[Math.min(1.9, width * 0.1), -2.1 * (scale / 1.6) - 0.1, 0]} scale={scale} rotationY={-Math.PI / 4} />;
 }
 
 /* ---------- Main menu ---------- */
@@ -135,7 +143,7 @@ export function MenuScreen() {
           <p className="hud-label mt-4">Press 1–{MENU.length} to jump</p>
         </div>
         <div className="h-[380px] md:h-[560px]">
-          <Scene3D camera={[0, 0.6, 7]} label="Your astronaut"><Astronaut {...look} pose={pose} position={[1.9, -2.1, 0]} scale={1.6} rotationY={-Math.PI / 4} /></Scene3D>
+          <Scene3D camera={[0, 0.6, 7]} label="Your astronaut"><MenuAstronaut look={look} pose={pose} /></Scene3D>
         </div>
       </div>
     </main>

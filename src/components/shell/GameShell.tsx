@@ -23,7 +23,8 @@ export function GameShell({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.toggle("high-contrast", highContrast);
   }, [reducedMotion, highContrast]);
 
-  const bare = BARE.includes(path);
+  // GitHub Pages serves routes with a trailing slash ("/menu/"), so normalise before comparing.
+  const bare = BARE.includes(path.length > 1 ? path.replace(/\/+$/, "") : path);
   const showHeader = !bare;
 
   return (
