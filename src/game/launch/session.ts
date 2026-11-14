@@ -25,9 +25,11 @@ export class LaunchSession {
     const f = this.flight;
     if (f.phase === "parking") {
       if (!this.parkWarped) { this.parkWarped = true; this.warp = Math.max(this.warp, 50); }
-      if (this.warp > 1 && f.tel.tliRemainS !== null && f.tel.tliRemainS < 90) this.warp = 1;
+      // last minutes before the window: the autopilot ignites it by itself, so keep moving at 5×; a manual pilot gets 1× for a precise ignition
+      const auto = f.rules.autopilot === "full" && this.input.autopilot;
+      if (this.warp > 1 && f.tel.tliRemainS !== null && f.tel.tliRemainS < 90) this.warp = auto ? Math.min(this.warp, 5) : 1;
     }
-    if (f.phase === "tli" && !this.tliSlowed) { this.tliSlowed = true; this.warp = Math.min(this.warp, 10); }
+    if (f.phase === "tli" && !this.tliSlowed) { this.tliSlowed = true; this.warp = 10; } // the ~4.5 min burn is long to watch at 1×
     // Fixed-step accumulator: simulated time advances exactly dtReal × warp on any display refresh rate.
     this.acc = Math.min(this.acc + dtReal * this.warp, LAUNCH.dt * 600); // cap catch-up work (e.g. after a hidden tab)
     const steps = Math.floor(this.acc / LAUNCH.dt + 1e-9);
