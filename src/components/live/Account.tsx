@@ -29,7 +29,7 @@ export function Account({ view }: { view: "profile" | "cosmetics" | "stats" }) {
           <h1 className="text-2xl font-bold">{p.name}</h1>
           <p>{p.rank} · {p.xp} XP{next && ` · ${next.minXp - p.xp} XP to ${next.title}`}</p>
           <div className="flex gap-2">
-            <input className="rounded bg-white/10 px-3 py-2" maxLength={20} value={name} onChange={(e) => setName(e.target.value)} />
+            <input className="rounded border border-white/20 bg-[#0b1530] px-3 py-2 text-white" maxLength={20} value={name} onChange={(e) => setName(e.target.value)} />
             <GameButton onClick={() => swallow(g.rename(name))}>Rename</GameButton>
           </div>
           <ul className="text-sm text-ink2">
