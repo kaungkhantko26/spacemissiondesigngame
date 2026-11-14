@@ -10,6 +10,8 @@ import type { Check, Evaluation, MissionResult } from "@/game/engine";
 import { useDesignStore, useEvaluation } from "@/game/store";
 import { buildTrajectory } from "@/game/trajectory";
 import { TrajectorySim } from "./TrajectorySim";
+import { CraftPreview } from "./CraftPreview";
+import { usePartThumbs } from "./partThumbs";
 
 const fmt = (n: number, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d });
 const usd = (n: number) => (n >= 1e9 ? `$${fmt(n / 1e9, 2)}B` : `$${fmt(n / 1e6)}M`);
@@ -21,6 +23,16 @@ function Section({ n, title, hint, children }: { n: number; title: string; hint?
       {hint && <p className="mb-3 text-xs text-muted">{hint}</p>}
       {children}
     </GlassPanel>
+  );
+}
+/** Picture of a part (rendered once by one shared offscreen context, see partThumbs.ts). */
+function PartImg({ k, thumbs, w = 64, h = 64 }: { k: string; thumbs: Record<string, string>; w?: number; h?: number }) {
+  const src = thumbs[k];
+  return (
+    <span aria-hidden className="grid shrink-0 place-items-center overflow-hidden rounded-md bg-white/[0.04]" style={{ width: w, height: h }}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- generated data URL */}
+      {src ? <img src={src} alt="" width={w} height={h} className="h-full w-full object-contain" /> : <span className="size-4 animate-pulse rounded-full bg-white/10" />}
+    </span>
   );
 }
 const GameChip = () => <span className="ml-1 rounded-sm border border-white/15 px-1 text-[10px] uppercase tracking-wider text-muted" title="Not in the dataset — a game-balance value">game</span>;
@@ -39,6 +51,7 @@ export function DesignStudio() {
   const { design, patch, toggleInstrument, autoFill, quickStart, launch, redesign, reset } = useDesignStore();
   const [qsFailed, setQsFailed] = useState(false);
   const ev = useEvaluation();
+  const thumbs = usePartThumbs();
   const [flight, setFlight] = useState<MissionResult | null>(null);
   const dest = ev.destination;
   const maxProp = 40_000;
@@ -76,9 +89,11 @@ export function DesignStudio() {
             <ul className="grid gap-2 sm:grid-cols-2">
               {DATASET.vehicles.slice().sort((a, b) => a.leo_capacity_kg - b.leo_capacity_kg).map((v) => (
                 <li key={v.id}><Pick on={design.vehicleId === v.id} onClick={() => patch({ vehicleId: v.id })} className="w-full">
+                  <div className="flex gap-3"><PartImg k={`veh:${v.id}`} thumbs={thumbs} w={56} h={84} /><div className="min-w-0 flex-1">
                   <div className="flex justify-between"><span className="font-display font-bold">{v.name}</span><span className="text-xs text-muted">{v.manufacturer_country}</span></div>
                   <p className="text-xs text-ink2">{fmt(v.leo_capacity_kg)} kg to LEO · {usd(v.launch_cost_usd)}</p>
                   <p className="text-xs text-muted">{v.successful_launches}/{v.total_launches} successes → {fmt(launchReliability(v) * 100, 1)} % reliable</p>
+                  </div></div>
                 </Pick></li>
               ))}
             </ul>
@@ -87,10 +102,10 @@ export function DesignStudio() {
           <Section n={3} title="Propulsion" hint="Thruster thrust, power and Isp are NASA-sourced; chemical engine values are game values.">
             <div className="grid gap-2 sm:grid-cols-2">
               <Pick on={design.propulsionId === "chem"} onClick={() => patch({ propulsionId: "chem" })}>
-                <p className="font-display font-bold">{GAME.chemical.name}<GameChip /></p><p className="text-xs text-ink2">Isp {GAME.chemical.isp_s} s · fast, heavy fuel use</p></Pick>
+                <div className="flex gap-3"><PartImg k="prop:chem" thumbs={thumbs} /><div><p className="font-display font-bold">{GAME.chemical.name}<GameChip /></p><p className="text-xs text-ink2">Isp {GAME.chemical.isp_s} s · fast, heavy fuel use</p></div></div></Pick>
               {DATASET.electric_propulsion.map((e) => (
                 <Pick key={e.id} on={design.propulsionId === e.id} onClick={() => patch({ propulsionId: e.id })}>
-                  <p className="font-display font-bold">{e.name}</p><p className="text-xs text-ink2">Isp {fmt(e.isp_s)} s · {e.thrust_n} N · {fmt(e.power_w)} W each</p></Pick>
+                  <div className="flex gap-3"><PartImg k={`prop:${e.id}`} thumbs={thumbs} /><div><p className="font-display font-bold">{e.name}</p><p className="text-xs text-ink2">Isp {fmt(e.isp_s)} s · {e.thrust_n} N · {fmt(e.power_w)} W each</p></div></div></Pick>
               ))}
             </div>
             <div className="mt-4 space-y-3">
@@ -106,6 +121,10 @@ export function DesignStudio() {
           </Section>
 
           <Section n={4} title="Power" hint="Sunlight at each planet is dataset data; array efficiency, mass and RTG specs are game values.">
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <div className="flex items-center gap-3 rounded-lg border border-[var(--border)] p-2"><PartImg k="power:solar" thumbs={thumbs} w={88} h={64} /><p className="text-xs text-ink2"><b className="text-ink">Solar wings</b><br />{fmt(design.solarAreaM2)} m² · sunlight-dependent</p></div>
+              <div className="flex items-center gap-3 rounded-lg border border-[var(--border)] p-2"><PartImg k="power:rtg" thumbs={thumbs} w={64} h={64} /><p className="text-xs text-ink2"><b className="text-ink">RTG</b> ×{design.rtgUnits}<br />nuclear · works at any distance</p></div>
+            </div>
             <div className="space-y-3">
               <Slider label="Solar array" note={<GameChip />} value={design.solarAreaM2} min={0} max={GAME.solar.maxM2} unit="m²" onChange={(v) => patch({ solarAreaM2: v })} />
               <Slider label="RTG units (nuclear, any distance)" note={<GameChip />} value={design.rtgUnits} min={0} max={GAME.rtg.max} unit="×" onChange={(v) => patch({ rtgUnits: v })} />
@@ -116,7 +135,7 @@ export function DesignStudio() {
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {ANTENNAS.map((a) => (
                 <Pick key={a.id} on={design.antennaId === a.id} onClick={() => patch({ antennaId: a.id })}>
-                  <p className="font-display font-bold">{a.name}</p><p className="text-xs text-ink2">{a.dishM} m · {a.txW} W · {a.massKg} kg</p></Pick>
+                  <div className="flex gap-3"><PartImg k={`ant:${a.id}`} thumbs={thumbs} w={56} h={56} /><div><p className="font-display font-bold">{a.name}</p><p className="text-xs text-ink2">{a.dishM} m · {a.txW} W · {a.massKg} kg</p></div></div></Pick>
               ))}
             </div>
           </Section>
@@ -127,9 +146,10 @@ export function DesignStudio() {
                 const wanted = dest.wants.includes(i.tag);
                 return (
                   <li key={i.id}><Pick on={design.instrumentIds.includes(i.id)} onClick={() => toggleInstrument(i.id)} className="w-full">
+                    <div className="flex gap-3"><PartImg k={`ins:${i.id}`} thumbs={thumbs} w={60} h={60} /><div className="min-w-0 flex-1">
                     <div className="flex justify-between gap-2"><span className="text-sm font-semibold">{i.name}</span>{wanted && <span className="hud-label !text-ok">wanted ×{GAME.wantedBonus}</span>}</div>
                     <p className="text-xs text-ink2">{i.mission} · {i.mass_kg} kg · {i.power_w ?? GAME.defaultInstrumentPowerW} W{i.power_w === null && <GameChip />}</p>
-                    <p className="text-xs capitalize text-muted">{i.tag}</p>
+                    <p className="text-xs capitalize text-muted">{i.tag}</p></div></div>
                   </Pick></li>
                 );
               })}
@@ -141,7 +161,7 @@ export function DesignStudio() {
           </Section>
         </div>
 
-        <aside className="lg:sticky lg:top-4 lg:self-start"><ReviewPanel ev={ev} onLaunch={onLaunch} /></aside>
+        <aside className="space-y-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto"><CraftPreview ev={ev} className="h-64" /><ReviewPanel ev={ev} onLaunch={onLaunch} /></aside>
       </div>
       <p className="text-center text-xs text-muted">Data: <a className="underline" href={DATASET.provenance.dataset}>space-mission-dataset</a> (NASA, JPL, Launch Library 2). Items marked “game” are balance values, not real data.</p>
     </ScreenContainer>

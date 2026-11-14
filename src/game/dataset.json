@@ -85,7 +85,13 @@
    "launch_cost_usd": 6000000,
    "total_launches": 99,
    "successful_launches": 95,
-   "reusable": false
+   "reusable": false,
+   "launch_mass_t": 13,
+   "liftoff_thrust_kn": 162,
+   "diameter_m": 1.2,
+   "length_m": 18.0,
+   "min_stage": 2,
+   "max_stage": 3
   },
   {
    "id": "ll2_cfg_43",
@@ -97,7 +103,13 @@
    "launch_cost_usd": 16000000,
    "total_launches": 18,
    "successful_launches": 18,
-   "reusable": false
+   "reusable": false,
+   "launch_mass_t": 230,
+   "liftoff_thrust_kn": 4847,
+   "diameter_m": 2.8,
+   "length_m": 44.0,
+   "min_stage": 4,
+   "max_stage": 4
   },
   {
    "id": "ll2_cfg_127",
@@ -109,7 +121,13 @@
    "launch_cost_usd": 48000000,
    "total_launches": 8,
    "successful_launches": 7,
-   "reusable": false
+   "reusable": false,
+   "launch_mass_t": 210,
+   "liftoff_thrust_kn": 2974,
+   "diameter_m": 3.0,
+   "length_m": 34.8,
+   "min_stage": 4,
+   "max_stage": 4
   },
   {
    "id": "ll2_cfg_134",
@@ -121,7 +139,13 @@
    "launch_cost_usd": 48500000,
    "total_launches": 36,
    "successful_launches": 36,
-   "reusable": false
+   "reusable": false,
+   "launch_mass_t": 313,
+   "liftoff_thrust_kn": 4150,
+   "diameter_m": 10.3,
+   "length_m": 46.3,
+   "min_stage": 4,
+   "max_stage": 4
   },
   {
    "id": "ll2_cfg_16",
@@ -133,7 +157,13 @@
    "launch_cost_usd": 115000000,
    "total_launches": 41,
    "successful_launches": 41,
-   "reusable": false
+   "reusable": false,
+   "launch_mass_t": 590,
+   "liftoff_thrust_kn": 3827,
+   "diameter_m": 3.8,
+   "length_m": 58.3,
+   "min_stage": 2,
+   "max_stage": 2
   },
   {
    "id": "ll2_cfg_121",
@@ -145,7 +175,13 @@
    "launch_cost_usd": 85000000,
    "total_launches": 6,
    "successful_launches": 6,
-   "reusable": false
+   "reusable": false,
+   "launch_mass_t": 530,
+   "liftoff_thrust_kn": 10370,
+   "diameter_m": 5.4,
+   "length_m": 63.0,
+   "min_stage": 2,
+   "max_stage": 2
   },
   {
    "id": "ll2_cfg_50",
@@ -157,7 +193,13 @@
    "launch_cost_usd": 70000000,
    "total_launches": 78,
    "successful_launches": 76,
-   "reusable": false
+   "reusable": false,
+   "launch_mass_t": 456,
+   "liftoff_thrust_kn": 5924,
+   "diameter_m": 3.35,
+   "length_m": 56.3,
+   "min_stage": 3,
+   "max_stage": 3
   },
   {
    "id": "ll2_cfg_164",
@@ -169,7 +211,13 @@
    "launch_cost_usd": 52000000,
    "total_launches": 644,
    "successful_launches": 643,
-   "reusable": true
+   "reusable": true,
+   "launch_mass_t": 549,
+   "liftoff_thrust_kn": 7607,
+   "diameter_m": 3.65,
+   "length_m": 70.0,
+   "min_stage": 2,
+   "max_stage": 2
   },
   {
    "id": "ll2_cfg_21",
@@ -181,7 +229,13 @@
    "launch_cost_usd": 350000000,
    "total_launches": 16,
    "successful_launches": 15,
-   "reusable": false
+   "reusable": false,
+   "launch_mass_t": 733,
+   "liftoff_thrust_kn": 8674,
+   "diameter_m": 5.0,
+   "length_m": 72.0,
+   "min_stage": 2,
+   "max_stage": 2
   },
   {
    "id": "ll2_cfg_161",
@@ -193,7 +247,13 @@
    "launch_cost_usd": 90000000,
    "total_launches": 14,
    "successful_launches": 14,
-   "reusable": true
+   "reusable": true,
+   "launch_mass_t": 1400,
+   "liftoff_thrust_kn": 22819,
+   "diameter_m": 12.2,
+   "length_m": 70.0,
+   "min_stage": 3,
+   "max_stage": 3
   }
  ],
  "electric_propulsion": [
@@ -366,6 +426,68 @@
    "power_w": null,
    "tag": "spectrometer",
    "source": "The electronics board for the MB, with a mass of about 0.14 kg and a volume of 16 x 10 x 2.5 cm is contained in the warm electronics box in the body of the rover."
+  }
+ ],
+ "launch_sites": [
+  {
+   "id": "ll2_pad_87",
+   "name": "Launch Complex 39A",
+   "location": "Kennedy Space Center, FL, USA",
+   "country": "USA",
+   "lat": 28.60822681,
+   "lon": -80.60428186,
+   "launches": 224,
+   "rotation_boost_m_s": 408.32
+  },
+  {
+   "id": "ll2_pad_16",
+   "name": "Space Launch Complex 4E",
+   "location": "Vandenberg SFB, CA, USA",
+   "country": "USA",
+   "lat": 34.632,
+   "lon": -120.611,
+   "launches": 307,
+   "rotation_boost_m_s": 382.69
+  },
+  {
+   "id": "ll2_pad_124",
+   "name": "Ariane Launch Area 2",
+   "location": "Guiana Space Centre, French Guiana",
+   "country": "GUF",
+   "lat": 5.232,
+   "lon": -52.778194,
+   "launches": 119,
+   "rotation_boost_m_s": 463.16
+  },
+  {
+   "id": "ll2_pad_50",
+   "name": "Satish Dhawan Space Centre First Launch Pad",
+   "location": "Satish Dhawan Space Centre, India",
+   "country": "IND",
+   "lat": 13.733,
+   "lon": 80.235,
+   "launches": 64,
+   "rotation_boost_m_s": 451.8
+  },
+  {
+   "id": "ll2_pad_32",
+   "name": "1/5",
+   "location": "Baikonur Cosmodrome, Republic of Kazakhstan",
+   "country": "KAZ",
+   "lat": 45.92,
+   "lon": 63.342,
+   "launches": 487,
+   "rotation_boost_m_s": 323.55
+  },
+  {
+   "id": "ll2_pad_22",
+   "name": "Launch Area 94 (SLS-2 / 603)",
+   "location": "Jiuquan Satellite Launch Center, People's Republic of China",
+   "country": "CHN",
+   "lat": 40.960482,
+   "lon": 100.298059,
+   "launches": 139,
+   "rotation_boost_m_s": 351.23
   }
  ]
 }

@@ -6,14 +6,16 @@ import raw from "./dataset.json";
  * contain (component prices, power/comms models); the UI labels these as game values, never as real data.
  */
 export interface Body { id: string; name: string; mu: number; radius_m: number; gravity: number | null; sma_m: number | null; parent: string | null; irradiance_w_m2?: number }
-export interface Vehicle { id: string; name: string; manufacturer: string; manufacturer_country: string; leo_capacity_kg: number; gto_capacity_kg: number | null; launch_cost_usd: number; total_launches: number; successful_launches: number; reusable: boolean }
+export interface Vehicle { id: string; name: string; manufacturer: string; manufacturer_country: string; leo_capacity_kg: number; gto_capacity_kg: number | null; launch_cost_usd: number; total_launches: number; successful_launches: number; reusable: boolean;
+  launch_mass_t: number | null; liftoff_thrust_kn: number | null; diameter_m: number | null; length_m: number | null; min_stage: number | null; max_stage: number | null }
+export interface LaunchSite { id: string; name: string; location: string; country: string; lat: number; lon: number; launches: number; rotation_boost_m_s: number }
 export interface ElectricThruster { id: string; name: string; type: string; thrust_n: number; power_w: number; isp_s: number }
 export type InstrumentTag = "radar" | "imager" | "fields" | "plasma" | "particles" | "spectrometer" | "other";
 export interface Instrument { id: string; name: string; mission: string; mass_kg: number; power_w: number | null; tag: InstrumentTag; source: string | null }
 
 export const DATASET = raw as unknown as {
   provenance: { dataset: string; note: string };
-  bodies: Body[]; vehicles: Vehicle[]; electric_propulsion: ElectricThruster[]; instruments: Instrument[];
+  bodies: Body[]; vehicles: Vehicle[]; electric_propulsion: ElectricThruster[]; instruments: Instrument[]; launch_sites: LaunchSite[];
 };
 export const bodyById = (id: string): Body => {
   const b = DATASET.bodies.find((x) => x.id === id);
