@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useThree } from "@react-three/fiber";
-import { Rocket, Users, User, Shirt, BarChart3, Settings, FlaskConical, Radar, Lock, Check } from "lucide-react";
+import { Rocket, Satellite, Users, User, Shirt, BarChart3, Settings, FlaskConical, Radar, Lock, Check } from "lucide-react";
 import {
   BackButton, GameButton, GlassPanel, LoadingBar, ScreenContainer, StatBar, XPProgressBar, LevelBadge, PlayerAvatar,
 } from "@/components/ui";
@@ -69,7 +69,8 @@ function MenuAstronaut({ look, pose }: { look: ReturnType<typeof useLook>; pose:
 /* ---------- Main menu ---------- */
 const LIVE = !!process.env.NEXT_PUBLIC_API_URL; // live backend mode → route to /play/*
 const MENU = [
-  { href: "/design", label: "Design Mission", icon: Rocket, primary: true },
+  { href: "/launch", label: "Launch Control", icon: Rocket, primary: true },
+  { href: "/design", label: "Design Mission", icon: Satellite },
   { href: "/mission-control", label: "Mission Control", icon: Radar },
   { href: LIVE ? "/play" : "/team", label: "Team Up", icon: Users },
   { href: LIVE ? "/play/profile" : "/profile", label: "Profile", icon: User },
