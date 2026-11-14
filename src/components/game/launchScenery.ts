@@ -17,7 +17,6 @@ export const BIOMES: Record<string, Biome> = {
   ll2_pad_124: { id: "kourou", name: "Guiana rainforest coast", land: [c("#2f7131"), c("#1d4f24")], hills: [{ amp: 90, freq: 2200, color: c("#3b6b3a"), p: 0.4 }], sea: { side: 1, shoreM: 900, shallow: c("#6db39a"), deep: c("#27698a") }, veg: "jungle", vegDensity: 0.9, sand: false, zenith: c("#2f74cf"), horizon: c("#d6e9ef"), glow: c("#ffd8a6"), haze: 0.65, cloudiness: 0.85 },
   ll2_pad_50: { id: "sriharikota", name: "Bay of Bengal sand spit", land: [c("#bfa772"), c("#92814f")], hills: [{ amp: 30, freq: 1200, color: c("#9d8c5f"), p: 0.5 }], sea: { side: 1, shoreM: 470, shallow: c("#63b8c0"), deep: c("#215f8a") }, veg: "palm", vegDensity: 0.25, sand: true, zenith: c("#3170c7"), horizon: c("#e0e8ee"), glow: c("#ffd199"), haze: 0.5, cloudiness: 0.5 },
   ll2_pad_32: { id: "baikonur", name: "Kazakh steppe", land: [c("#aa9a66"), c("#86764e")], hills: [{ amp: 22, freq: 2400, color: c("#9a8b5f"), p: 0.45 }], veg: "scrub", vegDensity: 0.22, sand: true, zenith: c("#3a73c0"), horizon: c("#e3e4dc"), glow: c("#ffd9a4"), haze: 0.5, cloudiness: 0.3 },
-  ll2_pad_22: { id: "jiuquan", name: "Gobi desert", land: [c("#a08c6c"), c("#7c6a52")], hills: [{ amp: 2200, freq: 16000, color: c("#8a8f9a"), p: 0.15 }, { amp: 520, freq: 5200, color: c("#8f836c"), p: 0.4 }], veg: "scrub", vegDensity: 0.1, sand: true, zenith: c("#2663b8"), horizon: c("#e1e5ea"), glow: c("#ffd3a0"), haze: 0.3, cloudiness: 0.2 },
 };
 export const biomeFor = (siteId: string): Biome => BIOMES[siteId] ?? BIOMES.ll2_pad_87;
 
