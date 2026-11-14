@@ -14,6 +14,8 @@ import { AscentFlight } from "./LaunchControl";
 import { LaunchSession } from "@/game/launch/session";
 import { RULES, scoreFlight, type Difficulty } from "@/game/launch/core";
 import { useMission } from "@/game/mission";
+import { MAX_TARGETS, placeLabel, strongestTiles, tileBounds, TILE_DEG, useTargets } from "@/game/lunarField";
+import { SurveyMap, useLunarField } from "./SurveyMap";
 import { useLaunchSetup } from "@/game/launch/store";
 import { CraftPreview } from "./CraftPreview";
 import { catalogUrl, curationOf, requiredMeasures, suitability } from "@/game/instruments";
@@ -61,6 +63,9 @@ export function DesignStudio() {
   const [flight, setFlight] = useState<MissionResult | null>(null);
   const dest = ev.destination;
   const maxProp = 40_000;
+  const { field, failed: fieldFailed, tiles } = useLunarField();
+  const targets = useTargets(), targetIds = targets.ids;
+  const needTargets = dest.id === "moon" && field !== null && targetIds.length < 1; // a survey needs somewhere to look
 
   const [ascent, setAscent] = useState<{ session: LaunchSession; n: number } | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -71,7 +76,7 @@ export function DesignStudio() {
     // Full Moon mission (parking orbit → TLI burn) when asked for, the target is the Moon and the rocket has the performance.
     const mission = setup.mission === "moon" && canFlyMoon(ev) ? "moon" : "orbit";
     setAttempt(n);
-    useMission.getState().start(design, n); // one saved mission from here to the final report
+    useMission.getState().start(design, n, dest.id === "moon" ? targetIds : []); // one saved mission from here to the final report
     setAscent({ n, session: new LaunchSession(setup.difficulty, setup.siteId, ev.vehicle.id, 1000 + n * 7919, Math.min(ev.wetKg, ev.vehicle.leo_capacity_kg), mission) });
   };
   const onLaunch = () => startAscent(attempt + 1);
@@ -107,7 +112,7 @@ export function DesignStudio() {
           <p className="font-display text-lg font-bold uppercase tracking-wide">1 Pick Moon or Mars · 2 Build it for me · 3 Launch from Earth</p>
           <p className="text-xs text-ink2">“Build it for me” picks the most reliable rocket, engine, power, antenna and instruments for {dest.name}. Tweak anything below afterwards.</p>
         </div>
-        <GameButton variant="primary" icon={<Wand2 className="size-5" />} onClick={() => setQsFailed(!quickStart(design.destinationId))}>Build it for me</GameButton>
+        <GameButton variant="primary" icon={<Wand2 className="size-5" />} onClick={() => { setQsFailed(!quickStart(design.destinationId)); if (dest.id === "moon" && tiles.length && targetIds.length < 1) targets.set(strongestTiles(tiles).map((t) => t.id)); }}>Build it for me</GameButton>
         {qsFailed && <p role="status" className="w-full text-xs text-bad">Couldn’t find a working build automatically — adjust the sections below.</p>}
       </GlassPanel>
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
@@ -199,12 +204,28 @@ export function DesignStudio() {
             </ul>
           </Section>
 
-          <Section n={7} title="Engineering margin" hint="Contingency mass makes every phase more reliable — at the cost of mass and money.">
+          {dest.id === "moon" && (
+            <Section n={7} title="Survey targets" hint={`Pick up to ${MAX_TARGETS} regions (10° x 10°) to survey. The colours are real: the magnetic field Lunar Prospector measured at 37 km altitude. Dark areas have no archived data and cannot be chosen.`}>
+              {field ? (
+                <>
+                  <SurveyMap field={field} tiles={tiles} selected={targetIds} onToggle={targets.toggle} />
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                    <GameButton variant="outline" onClick={() => targets.set(strongestTiles(tiles).map((t) => t.id))}>Suggest the strongest {MAX_TARGETS}</GameButton>
+                    <GameButton variant="ghost" onClick={targets.clear} disabled={!targetIds.length}>Clear</GameButton>
+                    <span className="text-ink2">{targetIds.length} of {MAX_TARGETS} chosen</span>
+                  </div>
+                  {targetIds.length > 0 && <ol className="mt-2 grid gap-1 text-xs text-ink2">{targetIds.map((id, i) => { const t = tiles.find((x) => x.id === id), bd = tileBounds(id)!; return <li key={id}><b className="text-orange">{i + 1}</b> {placeLabel(bd.lat0 + TILE_DEG / 2, bd.lon0 + TILE_DEG / 2)} · mean {t?.meanNT.toFixed(1)} nT · {t?.valid} of 25 cells have archived data</li>; })}</ol>}
+                  <p className="mt-2 text-[11px] text-muted">{field.meta.title}. Source: {field.meta.source}. {field.meta.caveat}</p>
+                </>
+              ) : fieldFailed ? <p className="text-sm text-warn">The archived map could not be loaded. The mission will use the simplified global coverage counter instead.</p> : <p className="text-sm text-muted">Loading the archived map…</p>}
+            </Section>
+          )}
+          <Section n={dest.id === "moon" ? 8 : 7} title="Engineering margin" hint="Contingency mass makes every phase more reliable — at the cost of mass and money.">
             <Slider label="Design margin" value={design.marginPct} min={0} max={30} unit="%" onChange={(v) => patch({ marginPct: v })} />
           </Section>
         </div>
 
-        <aside className="space-y-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto"><CraftPreview ev={ev} className="h-64" /><ReviewPanel ev={ev} onLaunch={onLaunch} /></aside>
+        <aside className="space-y-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto"><CraftPreview ev={ev} className="h-64" /><ReviewPanel ev={ev} needTargets={needTargets} onLaunch={onLaunch} /></aside>
       </div>
       <p className="text-center text-xs text-muted">Data: <a className="underline" href={DATASET.provenance.dataset}>space-mission-dataset</a> (NASA, JPL, Launch Library 2). Items marked “game” are balance values, not real data.</p>
     </ScreenContainer>
@@ -238,7 +259,7 @@ function LaunchSetupFields({ ev }: { ev: Evaluation }) {
 const stateText: Record<Check["state"], string> = { ok: "OK", warn: "Tight", bad: "Fail" };
 const stateColor = { ok: "text-ok", warn: "text-warn", bad: "text-bad" } as const;
 const MASS_LABEL = { full: "Mass: whole instrument", "shared-package": "Mass: shared electronics package, counted once", "sensor-only": "Mass: sensor only, electronics not included", "electronics-only": "Mass: electronics board only (estimate)", derived: "Mass: derived from the source's parts" } as const;
-function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void }) {
+function ReviewPanel({ ev, onLaunch, needTargets }: { ev: Evaluation; onLaunch: () => void; needTargets: boolean }) {
   const p = ev.probabilities;
   return (
     <GlassPanel active={ev.goNoGo} className="p-4">
@@ -279,7 +300,7 @@ function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void })
       <details className="mt-3 text-xs text-ink2"><summary className="cursor-pointer">Cost breakdown</summary>
         <ul className="mt-1 space-y-0.5">{Object.entries(ev.costBreakdown).map(([k, v]) => <li key={k} className="flex justify-between"><span>{k}</span><span className="tabular-nums">{usd(v)}</span></li>)}</ul></details>
       <LaunchSetupFields ev={ev} />
-      <GameButton variant="primary" className="mt-4 w-full py-3 text-lg" disabled={!ev.goNoGo} icon={<Rocket className="size-5" />} onClick={onLaunch}>{ev.goNoGo ? "Go for launch" : "No-go"}</GameButton>
+      <GameButton variant="primary" className="mt-4 w-full py-3 text-lg" disabled={!ev.goNoGo || needTargets} icon={<Rocket className="size-5" />} onClick={onLaunch}>{!ev.goNoGo ? "No-go" : needTargets ? "Pick a survey target first" : "Go for launch"}</GameButton>
       {!ev.goNoGo && <p className="mt-2 text-center text-xs text-bad" role="status">Fix the failing checks to unlock launch.</p>}
       {ev.destination.id === "moon" && <Link href="/mission-control" className="mt-2 block rounded-lg border border-[var(--border)] px-4 py-2 text-center text-sm text-ink2 transition hover:border-orange hover:text-ink">Or fly it live in Mission Control →</Link>}
     </GlassPanel>

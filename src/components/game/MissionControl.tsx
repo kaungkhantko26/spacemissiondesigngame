@@ -10,6 +10,12 @@ import { useDesignStore, useEvaluation } from "@/game/store";
 import { eventById } from "@/game/ops/events";
 import { useOps, type ResourceId, type Speed } from "@/game/ops/store";
 import { useMission, stageLabel, type MissionRecord } from "@/game/mission";
+import { observationOf } from "@/game/lunarField";
+import { buildLearning } from "@/game/learn";
+import { SurveyMap, useLunarField } from "./SurveyMap";
+import { Line } from "@react-three/drei";
+import { Scene3D, PlanetModel } from "@/components/three/lazy";
+import { SpacecraftModel } from "./TrajectorySim";
 import {
   CMD_LABEL, OPS, dataRateMbps, downlinkMbps, fmtMet, instrumentPowerW, orbitPhase, type Command, type OpsState, type Phase,
 } from "@/game/ops/sim";
@@ -97,39 +103,41 @@ function Bar({ frac, level, label }: { frac: number; level: Level; label: string
 
 const PHASES: { id: Phase; label: string }[] = [{ id: "ascent", label: "Ascent" }, { id: "cruise", label: "Cruise" }, { id: "loi", label: "Insertion" }, { id: "science", label: "Science" }];
 
+/** One 3-D scene (one canvas): the real textured Moon with the spacecraft orbiting it, or the Earth-Moon transfer. */
 function OrbitView({ s, ev }: { s: OpsState; ev: Evaluation }) {
   const science = s.phase === "science";
   const progress = s.phase === "ascent" ? s.phaseT / OPS.ascentS * 0.08 : s.phase === "cruise" ? 0.08 + 0.84 * Math.min(1, s.phaseT / (ev.cruiseDays * 86400)) : 0.95;
-  const ang = 2 * Math.PI * (orbitPhase(s.t) - 0.81);
-  const cx = 150, cy = 100, R = 62;
-  const sat = { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang) };
+  const ang = 2 * Math.PI * (orbitPhase(s.t) - 0.81), R = 2.5;
+  const sat: [number, number, number] = science ? [R * Math.cos(ang), 0, R * Math.sin(ang)] : [-3 + 6 * progress, 0.5 * Math.sin(progress * Math.PI), 0];
   const a0 = -0.19 * 2 * Math.PI, a1 = 0.19 * 2 * Math.PI;
-  const arc = `M ${cx + R * Math.cos(a0)} ${cy + R * Math.sin(a0)} A ${R} ${R} 0 0 1 ${cx + R * Math.cos(a1)} ${cy + R * Math.sin(a1)}`;
+  const ring = Array.from({ length: 96 }, (_, i) => { const a = (i / 96) * 2 * Math.PI; return [R * Math.cos(a), 0, R * Math.sin(a)] as [number, number, number]; });
+  const shadow = Array.from({ length: 24 }, (_, i) => { const a = a0 + ((a1 - a0) * i) / 23; return [R * Math.cos(a), 0, R * Math.sin(a)] as [number, number, number]; });
+  const status = science ? `${s.sunlit ? "Sunlight" : "ECLIPSE"} · pointing ${s.pointing} · ${s.observing ? "observing" : s.downlinking ? "downlinking" : "idle"}` : s.phase === "ascent" ? "Ascent to parking orbit" : s.phase === "cruise" ? `Trans-lunar coast · ${Math.round(progress * 100)} %` : "Arriving — insertion burn";
   return (
-    <svg viewBox="0 0 300 200" className="h-full w-full" role="img" aria-label={science ? `Lunar orbit, spacecraft ${s.sunlit ? "in sunlight" : "in eclipse"}, pointed at ${s.pointing}` : "Earth–Moon transfer progress"}>
-      <rect width="300" height="200" fill="none" />
-      {science ? (
-        <>
-          <circle cx={cx} cy={cy} r={R} fill="none" stroke="var(--border-strong, #3a4c66)" strokeDasharray="3 4" />
-          <path d={arc} fill="none" stroke="#0a0f1a" strokeWidth="5" opacity=".95" />
-          <path d={arc} fill="none" stroke="#c0c8d8" strokeWidth="1" strokeDasharray="2 3" />
-          <circle cx={cx} cy={cy} r="30" fill="#8d95a3" /><circle cx={cx - 8} cy={cy - 6} r="6" fill="#737b88" /><circle cx={cx + 9} cy={cy + 8} r="4" fill="#737b88" />
-          <text x="14" y="26" fill="#ffc857" fontSize="9" className="font-display">☀ SUN →</text>
-          <text x="232" y="190" fill="#4fc3f7" fontSize="9" className="font-display">⊕ EARTH</text>
-          {s.contact && <line x1={sat.x} y1={sat.y} x2="248" y2="176" stroke="#36d399" strokeDasharray="3 3" />}
-          <circle cx={sat.x} cy={sat.y} r="5" fill={s.safe ? "#ffc857" : "#fff"} stroke="#ff7a33" strokeWidth="2" />
-          <text x={cx} y="196" textAnchor="middle" fill="#9fb3c8" fontSize="8">{s.sunlit ? "Sunlight" : "ECLIPSE"} · pointing {s.pointing} · {s.observing ? "observing" : s.downlinking ? "downlinking" : "idle"}</text>
-        </>
-      ) : (
-        <>
-          <circle cx="40" cy={cy} r="26" fill="#1f6fd1" /><circle cx="270" cy={cy} r="9" fill="#9aa2af" />
-          <line x1="66" y1={cy} x2="261" y2={cy} stroke="#3a4c66" strokeDasharray="4 4" />
-          <circle cx={66 + 195 * progress} cy={cy - 12 * Math.sin(progress * Math.PI)} r="5" fill="#fff" stroke="#ff7a33" strokeWidth="2" />
-          <text x="40" y="150" textAnchor="middle" fill="#9fb3c8" fontSize="9">EARTH</text><text x="270" y="130" textAnchor="middle" fill="#9fb3c8" fontSize="9">MOON</text>
-          <text x="150" y="185" textAnchor="middle" fill="#9fb3c8" fontSize="9">{s.phase === "ascent" ? "Ascent to parking orbit" : s.phase === "cruise" ? `Trans-lunar coast · ${Math.round(progress * 100)} %` : "Arriving — insertion burn"}</text>
-        </>
-      )}
-    </svg>
+    <div className="relative h-full w-full" role="img" aria-label={science ? `Lunar orbit, spacecraft ${s.sunlit ? "in sunlight" : "in eclipse"}, pointed at ${s.pointing}` : "Earth–Moon transfer progress"}>
+      <Scene3D camera={science ? [0, 3.6, 5.4] : [0, 1.6, 7]} light="orbit" stars label="Spacecraft in lunar orbit">
+        {science ? (
+          <>
+            <directionalLight position={[-6, 1.5, 0]} intensity={2.2} color="#fff4e0" />
+            <PlanetModel kind="moon" radius={1.25} />
+            <PlanetModel kind="earth" radius={0.45} position={[4.4, -0.3, 2.3]} />
+            <Line points={ring} color="#6f86a8" lineWidth={1} dashed dashSize={0.12} gapSize={0.12} />
+            <Line points={shadow} color="#e7edf7" lineWidth={2.5} />
+            {s.contact && <Line points={[sat, [4.4, -0.3, 2.3]]} color="#36d399" lineWidth={1.5} dashed dashSize={0.15} gapSize={0.1} />}
+            <group position={sat} scale={0.28}><SpacecraftModel /></group>
+          </>
+        ) : (
+          <>
+            <PlanetModel kind="earth" radius={1} position={[-3.6, 0, 0]} />
+            <PlanetModel kind="moon" radius={0.38} position={[3.6, 0, 0]} />
+            <Line points={Array.from({ length: 40 }, (_, i) => { const t = i / 39; return [-3 + 6 * t, 0.5 * Math.sin(t * Math.PI), 0] as [number, number, number]; })} color="#6f86a8" lineWidth={1} dashed dashSize={0.15} gapSize={0.12} />
+            <group position={sat} scale={0.3}><SpacecraftModel /></group>
+          </>
+        )}
+      </Scene3D>
+      <p className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[11px] text-ink2">{status}</p>
+      {science && <p className="pointer-events-none absolute left-2 top-1 text-[11px] text-gold">☀ Sun ←</p>}
+    </div>
   );
 }
 
@@ -405,7 +413,10 @@ function EventDialog() {
 function ReportView() {
   const { report, s, ev, reset, begin, beginMission, attempt } = useOps();
   const record = useMission((m) => m.record), clearMission = useMission((m) => m.clear);
+  const { field, tiles } = useLunarField();
+  const obs = useMemo(() => (field && s && s.targets.length ? observationOf(field, s.targets, s.targetProgress, s.stats.generatedGb > 0 ? s.stats.returnedGb / s.stats.generatedGb : 0) : null), [field, s]);
   if (!report || !s || !ev) return null;
+  const learn = buildLearning(field, obs, s, ev);
   const color = report.outcome === "success" ? "text-ok" : report.outcome === "partial" ? "text-warn" : "text-bad";
   return (
     <ScreenContainer title="Mission report" subtitle={`${CONTRACT.name} · ${fmtMet(s.t)}`} actions={<BackButton href="/menu" label="Main menu" />}>
@@ -442,6 +453,23 @@ function ReportView() {
             <ul className="space-y-3">{report.categories.map((c) => { const lvl: Level = c.score < 40 ? "crit" : c.score < 70 ? "warn" : "ok"; return (
               <li key={c.id}><div className="flex justify-between text-sm"><span>{c.label}</span><span className="tabular-nums">{c.score}</span></div><Bar frac={c.score / 100} level={lvl} label={c.label} /><p className="mt-0.5 text-xs text-ink2">{c.why}</p></li>
             ); })}</ul></GlassPanel>
+          {field && obs && (
+            <GlassPanel className="p-5" aria-label="Survey result">
+              <p className="hud-label mb-2">Your survey, on the real map</p>
+              <SurveyMap field={field} tiles={tiles} selected={s.targets} revealed={obs.returned} observed={obs.observed} />
+              <p className="mt-2 text-xs text-ink2">Colour = the archived Lunar Prospector field in cells whose data reached Earth. Amber = observed but never downlinked. Grey = not observed. Everything outside your regions is dimmed.</p>
+            </GlassPanel>
+          )}
+          <GlassPanel className="p-5" aria-label="What we learned">
+            <p className="hud-label mb-2">What we can learn from this</p>
+            <h3 className="font-display text-lg font-bold">What your data shows</h3>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink2">{learn.found.map((l) => <li key={l}>{l}</li>)}</ul>
+            <h3 className="mt-3 font-display text-lg font-bold">What your design choices did</h3>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink2">{learn.design.map((l) => <li key={l}>{l}</li>)}</ul>
+            <h3 className="mt-3 font-display text-lg font-bold">Key ideas</h3>
+            <dl className="mt-1 space-y-2 text-sm">{learn.ideas.map((i) => <div key={i.term}><dt className="font-semibold text-ink">{i.term}</dt><dd className="text-ink2">{i.text}</dd></div>)}</dl>
+            <p className="mt-3 text-[11px] text-muted">{learn.caveat}</p>
+          </GlassPanel>
           <GlassPanel className="p-5"><p className="hud-label mb-2">What to try next</p><ul className="list-disc space-y-1 pl-5 text-sm text-ink2">{report.lessons.map((l) => <li key={l}>{l}</li>)}</ul></GlassPanel>
           <div className="flex flex-wrap gap-2">
             <GameButton variant="primary" onClick={() => (record?.ascent ? beginMission(record, true) : begin(ev, attempt + 1))}>{record?.ascent ? "Fly operations again (new dice)" : "Fly again (new dice)"}</GameButton>

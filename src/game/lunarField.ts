@@ -70,3 +70,21 @@ export function fieldColor(nT: number, max = 6): string {
   const t = Math.min(1, Math.max(0, nT / max));
   return `rgb(${Math.round(30 + 225 * t)},${Math.round(60 + 140 * Math.pow(t, 1.4))},${Math.round(150 * (1 - t) + 40)})`;
 }
+
+/* ---- what the mission observed, in terms of real archived cells ---- */
+const cellOrder = (k: number) => { const s = Math.sin(k * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }; // fixed pseudo-random order: which cells of a region are covered first
+export interface Observation { observed: Set<number>; returned: Set<number>; perTarget: { id: string; valid: number; observed: number; returned: number }[] }
+/**
+ * Cells of each chosen region that were observed (progress) and whose data reached Earth (progress x share of the recorded data that was downlinked).
+ * Only cells with archived data count; this is a simplified coverage model, not a physical ground-track simulation.
+ */
+export function observationOf(f: LunarField, targets: string[], progress: number[], returnedShare: number): Observation {
+  const observed = new Set<number>(), returned = new Set<number>(), perTarget: Observation["perTarget"] = [];
+  targets.forEach((id, i) => {
+    const cells = tileCells(id).filter((k) => !Number.isNaN(f.values[k])).sort((a, b) => cellOrder(a) - cellOrder(b));
+    const nObs = Math.round(cells.length * Math.min(1, progress[i] ?? 0)), nRet = Math.round(nObs * Math.min(1, Math.max(0, returnedShare)));
+    cells.slice(0, nObs).forEach((k) => observed.add(k)); cells.slice(0, nRet).forEach((k) => returned.add(k));
+    perTarget.push({ id, valid: cells.length, observed: nObs, returned: nRet });
+  });
+  return { observed, returned, perTarget };
+}

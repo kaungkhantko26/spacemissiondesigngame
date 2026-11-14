@@ -18,12 +18,12 @@ export interface TransitRecord {
 }
 export interface MissionSummary { outcome: "success" | "partial" | "failure"; total: number; grade: string; headline: string; coverage: number; usefulGb: number; health: number }
 export interface MissionRecord {
-  id: string; attempt: number; createdAt: number; updatedAt: number; stage: MissionStage; design: Design;
+  id: string; attempt: number; /** survey regions chosen in the Architect (lunarField tile ids) */ targets: string[]; createdAt: number; updatedAt: number; stage: MissionStage; design: Design;
   ascent: AscentRecord | null; transit: TransitRecord | null; ops: OpsState | null; summary: MissionSummary | null; lostReason: string | null;
 }
 interface Store {
   record: MissionRecord | null;
-  start: (design: Design, attempt: number) => void;
+  start: (design: Design, attempt: number, targets?: string[]) => void;
   setAscent: (a: AscentRecord) => void;
   setTransit: (t: TransitRecord) => void;
   saveOps: (s: OpsState) => void;
@@ -37,7 +37,7 @@ const touch = (r: MissionRecord, p: Partial<MissionRecord>): MissionRecord => ({
 
 export const useMission = create<Store>()(persist((set, get) => ({
   record: null,
-  start: (design, attempt) => set({ record: { id: id(), attempt, createdAt: Date.now(), updatedAt: Date.now(), stage: "ascent", design, ascent: null, transit: null, ops: null, summary: null, lostReason: null } }),
+  start: (design, attempt, targets = []) => set({ record: { id: id(), attempt, targets, createdAt: Date.now(), updatedAt: Date.now(), stage: "ascent", design, ascent: null, transit: null, ops: null, summary: null, lostReason: null } }),
   setAscent: (a) => { const r = get().record; if (r) set({ record: touch(r, { ascent: a, stage: a.ok ? "transit" : "lost", lostReason: a.ok ? null : a.failure ?? "Launch failure." }) }); },
   setTransit: (t) => { const r = get().record; if (!r) return; const ok = t.cruiseOk && t.insertionOk; set({ record: touch(r, { transit: t, stage: ok ? "operating" : "lost", lostReason: ok ? null : !t.cruiseOk ? "The spacecraft was lost during the transfer to the Moon." : "The lunar-orbit insertion burn failed." }) }); },
   saveOps: (s) => { const r = get().record; if (r && r.stage === "operating") set({ record: touch(r, { ops: s }) }); },

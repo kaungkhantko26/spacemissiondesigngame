@@ -44,7 +44,7 @@ const UP = new Vector3(0, 1, 0);
 const nearStart = (traj: Trajectory): [number, number, number] => { const c = traj.sample(0).craft; return [c[0] + traj.earthR * 0.6, c[1] + traj.earthR * 0.5, c[2] + traj.earthR * 1.1]; };
 
 /** Apollo-style spacecraft (command module, service module, engine bell, high-gain dish, RCS quads), nose along +Y, about 2 units long. */
-function SpacecraftModel() {
+export function SpacecraftModel() {
   return (
     <group>
       <mesh position={[0, 0.78, 0]}><coneGeometry args={[0.3, 0.55, 20]} /><meshStandardMaterial color="#d9d6cf" metalness={0.5} roughness={0.35} emissive="#3a3935" /></mesh>

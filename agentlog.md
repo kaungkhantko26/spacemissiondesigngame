@@ -181,3 +181,10 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Tests: `mission.test.ts`. Verified end to end in a browser: Architect -> ascent -> capture -> Take over -> operations -> reload -> Resume.
 - Real NASA data: public/data/lp-mag-37km-2deg.json built by scripts/build_lp_field.py from PDS PPI LP-L-MAG-5-SURFACE-FIELD-MAP-V1.0 (total field, 37 km, 2-degree cells; 4547 of 16200 cells have data); src/game/lunarField.ts + SurveyMap.tsx (map + target store). NOT yet wired into Architect/ops/report.
 - Mars/Sun/Earth in the heliocentric trajectory view are now textured/glowing bodies; muted/secondary text tokens brightened; Settings On/Off switches redesigned. axe contrast check: 0 violations on 8 pages.
+
+## Session: survey target layer
+- Architect: "Survey targets" section (Moon): pick up to 3 10-degree regions on the real archived Lunar Prospector 37 km field map (SurveyMap); launch is blocked until one is chosen; "Build it for me" preselects the strongest 3. Targets saved in the mission record.
+- Ops: coverage = mean progress over the chosen regions (region-specific rates), replaces the global counter when targets exist; auto-plan now clears safe mode (it used to loop on "cannot enable science while in safe mode").
+- Report: survey map showing returned/observed/unobserved cells plus "What we can learn from this" (src/game/learn.ts: data findings vs the archive, design cause-and-effect, key ideas, caveat). Landmarks (Mare Ingenii, Reiner Gamma) are approximate general knowledge, labelled as such.
+- Mission Control orbit view: one 3-D canvas with the real textured Moon/Earth and the spacecraft model instead of SVG circles.
+- Still open from the review: same-seed replay comparison, chemical demo design as quick start, learner testing, recording.

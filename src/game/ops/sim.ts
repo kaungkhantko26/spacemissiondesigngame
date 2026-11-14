@@ -12,7 +12,7 @@ export function createOps(ev: Evaluation, seed: number): OpsState {
   const n: OpsState = {
     t: 0, phase: "prelaunch", phaseT: 0, sciT0: 0,
     pointing: "sun", slewLeft: 0, scienceOn: false, safe: false,
-    dvLeft: ev.dvAvailable, batteryWh: OPS.batteryWh, tempC: 15, dataGb: 0, dataQuality: 1, coverage: 0,
+    dvLeft: ev.dvAvailable, batteryWh: OPS.batteryWh, tempC: 15, dataGb: 0, dataQuality: 1, coverage: 0, targets: [], targetProgress: [],
     health: { power: 1, comms: 1, instruments: 1, propulsion: 1 },
     flags: {
       launchAnomaly: false, antennaRoll: false, navRoll: false, propRoll: false, targetRoll: false, navError: false, wheelBias: false,
@@ -33,11 +33,12 @@ export function createOps(ev: Evaluation, seed: number): OpsState {
 }
 
 /** Operations that start where the flown mission ended: in lunar orbit, with the propellant the spacecraft really has left. */
-export function createOpsFromMission(ev: Evaluation, m: { attempt: number; transit: { departureBy: "launcher" | "spacecraft"; transferDays: number } | null }, attempt = 0): OpsState {
+export function createOpsFromMission(ev: Evaluation, m: { attempt: number; targets?: string[]; transit: { departureBy: "launcher" | "spacecraft"; transferDays: number } | null }, attempt = 0): OpsState {
   const n = createOps(ev, seedFromDesign(ev.design, m.attempt * 31 + attempt));
   const departure = m.transit?.departureBy === "spacecraft" ? ev.plan.departureDv : 0; // a launcher that flew TLI already spent that burn
   n.dvLeft = Math.max(0, ev.dvAvailable - departure - ev.plan.captureDv);
   n.phase = "science"; n.phaseT = 0; n.t = 0; n.sciT0 = 0; n.pointing = "sun"; n.scienceOn = false;
+  n.targets = [...(m.targets ?? [])]; n.targetProgress = n.targets.map(() => 0);
   n.log = [];
   addLog(n, "good", `Lunar orbit achieved after a ${m.transit ? Math.round(m.transit.transferDays * 10) / 10 : "?"}-day transfer. ${Math.round(n.dvLeft)} m/s of spacecraft propellant remain. Point at the Moon, switch instruments on and plan your downlinks.`);
   return n;
@@ -124,7 +125,11 @@ function physics(n: OpsState, ev: Evaluation, dt: number) {
   if (science) n.stats.scienceS += dt;
   if (n.observing) {
     const q = n.health.instruments * (n.flags.wheelBias ? 0.7 : 1);
-    n.coverage = Math.min(1, n.coverage + (dt / (OPS.coverageDays * 86400)) * q * (hasFields(ev) ? 1 : 0.3));
+    const gain = (dt / (OPS.coverageDays * 86400)) * q * (hasFields(ev) ? 1 : 0.3);
+    if (n.targets.length) { // as the Moon turns under the polar orbit every chosen region is overflown; regions differ a little in how often (deterministic per region)
+      n.targetProgress = n.targetProgress.map((p, i) => Math.min(1, p + gain * regionRate(n.targets[i])));
+      n.coverage = n.targetProgress.reduce((a, b) => a + b, 0) / n.targetProgress.length;
+    } else n.coverage = Math.min(1, n.coverage + gain);
     const gb = (dataRateMbps(ev) * dt) / 8 / 1000;
     const added = Math.min(Math.max(0, OPS.storageGb - n.dataGb), gb);
     const total = n.dataGb + added;
@@ -139,6 +144,8 @@ function physics(n: OpsState, ev: Evaluation, dt: number) {
 }
 
 /* ---------- phases ---------- */
+/** 0.85 to 1.0, fixed per region id: some regions are simply overflown a little less often than others. */
+const regionRate = (id: string) => { let h = 0; for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return 0.85 + 0.15 * ((h % 100) / 99); };
 function setPhase(n: OpsState, p: Phase) { n.phase = p; n.phaseT = 0; }
 function phaseLogic(n: OpsState, ev: Evaluation) {
   if (n.phase === "ascent" && n.phaseT >= OPS.ascentS) {
@@ -220,6 +227,7 @@ export function planNextDay(s: OpsState): Command[] {
     if ((!c || t + 120 > end) && inWin) { inWin = false; if (t - a >= 1500) wins.push([a, t]); }
   }
   const picked = wins.filter((w, i) => i % 2 === 0 || s.dataGb > OPS.storageGb * 0.5).slice(0, 4);
+  if (s.safe && s.batteryWh >= 0.25 * OPS.batteryWh) out.push({ at: t0 + 2, kind: "resume" }); // the plan used to keep asking for science while the spacecraft stayed in safe mode
   out.push({ at: t0 + 5, kind: "point-moon" }, { at: t0 + 10, kind: "science-on" });
   for (const w of picked) {
     out.push({ at: Math.max(t0 + 60, w[0] - OPS.slewS * 0.5), kind: "point-earth" }, { at: w[1] - 60, kind: "point-moon" });
@@ -249,7 +257,7 @@ export function buildReport(n: OpsState, ev: Evaluation): Report {
   const objectives: ReportObjective[] = [
     { id: "orbit", label: "Reach lunar orbit", required: true, met: reachedOrbit, detail: reachedOrbit ? "Orbit achieved." : n.stats.lossCause ?? "Did not reach lunar orbit." },
     { id: "mag", label: "Carry a magnetometer / fields instrument", required: true, met: hasFields(ev), detail: hasFields(ev) ? "Magnetometer aboard." : "No fields instrument: survey value is reduced to 30 %." },
-    { id: "coverage", label: `Survey ≥ ${pct(OPS.goalCoverage)} of the surface`, required: true, met: n.coverage >= OPS.goalCoverage, detail: `Coverage ${pct(n.coverage)} after ${days.toFixed(1)} science days.` },
+    { id: "coverage", label: n.targets.length ? `Observe ≥ ${pct(OPS.goalCoverage)} of your ${n.targets.length} chosen region${n.targets.length === 1 ? "" : "s"}` : `Survey ≥ ${pct(OPS.goalCoverage)} of the surface`, required: true, met: n.coverage >= OPS.goalCoverage, detail: `Coverage ${pct(n.coverage)} after ${days.toFixed(1)} science days.` },
     { id: "data", label: `Return ≥ ${goalGb} GB of useful data`, required: true, met: returned >= goalGb, detail: `${returned.toFixed(1)} GB useful data reached Earth.` },
     { id: "stretch", label: `Bonus: return ≥ ${OPS.stretchDataGb} GB`, required: false, met: returned >= OPS.stretchDataGb, detail: `${returned.toFixed(1)} GB returned.` },
     { id: "health", label: "Bonus: finish with ≥ 60 % spacecraft health", required: false, met: reachedOrbit && meanHealth >= 0.6, detail: `Average health ${pct(meanHealth)}.` },

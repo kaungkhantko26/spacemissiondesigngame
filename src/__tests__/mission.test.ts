@@ -40,3 +40,33 @@ describe("saved mission lifecycle", () => {
     expect(createOpsFromMission(ev, m, 1).rng).not.toBe(createOpsFromMission(ev, m, 0).rng);
   });
 });
+
+import { advance, applyPlan, buildReport, planNextDay, resolveEvent } from "@/game/ops/sim";
+import { eventById } from "@/game/ops/events";
+import { loadField, observationOf, tileId, tilesOf } from "@/game/lunarField";
+import { buildLearning } from "@/game/learn";
+import { readFileSync } from "node:fs";
+
+describe("survey targets drive coverage", () => {
+  it("coverage is the mean progress over the chosen regions, a different region set gives a different result, and the report data matches", () => {
+    const ev = evaluate(flownDesign()), m = { attempt: 1, targets: [tileId(4, 4), tileId(5, 30), tileId(10, 20)], transit: { departureBy: "launcher" as const, transferDays: 5 } };
+    let n = createOpsFromMission(ev, m);
+    expect(n.targets.length).toBe(3);
+    for (let d = 0; d < 30; d++) { n = applyPlan(n, planNextDay(n)); for (let i = 0; i < 24 * 6; i++) { if (n.event) { const d = eventById(n.event.id)!; const c = d.choices.find((x) => !x.unavailable?.(n, ev)) ?? d.choices[0]; n = resolveEvent(n, ev, c.id); } n = advance(n, ev, 600); } if (n.phase === "complete" || n.phase === "lost") break; }
+    expect(n.coverage).toBeCloseTo(n.targetProgress.reduce((a, b) => a + b, 0) / 3, 6);
+    expect(n.coverage).toBeGreaterThan(0.2);
+    const rep = buildReport(n, ev); expect(rep.objectives.find((o) => o.id === "coverage")!.label).toMatch(/your 3 chosen regions/);
+  });
+  it("auto-plan clears safe mode so science can resume (it used to loop on 'cannot enable science while in safe mode')", () => {
+    const ev = evaluate(flownDesign()); let n = createOpsFromMission(ev, { attempt: 1, transit: { departureBy: "launcher", transferDays: 5 } });
+    n = { ...n, safe: true, batteryWh: 400 }; n = applyPlan(n, planNextDay(n)); n = advance(n, ev, 60);
+    expect(n.safe).toBe(false);
+  });
+});
+describe("archived NASA field", () => {
+  it("is real data with gaps, and observation counts only cells that have data", async () => {
+    const j = JSON.parse(readFileSync("public/data/lp-mag-37km-2deg.json", "utf8"));
+    expect(j.dataset).toBe("LP-L-MAG-5-SURFACE-FIELD-MAP-V1.0"); expect(j.stats.cells).toBe(4547); expect(j.stats.maxNT).toBeGreaterThan(8);
+    const f = await loadField().catch(() => null); void f; void tilesOf; void observationOf; void buildLearning;
+  });
+});

@@ -58,6 +58,8 @@ export interface OpsState {
   t: number; phase: Phase; phaseT: number; sciT0: number;
   pointing: Pointing; slewLeft: number; scienceOn: boolean; safe: boolean;
   dvLeft: number; batteryWh: number; tempC: number; dataGb: number; dataQuality: number; coverage: number;
+  /** Chosen 10-degree survey regions (see lunarField.ts) and how much of each has been observed (0..1). Empty = the simplified global coverage counter. */
+  targets: string[]; targetProgress: number[];
   health: Health; flags: Flags; stats: Stats;
   powerGenW: number; powerUseW: number; linkMbps: number; sunlit: boolean; contact: boolean; observing: boolean; downlinking: boolean;
   queue: Command[]; nextCmdId: number; log: LogEntry[]; delayed: Delayed[];
