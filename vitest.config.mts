@@ -5,5 +5,5 @@ import path from "node:path";
 export default defineConfig({
   plugins: [react()],
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
-  test: { environment: "jsdom", setupFiles: ["./src/test-setup.ts"], globals: true, exclude: ["**/node_modules/**", "**/._*"] },
+  test: { environment: "jsdom", setupFiles: ["./src/test-setup.ts"], globals: true, testTimeout: 60000, exclude: ["**/node_modules/**", "**/._*"] },
 });

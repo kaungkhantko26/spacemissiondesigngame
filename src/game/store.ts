@@ -30,7 +30,9 @@ export const useDesignStore = create<GameState>((set, get) => ({
   quickStart: (destinationId) => {
     const dest = destinationById(destinationId);
     if (!dest) return false;
-    const wanted = DATASET.instruments.filter((i) => dest.wants.includes(i.tag)).sort((a, b) => a.mass_kg - b.mass_kg);
+    // Prefer the destination's primary tag first (Moon: a magnetometer-class "fields" instrument), then lighter instruments.
+    const rank = (t: string) => dest.wants.indexOf(t as (typeof dest.wants)[number]);
+    const wanted = DATASET.instruments.filter((i) => dest.wants.includes(i.tag)).sort((a, b) => rank(a.tag) - rank(b.tag) || a.mass_kg - b.mass_kg);
     const props = ["chem", ...DATASET.electric_propulsion.map((e) => e.id)];
     const build = (vehicleId: string, pr: string, th: number, solar: number, antennaId: string, ins: string[]) => {
       const base: Design = { destinationId, vehicleId, propulsionId: pr, thrusters: th, propellantKg: 0, solarAreaM2: solar, rtgUnits: 0, antennaId, instrumentIds: ins, marginPct: 15 };

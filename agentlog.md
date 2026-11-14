@@ -58,3 +58,10 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 
 ## Session 3 (cont.) — GitHub Pages
 - Static export when `GITHUB_PAGES=1` (next.config.ts: output export, basePath from NEXT_PUBLIC_BASE_PATH, trailingSlash). Public files go through `asset()` (src/lib/asset.ts) so the sub-path works. `npm run deploy:pages` builds and force-pushes ./out to the gh-pages branch (no workflow file: the gh token has no `workflow` scope). Pages source = gh-pages /. Live: https://kaungkhantko26.github.io/spacemissiondesigngame/ (static only; /play needs a backend URL at build time).
+
+## Session 3 (cont.) — Mission Control vertical slice (Moon orbiter)
+- `src/game/ops/` (pure, tested): `core.ts` (types + OPS balance constants, all game values), `sim.ts` (createOps/step/advance, command queue, phases ascent→cruise→insertion→science, power/battery/data/comms/thermal/health, mission report), `events.ts` (11 data-driven events with 2–4 choices, delayed effects, quality scores), `store.ts` (Zustand, in-memory only: persistence is backend scope).
+- UI `/mission-control` (`MissionControl.tsx`): briefing (contract, objectives, design check, recommended design) → Mission Control dashboard (phase stepper, MET, Pause/1×/10×/100×, orbit schematic, six resource cards with "what drives it" explanations, alerts that select the relevant resource, objectives, health, quick actions + command queue + "Auto-plan next 24 h", log, event dialog pauses time) → report (7-category scorecard with cause/effect text, objectives, lessons). Mobile: Status/Orbit/Commands tabs. Cruise auto-warps ×10.
+- Design link: Moon review panel has "fly it live"; menu has Mission Control. `quickStart` now prefers the destination's primary instrument tag (magnetometer for the Moon).
+- Balance (headless perfect-play autopilot): patch antenna → partial (~22 GB), 1 m / 2.5 m dish → success. Tuning knobs live in `OPS`. Not done: save/resume, Mars scenario, wizard mode, ten-minute playtest with real humans.
+- Tests: `ops.test.ts` (event shape, determinism, resource invariants, report, eclipse, antenna comparison); vitest timeout raised to 60 s.

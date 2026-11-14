@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Rocket, Users, User, Shirt, BarChart3, Settings, FlaskConical, Lock, Check } from "lucide-react";
+import { Rocket, Users, User, Shirt, BarChart3, Settings, FlaskConical, Radar, Lock, Check } from "lucide-react";
 import {
   BackButton, GameButton, GlassPanel, LoadingBar, ScreenContainer, StatBar, XPProgressBar, LevelBadge, PlayerAvatar,
 } from "@/components/ui";
@@ -62,6 +62,7 @@ export function SplashScreen() {
 const LIVE = !!process.env.NEXT_PUBLIC_API_URL; // live backend mode → route to /play/*
 const MENU = [
   { href: "/design", label: "Design Mission", icon: Rocket, primary: true },
+  { href: "/mission-control", label: "Mission Control", icon: Radar },
   { href: LIVE ? "/play" : "/team", label: "Team Up", icon: Users },
   { href: LIVE ? "/play/profile" : "/profile", label: "Profile", icon: User },
   { href: LIVE ? "/play/cosmetics" : "/cosmetics", label: "Cosmetics", icon: Shirt },

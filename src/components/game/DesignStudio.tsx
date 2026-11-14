@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Rocket, Wand2, RotateCcw, Pencil } from "lucide-react";
 import { BackButton, GameButton, GlassPanel, ScreenContainer, StatusPill } from "@/components/ui";
@@ -176,6 +177,7 @@ function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void })
         <ul className="mt-1 space-y-0.5">{Object.entries(ev.costBreakdown).map(([k, v]) => <li key={k} className="flex justify-between"><span>{k}</span><span className="tabular-nums">{usd(v)}</span></li>)}</ul></details>
       <GameButton variant="primary" className="mt-4 w-full py-3 text-lg" disabled={!ev.goNoGo} icon={<Rocket className="size-5" />} onClick={onLaunch}>{ev.goNoGo ? "Go for launch" : "No-go"}</GameButton>
       {!ev.goNoGo && <p className="mt-2 text-center text-xs text-bad" role="status">Fix the failing checks to unlock launch.</p>}
+      {ev.destination.id === "moon" && <Link href="/mission-control" className="mt-2 block rounded-lg border border-[var(--border)] px-4 py-2 text-center text-sm text-ink2 transition hover:border-orange hover:text-ink">Or fly it live in Mission Control →</Link>}
     </GlassPanel>
   );
 }
