@@ -16,7 +16,7 @@ function Sel({ label, field, value, options, owners, mine, onChange }: {
   return (
     <label className="block text-xs">
       <span className="text-ink2">{label} <i>{owners.length ? (own ? "· yours" : `· ${owners.join("/")}`) : ""}</i></span>
-      <select className="mt-1 w-full rounded bg-white/10 p-2 text-sm" value={value ?? ""} data-field={field} onChange={(e) => onChange(e.target.value)}>
+      <select className="mt-1 w-full rounded border border-white/20 bg-[#0b1530] p-2 text-sm text-white [&>option]:bg-[#0b1530] [&>option]:text-white" value={value ?? ""} data-field={field} onChange={(e) => onChange(e.target.value)}>
         <option value="">—</option>
         {options.map((o) => <option key={o.id} value={o.id}>{o.name}{o.hint ? ` (${o.hint})` : ""}</option>)}
       </select>
@@ -67,7 +67,7 @@ export function Design() {
           <label className="block text-xs"><span className="text-ink2">Ops months ({mission.lifetimeMonths.min}–{mission.lifetimeMonths.max})</span>
             <input type="number" min={mission.lifetimeMonths.min} max={mission.lifetimeMonths.max} className="mt-1 w-full rounded bg-white/10 p-2 text-sm" value={d.opsMonths} onChange={(e) => set({ opsMonths: Number(e.target.value) })} /></label>
           <label className="block text-xs"><span className="text-ink2">Instrument duty {Math.round(d.duty * 100)}%</span>
-            <input type="range" min={0.1} max={1} step={0.05} className="mt-2 w-full" value={d.duty} onChange={(e) => set({ duty: Number(e.target.value) })} /></label>
+            <input type="range" min={0.1} max={1} step={0.05} className="mt-2 w-full accent-orange" value={d.duty} onChange={(e) => set({ duty: Number(e.target.value) })} /></label>
         </GlassPanel>
         <GlassPanel className="p-4">
           <h3 className="mb-2 font-semibold">Instruments</h3>

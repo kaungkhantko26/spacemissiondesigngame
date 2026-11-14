@@ -35,7 +35,7 @@ function Entry() {
     <GlassPanel className="space-y-4 p-6">
       <h1 className="text-2xl font-bold">Team up</h1>
       <div className="flex gap-2">
-        <input className="rounded bg-white/10 px-3 py-2" value={name} onChange={(e) => setName(e.target.value)} maxLength={20} />
+        <input className="rounded border border-white/20 bg-[#0b1530] px-3 py-2 text-white" value={name} onChange={(e) => setName(e.target.value)} maxLength={20} />
         <GameButton onClick={() => swallow(g.rename(name))}>Set name</GameButton>
       </div>
       <GameButton variant="primary" onClick={() => swallow(g.createRoom())}>Create room</GameButton>
