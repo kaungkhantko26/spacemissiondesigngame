@@ -16,8 +16,8 @@ export function patternTexture(kind: string): CanvasTexture | null {
   const r = rng(kind.length * 7919 + kind.charCodeAt(kind.length - 1));
   if (kind === "pattern-stripes") {
     g.fillStyle = "#fff";
-    for (let x = 0; x < 512; x += 80) g.fillRect(x, 0, 22, 512);
-    g.fillStyle = "#888"; for (let x = 36; x < 512; x += 80) g.fillRect(x, 0, 6, 512);
+    for (let x = 0; x < 512; x += 128) g.fillRect(x, 0, 18, 512);
+    
   } else if (kind === "pattern-stars") {
     g.fillStyle = "#fff";
     for (let i = 0; i < 160; i++) { const s = 1.5 + r() * 4; g.beginPath(); g.arc(r() * 512, r() * 512, s, 0, 7); g.fill(); }
@@ -40,7 +40,7 @@ const Metal = ({ color }: { color: string }) => <meshStandardMaterial color={col
 export function Headgear({ kind, color }: { kind: string; color: string }) {
   switch (kind) {
     case "head-antenna": return (
-      <group position={[0.22, 0.28, -0.02]} rotation={[0, 0, -0.25]}>
+      <group position={[0.2, 0.17, -0.05]} rotation={[0, 0, -0.25]}>
         <mesh position={[0, 0.22, 0]}><cylinderGeometry args={[0.012, 0.018, 0.44, 8]} /><Metal color="#c9d4e5" /></mesh>
         <mesh position={[0, 0.46, 0]}><sphereGeometry args={[0.04, 12, 12]} /><Glow color={color} /></mesh>
       </group>);

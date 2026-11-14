@@ -72,8 +72,8 @@ const POSE_CLIP = { idle: "idle", wave: "wave", ready: "floating", celebrate: "m
 const MODEL_HEIGHT = 3.1165; // native height of the GLB in its own units
 const TARGET_HEIGHT = 2.4; // world units, feet resting on y=-0.25
 
-export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = [0, 0, 0], scale = 1, pattern, patternColor, headgear, headgearColor, shoulder, shoulderColor, boots, bootsColor }:
-  AstronautLook & { position?: [number, number, number]; scale?: number }) {
+export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = [0, 0, 0], scale = 1, rotationY = 0, pattern, patternColor, headgear, headgearColor, shoulder, shoulderColor, boots, bootsColor }:
+  AstronautLook & { position?: [number, number, number]; scale?: number; rotationY?: number }) {
   const { scene, animations } = useGLTF(ASTRONAUT_URL);
   // Per-instance clone so skins and animation state never leak between crew members.
   const model = useMemo(() => {
@@ -101,7 +101,7 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
       mat.color.set(suit);
       // Pattern decal = glowing emissive mask in the pattern colour (keeps the suit's baked detail underneath).
       const tex = pattern ? patternTexture(pattern) : null;
-      mat.emissiveMap = tex; mat.emissive.set(tex ? patternColor ?? "#ffffff" : "#000000"); mat.emissiveIntensity = tex ? 0.9 : 0;
+      mat.emissiveMap = tex; mat.emissive.set(tex ? patternColor ?? "#ffffff" : "#000000"); mat.emissiveIntensity = tex ? 0.55 : 0;
       mat.needsUpdate = true;
     });
   }, [model, suit, helmet, pattern, patternColor]);
@@ -133,7 +133,7 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
   }, [actions, pose, reduced]);
 
   return (
-    <group ref={root} position={position} scale={scale}>
+    <group ref={root} position={position} scale={scale} rotation={[0, rotationY, 0]}>
       <primitive object={model} scale={k} position={offset} />
       {headgear && <group ref={headG}><Headgear kind={headgear} color={headgearColor ?? "#ffc857"} /></group>}
       {shoulder && <><group ref={lShG}><ShoulderGear kind={shoulder} color={shoulderColor ?? "#9fb3c8"} side={1} /></group><group ref={rShG}><ShoulderGear kind={shoulder} color={shoulderColor ?? "#9fb3c8"} side={-1} /></group></>}
