@@ -89,11 +89,11 @@ export function AstronautGuide({ children }: { children: React.ReactNode }) {
     <div className="relative h-full" onMouseEnter={greet} onMouseLeave={leave} onClick={greet} onFocus={greet}>
       {children}
       {open && !tour && (
-        <div role="status" className="enter absolute left-1/2 top-[6%] z-20 w-[min(22rem,90%)] -translate-x-1/2 rounded-2xl border border-orange/60 bg-panel/95 p-4 text-sm shadow-xl backdrop-blur">
+        <div role="status" className="pointer-events-auto absolute inset-x-0 top-[4%] z-20 mx-auto w-[min(22rem,90%)] rounded-2xl border border-orange/60 bg-[#10182b] p-4 text-sm shadow-xl">
           <p className="font-semibold text-orange">Astronaut</p>
           <p className="mt-1 text-ink2">Hi, welcome to Space Mission Design! Launch real rockets, fly Apollo to the Moon, or design your own mission. New here?</p>
           <GameButton className="mt-3" variant="primary" icon={<HelpCircle className="size-4" />} onClick={(e) => { e.stopPropagation(); stopSpeaking(); setTour(true); }}>Show me how to play</GameButton>
-          <span aria-hidden className="absolute -bottom-2 left-1/2 size-4 -translate-x-1/2 rotate-45 border-b border-r border-orange/60 bg-panel/95" />
+          
         </div>
       )}
       {tour && <Tutorial onClose={() => setTour(false)} />}
