@@ -2,10 +2,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HelpCircle } from "lucide-react";
+import { useProgress } from "@react-three/drei";
+import { preloadAstronaut } from "@/components/three/lazy";
 import { GameButton } from "@/components/ui";
 import { useUIStore } from "@/stores";
 import { Tour, setPendingTour, type TourStep } from "@/components/game/Tour";
-import { installVoiceUnlock, playVoice, stopVoice } from "@/lib/voice";
+import { installVoiceUnlock, playVoice, primeVoice, stopVoice, voiceStatus } from "@/lib/voice";
 
 const MENU_TOUR: TourStep[] = [
   { target: "[data-tour=astronaut]", title: "Meet your astronaut", body: "Hover over me any time for a hello. I'll walk you through the game." },
@@ -37,10 +39,12 @@ export function AstronautGuide({ children }: { children: React.ReactNode }) {
     });
   };
   const leave = () => { hide.current = setTimeout(() => setOpen(false), 600); };
-  useEffect(() => { installVoiceUnlock(); return () => { if (hide.current) clearTimeout(hide.current); stopVoice(); }; }, []);
+  const { active, progress } = useProgress();
+  useEffect(() => { preloadAstronaut(); installVoiceUnlock(); return () => { if (hide.current) clearTimeout(hide.current); stopVoice(); }; }, []);
   return (
     <div data-tour="astronaut" className="relative h-full" onMouseEnter={greet} onMouseLeave={leave} onClick={greet}>
       {children}
+      {active && progress < 100 && <div role="status" className="pointer-events-none absolute inset-x-0 top-1/2 mx-auto w-48 -translate-y-1/2 text-center text-xs text-ink2"><div className="mb-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-orange transition-all" style={{ width: `${Math.round(progress)}%` }} /></div>Loading your astronaut… {Math.round(progress)}%</div>}
       {open && !tour && (
         <div role="status" className="absolute inset-x-0 top-[4%] z-20 mx-auto w-[min(22rem,90%)] rounded-2xl border border-orange/60 bg-[#10182b] p-4 text-sm shadow-xl">
           <p className="font-semibold text-orange">Astronaut</p>
@@ -59,4 +63,15 @@ export function TutorialButton() {
   const [on, setOn] = useState(false);
   return (<><GameButton variant="outline" icon={<HelpCircle className="size-4" />} onClick={() => setOn(true)}>How to play</GameButton>
     {on && <Tour steps={MENU_TOUR.slice(1)} doneLabel="Open Launch Control" onDone={() => { setOn(false); setPendingTour("launch"); router.push("/launch"); }} onSkip={() => setOn(false)} />}</>);
+}
+
+/** Plays the greeting on click and shows what the browser says, so a silent voice can be diagnosed. */
+export function TestVoiceButton() {
+  const muted = useUIStore((s) => s.muted);
+  const [msg, setMsg] = useState("");
+  const run = () => {
+    primeVoice();
+    void playVoice("cd-10", false).then((ok) => setMsg(ok ? "Playing… (" + voiceStatus() + ")" : "Blocked: " + voiceStatus()));
+  };
+  return (<span className="inline-flex items-center gap-2"><GameButton variant="outline" onClick={run}>Test voice</GameButton>{(msg || muted) && <span role="status" className="text-xs text-muted">{muted ? "Sound is muted in the top bar. " : ""}{msg}</span>}</span>);
 }

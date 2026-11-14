@@ -142,7 +142,8 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
     </group>
   );
 }
-useGLTF.preload(ASTRONAUT_URL);
+/** Only screens that actually show the astronaut ask for it; the Launch Control and Moon views never download the model. */
+export const preloadAstronaut = () => useGLTF.preload(ASTRONAUT_URL);
 
 export function CrewLineup({ crew, pose = "idle" }: { crew: (AstronautLook | null)[]; pose?: AstronautLook["pose"] }) {
   const n = crew.length;

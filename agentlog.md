@@ -141,3 +141,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Moon coast voice: flight director calls coast start, mid-course, approach, capture/lost contact (MoonLeg), with a mute button.
 - Voice: single shared audio element unlocked by the first user gesture (Safari blocked new Audio().play() outside a click), falls back to browser speech if still locked.
 - Voice now plays via Web Audio (AudioContext unlocked by first gesture, clips decoded/cached); browser speech only if a clip cannot load. Fixes users hearing the robotic fallback instead of ElevenLabs.
+- Astronaut GLB shrunk 32MB -> 18.7MB (textures downscaled/JPEG); no longer preloaded globally (Launch Control/Moon views never download it); menu shows loading progress. Voice: audio unlock listens from page load, primeVoice() inside the Start countdown click, Test voice button shows audio state.
