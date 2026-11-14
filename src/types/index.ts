@@ -5,7 +5,7 @@
 export type Id = string;
 export type DifficultyId = "easy" | "medium" | "hard";
 export type RoleId = "leader" | "specialist" | "engineer";
-export type CosmeticCategory = "suit" | "helmet" | "backpack" | "patch" | "emote";
+export type CosmeticCategory = "suit" | "pattern" | "helmet" | "headgear" | "shoulder" | "boots" | "backpack" | "patch" | "emote";
 export type Rarity = "common" | "rare" | "epic" | "legendary";
 export type Severity = "low" | "medium" | "high";
 export type HudState = "loading" | "normal" | "warning" | "critical";

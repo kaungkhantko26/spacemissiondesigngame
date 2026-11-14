@@ -20,9 +20,9 @@ describe("transfer physics (dataset μ, radii, orbits)", () => {
     const p = planTransfer(DESTINATIONS.find((d) => d.id === "mars")!);
     expect(p.transferDays).toBeGreaterThan(250); expect(p.transferDays).toBeLessThan(270);
   });
-  it("outer targets cost more delta-v than the Moon", () => {
+  it("Mars costs more delta-v than the Moon", () => {
     const dv = (id: string) => planTransfer(DESTINATIONS.find((d) => d.id === id)!).totalDv;
-    expect(dv("jupiter")).toBeGreaterThan(dv("mars")); expect(dv("mars")).toBeGreaterThan(dv("moon"));
+    expect(dv("mars")).toBeGreaterThan(dv("moon"));
   });
 });
 
@@ -40,11 +40,9 @@ describe("design review", () => {
     const ev = evaluate(filled({ ...moonDesign(), vehicleId: "ll2_cfg_26" }));
     expect(ev.checks.find((c) => c.id === "mass")!.state).toBe("bad");
   });
-  it("chemical Jupiter is impossible; ion thrusters need solar arrays", () => {
-    const j: Design = { ...moonDesign(), destinationId: "jupiter", vehicleId: "ll2_cfg_161" };
-    expect(evaluate(j).propellantNeededKg).toBe(Infinity);
-    const rtgOnly = evaluate({ ...j, propulsionId: "next", solarAreaM2: 0, rtgUnits: 4 });
-    expect(rtgOnly.checks.find((c) => c.id === "thruster-power")!.state).toBe("bad");
+  it("ion thrusters cannot run on RTGs alone at Mars", () => {
+    const m: Design = { ...moonDesign(), destinationId: "mars", vehicleId: "ll2_cfg_161", propulsionId: "next", solarAreaM2: 0, rtgUnits: 1 };
+    expect(evaluate(m).checks.find((c) => c.id === "thruster-power")!.state).toBe("bad");
   });
 });
 
@@ -90,7 +88,5 @@ describe("trajectory (Earth → Moon from dataset μ)", () => {
     expect(t.mode).toBe("sun");
     const arr = t.sample(t.markers.seg2 + 1e-4);
     expect(arr.telemetry.metS / 86400).toBeGreaterThan(255); expect(arr.telemetry.rangeKm).toBeLessThan(2e7);
-    const ven = buildTrajectory(DESTINATIONS.find((d) => d.id === "venus")!, null).sample(0.79);
-    expect(ven.telemetry.rangeKm).toBeLessThan(2e7);
   });
 });

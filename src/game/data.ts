@@ -57,9 +57,6 @@ export interface Destination {
 }
 export const DESTINATIONS: Destination[] = [
   { id: "moon", bodyId: "moon", name: "Moon", tagline: "Low lunar orbit survey", kind: "moon", opsDays: 60, deadlineDays: 400, budgetUsd: 250e6, scienceGoal: 20, wants: ["fields", "particles"], difficulty: 1 },
-  { id: "venus", bodyId: "venus", name: "Venus", tagline: "Radar-map the cloud-shrouded surface", kind: "planet", opsDays: 200, deadlineDays: 700, budgetUsd: 600e6, scienceGoal: 30, wants: ["radar", "spectrometer"], difficulty: 3 },
   { id: "mars", bodyId: "mars", name: "Mars", tagline: "Orbiter to image candidate landing sites", kind: "planet", opsDays: 365, deadlineDays: 800, budgetUsd: 700e6, scienceGoal: 35, wants: ["imager", "spectrometer"], difficulty: 2 },
-  { id: "mercury", bodyId: "mercury", name: "Mercury", tagline: "Survive the solar furnace and map the magnetic field", kind: "planet", opsDays: 200, deadlineDays: 1500, budgetUsd: 800e6, scienceGoal: 35, wants: ["fields", "particles"], difficulty: 4 },
-  { id: "jupiter", bodyId: "jupiter", name: "Jupiter", tagline: "Where sunlight is 4 % — bring your own power", kind: "planet", opsDays: 400, deadlineDays: 2200, budgetUsd: 1200e6, scienceGoal: 40, wants: ["plasma", "fields", "imager"], difficulty: 5 },
 ];
 export const destinationById = (id: string) => DESTINATIONS.find((d) => d.id === id);

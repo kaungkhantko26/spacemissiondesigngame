@@ -92,6 +92,7 @@ function MissionClock() {
 export function MenuScreen() {
   const profile = usePlayerStore((s) => s.profile);
   const router = useRouter();
+  const look = useLook();
   const [pose, setPose] = useState<Pose>("wave");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -133,7 +134,7 @@ export function MenuScreen() {
           <p className="hud-label mt-4">Press 1–{MENU.length} to jump</p>
         </div>
         <div className="h-[380px] md:h-[560px]">
-          <Scene3D camera={[0, 1, 5]} label="Your astronaut"><Astronaut suit="#e8eef7" pose={pose} position={[0, -1.2, 0]} scale={1.2} /></Scene3D>
+          <Scene3D camera={[0, 0.6, 7]} label="Your astronaut"><Astronaut {...look} pose={pose} position={[1.9, -2.1, 0]} scale={1.6} rotationY={-Math.PI / 4} /></Scene3D>
         </div>
       </div>
     </main>
@@ -151,7 +152,12 @@ export function useLook() {
     const p = byId(previewId);
     if (p) eq[p.category] = p.id;
     const suit = byId(eq.suit), helmet = byId(eq.helmet), pack = byId(eq.backpack);
-    return { suit: suit?.color ?? "#e8eef7", accent: suit?.accent ?? "#168bff", helmet: helmet?.color ?? "#4fc3f7", pack: pack?.color ?? "#9fb3c8" };
+    const pat = byId(eq.pattern), head = byId(eq.headgear), sh = byId(eq.shoulder), bt = byId(eq.boots);
+    return {
+      suit: suit?.color ?? "#e8eef7", accent: suit?.accent ?? "#168bff", helmet: helmet?.color ?? "#4fc3f7", pack: pack?.color ?? "#9fb3c8",
+      pattern: pat?.id, patternColor: pat?.color, headgear: head?.id, headgearColor: head?.color,
+      shoulder: sh?.id, shoulderColor: sh?.color, boots: bt?.id, bootsColor: bt?.color,
+    };
   }, [profile.equipped, items, previewId]);
 }
 
@@ -204,8 +210,9 @@ export function ProfileScreen() {
 
 /* ---------- Cosmetics ---------- */
 const CATS: { id: CosmeticCategory; label: string }[] = [
-  { id: "suit", label: "Suits" }, { id: "helmet", label: "Helmets" }, { id: "backpack", label: "Backpacks" },
-  { id: "patch", label: "Patches" }, { id: "emote", label: "Emotes" },
+  { id: "suit", label: "Suits" }, { id: "pattern", label: "Patterns" }, { id: "helmet", label: "Helmets" },
+  { id: "headgear", label: "Headgear" }, { id: "shoulder", label: "Shoulder" }, { id: "boots", label: "Boots" },
+  { id: "backpack", label: "Backpacks" }, { id: "patch", label: "Patches" }, { id: "emote", label: "Emotes" },
 ];
 const rarityColor = { common: "text-ink2", rare: "text-cyan", epic: "text-[#c084fc]", legendary: "text-gold" } as const;
 

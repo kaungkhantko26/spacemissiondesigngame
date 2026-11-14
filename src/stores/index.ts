@@ -29,7 +29,7 @@ interface UIState {
 let toastId = 1;
 export const useUIStore = create<UIState>((set) => ({
   toasts: [], confirm: null, muted: false, reducedMotion: false, highContrast: false,
-  quality: "high", booted: false,
+  quality: "medium", booted: false,
   toast: (message, tone = "info") => {
     const id = toastId++;
     set((s) => ({ toasts: [...s.toasts, { id, message, tone }] }));

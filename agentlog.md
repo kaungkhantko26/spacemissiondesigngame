@@ -45,3 +45,20 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Mission Operations phase (/mission/ops, src/components/live/Ops.tsx): after launch the team flies the mission in real time (gauges, role controls, incidents with a countdown). Needs the updated backend (room status 'ops').
 - Dev tools (when server DEV_TOOLS != 0): lobby 'Add test player', design 'Auto-design'.
 - Ops v2: ~10 min run, 16 incident types, trait-driven options, animated OpsScene (SVG). Requires backend with opstraits.
+
+## Session 3 (cont.) — Real globe, Moon/Mars only, easier design, perf
+- Destinations limited to Moon and Mars (Venus/Mercury/Jupiter removed from `DESTINATIONS`; tests updated).
+- Real textures in `public/textures` (three.js example maps: Earth 2K + clouds, Moon 1K); `PlanetModel` uses them via `useTexture`. Mars is still a flat-colour sphere (no texture bundled).
+- `useDesignStore.quickStart(destId)`: two-phase search → most reliable go-for-launch build ("Build it for me" button + 3-step banner on /design). Tests in `quickstart.test.ts`.
+- Flight view waits on the pad: "Launch from Earth" → 3-2-1 countdown → ascent.
+- Perf: evaluation memoized (`useEvaluation`), default quality `medium`, high-performance GL hint. Still open: `astronaut.glb` is 32 MB — compress textures (gltf-transform) for faster loads.
+- Menu astronaut re-framed (head no longer cropped). Flight view: close chase camera from the pad, auto switch to system overview after LEO; explosion flash/fireball when a phase is lost (not yet seen live: needs a failing seed).
+- Menu astronaut re-framed (head no longer cropped). Flight view: close chase camera from the pad, auto switch to overview after LEO; explosion flash/fireball when a phase is lost (not yet seen live).
+
+## Session 3 (cont.) — Cosmetics beyond colour
+- New categories: pattern, headgear, shoulder, boots (13 new items in mock data). Patterns = glowing emissive decal masks (canvas textures, `three/Gear.tsx`); accessories are procedural meshes that follow GLB bones (head/clavicles/ankles; note three strips dots from bone names). `useLook` passes ids+colours to `Astronaut`. Verified on /cosmetics (patterns, halo, flag, thruster boots); other items not all eyeballed.
+- Menu astronaut: lower-right of the Earth, turned 45° right (`rotationY` prop), wears equipped cosmetics. Antenna lowered onto helmet; pattern decals softened.
+- Menu astronaut: turned 45° to the LEFT (rotationY -PI/4), scale 1.6, bottom-right corner.
+
+## Merge origin/main (cosmetics, Moon/Mars-only, astronaut gear) into live-on-main
+- Merged teammate's latest UI push; only agentlog.md conflicted (kept both). Live flow untouched.
