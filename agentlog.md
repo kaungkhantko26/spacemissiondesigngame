@@ -191,3 +191,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Same-seed replay comparison (src/game/replay.ts, ReplayCompare in the report): same scenario flown twice with one change, assisted controller, written explanation incl. trade-offs the grade can hide.
 - Quick start for the Moon now builds the chemical demo design (Falcon 9, 30 m2, 2.5 m dish, MAG+ER) when it is GO and meets the goal.
 - Captions for voice lines (Settings switch), About and glossary page, validation tests + docs/validation.md.
+- Removed the "Your mission" card from the menu (user request); menu back to two columns.
