@@ -62,3 +62,6 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 
 ## Merge origin/main (cosmetics, Moon/Mars-only, astronaut gear) into live-on-main
 - Merged teammate's latest UI push; only agentlog.md conflicted (kept both). Live flow untouched.
+
+## Character portraits (ONI-style cards)
+- New `src/components/live/Portrait.tsx`: generated SVG astronaut portrait seeded from character id (skin/hair/style/suit colour by role). Character cards now show portrait beside name + stats. Placeholder until the UI teammate's art lands; swap the component internals only.

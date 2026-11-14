@@ -9,6 +9,7 @@ import { useGame } from "@/live/store";
 import { Design } from "./Design";
 import { Report } from "./Report";
 import { Ops } from "./Ops";
+import { Portrait } from "./Portrait";
 import { cn } from "@/lib/mission";
 import type { Difficulty, Room } from "@/live/types";
 
@@ -213,9 +214,14 @@ export function LiveCharacters() {
         {cat.characters.filter((c) => c.role === s.role).map((c) => { const tp = cat.traitPreview[diff][c.id]; return (
           <li key={c.id}><button className="w-full text-left" onClick={() => swallow(g.claim(s.slot, c.id))}>
             <GlassPanel active={mineNow === c.id} className="h-full space-y-2 p-4">
-              <p className="font-display text-lg font-bold">{c.name} <span className="text-sm font-normal text-ink2">{c.title}</span></p>
-              <p className="text-xs text-ink2">{c.bio}</p>
-              <div className="grid gap-1">{cat.stats.map((st) => <StatBar key={st.id} label={st.label} value={c.stats[st.id]} max={10} />)}</div>
+              <div className="flex gap-3">
+                <Portrait id={c.id} role={c.role} size={92} />
+                <div className="min-w-0 flex-1">
+                  <p className="font-display text-lg font-bold">{c.name} <span className="text-sm font-normal text-ink2">{c.title}</span></p>
+                  <p className="mb-1 text-xs text-ink2">{c.bio}</p>
+                  <div className="grid gap-1">{cat.stats.map((st) => <StatBar key={st.id} label={st.label} value={c.stats[st.id]} max={10} />)}</div>
+                </div>
+              </div>
               {tp?.perks.map((p) => <p key={p.id} className="text-xs text-ok">＋ <b>{p.label}</b>: {p.effects.map((e) => e.text).join(", ")}</p>)}
               {tp?.flaw && <p className={cn("text-xs", tp.flaw.active ? "text-bad" : "text-muted")}>− <b>{tp.flaw.label}</b>{tp.flaw.active ? "" : " (dormant)"}: {tp.flaw.effects.map((e) => e.text).join(", ")}</p>}
               {mineNow === c.id && <p className="text-xs font-bold text-orange">✓ Selected</p>}
