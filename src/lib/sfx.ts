@@ -86,3 +86,18 @@ export function playSfx(kind: "ignition" | "separation" | "ignite2" | "explosion
   else if (kind === "explosion") { out.gain.value = 0.8; burst("white", 3.6, [5000, 90], 1, 0.003, 3.6); burst("brown", 4.5, [400, 60], 1, 0.01, 4.5); tone("sine", 80, 22, 2.5, 1); }
   else { out.gain.value = 0.5; tone("sine", 880, 880, 0.9, 0.5); tone("sine", 1318, 1318, 1.1, 0.4, 0.18); }
 }
+
+/** Quiet spacecraft ambience for the coast: low electrical hum plus ventilation hiss. */
+export class SpaceHum {
+  private g: GainNode; private nodes: { stop(): void }[] = [];
+  constructor(private c: AudioContext) {
+    this.g = c.createGain(); this.g.gain.value = 0; this.g.connect(c.destination);
+    const o1 = c.createOscillator(), o2 = c.createOscillator(); o1.frequency.value = 55; o2.frequency.value = 110.7; o2.type = "triangle";
+    const og = c.createGain(); og.gain.value = 0.35; o1.connect(og); o2.connect(og); og.connect(this.g);
+    const n = loop(c, noise(c, "white", 3)), f = c.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 900; f.Q.value = 0.4;
+    const ng = c.createGain(); ng.gain.value = 0.05; n.connect(f); f.connect(ng); ng.connect(this.g);
+    for (const x of [o1, o2, n]) { x.start(); this.nodes.push(x); }
+  }
+  set(on: boolean) { this.g.gain.setTargetAtTime(on ? 0.06 : 0, this.c.currentTime, 0.4); }
+  dispose() { this.set(false); setTimeout(() => this.nodes.forEach((n) => { try { n.stop(); } catch { /* stopped */ } }), 1200); }
+}

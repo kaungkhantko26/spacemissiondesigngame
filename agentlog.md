@@ -145,3 +145,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Astronaut: GLB 32MB -> 11.9MB (dropped unused TANGENT/UV1/UV4, weights as uint16, JPEG textures); instant poster image (astronaut-poster.webp) until the live model is ready; Boundary retries a dropped model download (4x) instead of leaving a hole.
 - Menu simplified: 4 main choices + collapsible More options; Test voice moved to Settings; tour points at More options.
 - Sound design: procedural Web Audio rocket engine (src/lib/sfx.ts) follows throttle/altitude/max-Q; one-shots for ignition, separation, upper-stage ignition, explosion, chime. ElevenLabs key lacks sound_generation permission so effects are synthesised, not generated.
+- Moon coast sound: cabin hum throughout, engine during mid-course correction and the LOI burn, chime or explosion at the end; shares the mute button with the voice.

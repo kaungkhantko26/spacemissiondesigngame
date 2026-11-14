@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { useUIStore } from "@/stores";
-import { playVoice, stopVoice, type VoiceId } from "@/lib/voice";
+import { playVoice, stopVoice, audioContext, type VoiceId } from "@/lib/voice";
+import { RocketSound, SpaceHum, playSfx } from "@/lib/sfx";
 import { RotateCcw } from "lucide-react";
 import { GameButton, GlassPanel } from "@/components/ui";
 import { cn } from "@/lib/mission";
@@ -38,7 +39,24 @@ export function MoonLeg({ flight, onAgain, onExit }: { flight: Flight; onAgain: 
     if (u >= seg2) say("approach", "approach");
     if (seenEnd) say("end", plan.loiOk ? "captured" : "lostcontact");
   }, [u, seenEnd, traj, plan.loiOk, voice]);
-  useEffect(() => () => stopVoice(), []);
+  // coast sound: cabin ambience all the way, engine for the mid-course correction and the lunar-orbit-insertion burn, chime or explosion at the end
+  const engine = useRef<RocketSound | null>(null), hum = useRef<SpaceHum | null>(null), lastMove = useRef(0), fx = useRef(new Set<string>());
+  useEffect(() => {
+    const c = audioContext(); if (!c) return;
+    if (!voice) { engine.current?.silence(); hum.current?.set(false); return; }
+    engine.current ??= new RocketSound(c); hum.current ??= new SpaceHum(c);
+    const { seg1, seg2 } = traj.markers, mid = seg1 + 0.4 * (seg2 - seg1);
+    lastMove.current = performance.now();
+    const burn = (u >= mid && u < mid + 0.012) || (u >= seg2 + 0.01 && u < traj.reveal[2]);
+    engine.current.update(burn ? 0.55 : 0, 4e8, 0, burn);
+    hum.current.set(true);
+    if (seenEnd && !fx.current.has("end")) { fx.current.add("end"); engine.current.silence(); playSfx(plan.loiOk ? "chime" : "explosion"); }
+  }, [u, seenEnd, traj, plan.loiOk, voice]);
+  useEffect(() => { // the engine falls silent when the playback pauses or ends
+    const id = setInterval(() => { if (performance.now() - lastMove.current > 500) engine.current?.silence(); }, 250);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => () => { stopVoice(); engine.current?.dispose(); hum.current?.dispose(); engine.current = null; hum.current = null; }, []);
   const onUpdate = useCallback((nu: number, d: boolean) => { setU(nu); if (d) setSeenEnd(true); }, []);
   const show = (i: number) => seenEnd || u >= traj.reveal[i] - 1e-6;
   const base = scoreFlight(flight), mult = flight.rules.scoreMult;
