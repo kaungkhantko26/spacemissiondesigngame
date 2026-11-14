@@ -357,8 +357,14 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
           <B label="Stage separation / ignite (Space)" disabled={!stageReady} onClick={() => session.stage()}><Layers className="size-4" />{rules.autoStaging ? "Staging auto" : "Stage"}</B>
           <B label="Engine cutoff (X)" disabled={!canCut} onClick={() => session.cut()}><Octagon className="size-4" />Cut</B>
           <B label="Restart engine (R)" disabled={!canRestart} onClick={() => session.restart()}><Power className="size-4" />{s.phase === "parking" ? "Ignite TLI" : "Restart"}</B>
-          <label data-tour="warp" className="ml-auto flex items-center gap-1 text-xs text-ink2">Warp
-            <select aria-label="Time warp" value={s.warp} onChange={(e) => setWarp(Number(e.target.value))} className="px-1 py-0.5 text-xs">{[1, 2, 5, 10, 50].map((w) => <option key={w} value={w}>{w}×</option>)}</select></label>
+          <div data-tour="warp" role="radiogroup" aria-label="Time warp" className="ml-auto flex items-center gap-2">
+            <span className="hud-label !text-sm">Warp</span>
+            <div className="flex overflow-hidden rounded-md border border-[var(--border)]">
+              {[1, 2, 5, 10, 50].map((w, i) => (
+                <button key={w} type="button" role="radio" aria-checked={s.warp === w} aria-label={`Time warp ${w}x (key ${i + 1})`} title={`${w}× (key ${i + 1})`} onClick={() => setWarp(w)}
+                  className={cn("h-10 min-w-12 px-3 font-display text-base font-semibold tabular-nums transition", s.warp === w ? "bg-orange text-[#1a0b00]" : "bg-panel text-ink2 hover:text-ink", i > 0 && "border-l border-[var(--border)]")}>{w}×</button>))}
+            </div>
+          </div>
         </div>
       </div>
 

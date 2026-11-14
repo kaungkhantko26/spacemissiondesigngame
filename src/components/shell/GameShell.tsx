@@ -7,7 +7,6 @@ import { useUIStore, usePlayerStore } from "@/stores";
 import { GlassPanel, GameButton, IconButton, LevelBadge, PlayerAvatar, XPProgressBar } from "@/components/ui";
 import Link from "next/link";
 import { cn } from "@/lib/mission";
-import { asset } from "@/lib/asset";
 import { GlobalSound } from "./GlobalSound";
 import { useProgress } from "@/game/progress";
 import { useAvatar } from "@/game/avatar";
@@ -43,7 +42,7 @@ export function GameShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="starfield relative flex min-h-screen flex-col">
-      <div className="deepspace" aria-hidden style={{ "--deep-img": `url(${asset("/bg/deep-field.jpg")})` } as React.CSSProperties} />
+      <div className="stars" aria-hidden />
       <GlobalSound />
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-gold focus:p-2 focus:text-black">Skip to content</a>
 
@@ -70,8 +69,9 @@ export function GameShell({ children }: { children: React.ReactNode }) {
       <div id="main" className="relative z-10 flex flex-1 flex-col">
         <AnimatePresence mode="wait">
           <motion.div key={path} className="flex flex-1 flex-col"
-            initial={{ opacity: 0, y: reducedMotion ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            transition={{ duration: reducedMotion ? 0 : 0.3 }}>
+            initial={{ opacity: 0, y: reducedMotion ? 0 : 14, filter: reducedMotion ? "none" : "blur(6px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: reducedMotion ? 0 : -6, filter: reducedMotion ? "none" : "blur(4px)", transition: { duration: reducedMotion ? 0 : 0.16 } }}
+            transition={{ duration: reducedMotion ? 0 : 0.42, ease: [0.22, 1, 0.36, 1] }}>
             {children}
           </motion.div>
         </AnimatePresence>

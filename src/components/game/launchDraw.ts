@@ -1,7 +1,6 @@
 import { LAUNCH, MOON_DIST_M, R_E, TLI, density, orbitElements, padPosition, thrustDir, type Flight } from "@/game/launch/core";
 import { biomeFor, drawClouds, hash, puff, drawComplex, drawSky, drawSmoke, drawTerrain, trailAlpha, updateSmoke, type Biome, type Puff, type Scene } from "./launchScenery";
 import type { RocketSprite } from "./partThumbs";
-import { asset } from "@/lib/asset";
 
 /** Camera + scene state for the launch canvas (a class so async loaders can attach textures without mutating React state). */
 export class SceneView {
@@ -9,13 +8,6 @@ export class SceneView {
   smoke: Puff[] = []; earth: HTMLCanvasElement | null = null; sprite: RocketSprite | null = null; biome: Biome;
   stars: [number, number, number][] = Array.from({ length: 190 }, (_, i) => { const a = Math.sin(i * 91.7) * 43758.5453; const b = Math.sin(i * 12.9) * 24634.6345; return [a - Math.floor(a), b - Math.floor(b), 0.35 + ((i * 37) % 10) / 12] as [number, number, number]; });
   constructor(siteId: string) { this.biome = biomeFor(siteId); }
-  deep: HTMLImageElement | null = null;
-  /** The Webb deep-field photo for the space background (loads once; the scene works without it). */
-  deepField(): HTMLImageElement | null {
-    if (typeof Image === "undefined") return null;
-    if (!this.deep) { const im = new Image(); im.src = asset("/bg/deep-field.jpg"); this.deep = im; }
-    return this.deep.complete && this.deep.naturalWidth ? this.deep : null;
-  }
   setEarth(c: HTMLCanvasElement | null) { this.earth = c; }
   setSprite(s: RocketSprite | null) { this.sprite = s; }
 }
@@ -30,7 +22,7 @@ export function updateView(v: SceneView, f: Flight, dtReal: number, reduced: boo
   const alt = Math.hypot(f.x, f.y) - R, pad = padPosition(f);
   const onPad = !f.liftedOff || alt < 40;
   const d = Math.hypot(f.x - pad.x, f.y - pad.y);
-  const s = smooth((alt - 70_000) / 80_000); // orbit view blend
+  const s = smooth((alt - 35_000) / 130_000); // orbit view blend: starts earlier and spreads over a longer climb so the zoom-out to the whole Earth is gradual
   const b = onPad ? 0.5 : Math.max(0, 0.5 * (1 - alt / 40_000));
   const tx = lerp(lerp(f.x, pad.x, b), 0, s), ty = lerp(lerp(f.y, pad.y, b), 0, s);
   const eAsc = Math.max(onPad ? 190 : 260, 2.1 * d + 160);
@@ -43,7 +35,7 @@ export function updateView(v: SceneView, f: Flight, dtReal: number, reduced: boo
       tLogE = Math.log(rApo * 0.62); cx = Math.cos(a) * rApo * 0.5; cy = Math.sin(a) * rApo * 0.5;
     }
   }
-  const k = 1 - Math.exp(-dtReal * (onPad ? 3 : 2.2));
+  const k = 1 - Math.exp(-dtReal * (onPad ? 3 : 2.8));
   v.cx += (cx - v.cx) * k; v.cy += (cy - v.cy) * k; v.logE += (tLogE - v.logE) * k;
   const thrusting = f.engineOn && f.tel.thrust > 0;
   v.shake = reduced ? 0 : thrusting && alt < 8000 ? Math.min(1, (f.tel.thrust / (f.rocket.s1.thrustSlN || 1)) * (1 - alt / 8000)) * 2.2 : 0;
@@ -68,11 +60,7 @@ export function drawFlight(ctx: CanvasRenderingContext2D, W: number, H: number, 
 
   // ---- sky + stars (space is the default background)
   ctx.save(); ctx.globalAlpha = 1; drawSky(ctx, { ...scene, alpha: skyA }, b); ctx.restore();
-  const starA = Math.max(0, night - 0.15) * 1.1;
-  if (starA > 0) {
-    const im = v.deepField();
-    if (im) { const sc = Math.max(W / im.naturalWidth, H / im.naturalHeight) * 1.08, w = im.naturalWidth * sc, h = im.naturalHeight * sc; ctx.globalAlpha = Math.min(1, starA) * 0.42; ctx.drawImage(im, (W - w) / 2 - (v.cx % 1e6) * 0, (H - h) / 2, w, h); ctx.globalAlpha = 1; }
-  }
+  const starA = smooth((night - 0.03) / 0.6); // stars fade in gradually as the sky darkens, no sudden switch to space
   if (starA > 0) { ctx.fillStyle = "#fff"; for (const [a, c, s] of v.stars) { ctx.globalAlpha = Math.min(1, starA) * s * 0.85; ctx.fillRect(a * W, c * H, s * 1.6, s * 1.6); } ctx.globalAlpha = 1; }
 
   // ---- Earth: surface colour (mid zoom), real texture (orbit zoom), atmosphere rim
