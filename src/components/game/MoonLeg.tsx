@@ -1,5 +1,8 @@
 "use client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Volume2, VolumeX } from "lucide-react";
+import { useUIStore } from "@/stores";
+import { playVoice, stopVoice, type VoiceId } from "@/lib/voice";
 import { RotateCcw } from "lucide-react";
 import { GameButton, GlassPanel } from "@/components/ui";
 import { cn } from "@/lib/mission";
@@ -24,6 +27,18 @@ export function MoonLeg({ flight, onAgain, onExit }: { flight: Flight; onAgain: 
   const traj = useMemo(() => buildTrajectory(moon, plan.failIndex), [moon, plan.failIndex]);
   const [u, setU] = useState(0);
   const [seenEnd, setSeenEnd] = useState(false);
+  const muted = useUIStore((st) => st.muted);
+  const [voice, setVoice] = useState(!muted);
+  const called = useRef(new Set<string>());
+  useEffect(() => { // flight director callouts along the coast, once each
+    const { seg1, seg2 } = traj.markers;
+    const say = (key: string, id: VoiceId) => { if (called.current.has(key)) return; called.current.add(key); void playVoice(id, !voice); };
+    if (u > seg1 + 1e-3) say("coast", "coast");
+    if (u >= seg1 + 0.4 * (seg2 - seg1)) say("mid", "midcourse");
+    if (u >= seg2) say("approach", "approach");
+    if (seenEnd) say("end", plan.loiOk ? "captured" : "lostcontact");
+  }, [u, seenEnd, traj, plan.loiOk, voice]);
+  useEffect(() => () => stopVoice(), []);
   const onUpdate = useCallback((nu: number, d: boolean) => { setU(nu); if (d) setSeenEnd(true); }, []);
   const show = (i: number) => seenEnd || u >= traj.reveal[i] - 1e-6;
   const base = scoreFlight(flight), mult = flight.rules.scoreMult;
@@ -41,6 +56,7 @@ export function MoonLeg({ flight, onAgain, onExit }: { flight: Flight; onAgain: 
   return (
     <main className="relative mx-auto flex w-full max-w-[1500px] flex-1 flex-col gap-4 px-4 pb-8 pt-4 md:px-8">
       <header><p className="hud-label !text-orange">Moon mission · {flight.rocket.name} · {flight.rules.name}</p>
+        <button type="button" aria-label={voice ? "Mute flight director voice" : "Unmute flight director voice"} aria-pressed={voice} onClick={() => { if (voice) stopVoice(); setVoice((v) => !v); }} className="float-right rounded-md border border-white/15 p-2 text-ink2 hover:text-ink">{voice ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}</button>
         <h1 className="text-3xl font-bold md:text-5xl">{finished ? (plan.loiOk ? "Mission to the Moon: success" : "Mission lost on the way") : "Translunar coast"}</h1></header>
       <div className="grid gap-4 xl:grid-cols-[minmax(320px,430px)_1fr]">
         <GlassPanel className="p-5">

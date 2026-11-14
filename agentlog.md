@@ -138,3 +138,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Added the real greeting voice clip public/voice/greeting.mp3 ; countdown clips cd-0..cd-10 generated with ElevenLabs voice c6SfcYrb2t09NHXiT80T.
 - playVoice resolves whether sound started; greeting only counts as played after audio actually starts (autoplay needs a click).
 - Flight callouts: launch director voice (ElevenLabs clips) reports max-Q, separations, ignitions, Karman line, orbit/parking, TLI, loss; muted by the speaker button.
+- Moon coast voice: flight director calls coast start, mid-course, approach, capture/lost contact (MoonLeg), with a mute button.
