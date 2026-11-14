@@ -52,7 +52,8 @@ export function AstronautGuide({ children, spin }: { children: React.ReactNode; 
         <img src={asset("/models/astronaut-poster.webp")} alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full object-contain object-right-bottom" />
       )}
       {open && !tour && (
-        <div role="status" className="absolute inset-x-0 top-[4%] z-20 mx-auto w-[min(22rem,90%)] rounded-2xl border border-orange/60 bg-[#10182b] p-4 text-sm shadow-xl">
+        <div role="status" className="absolute left-0 top-[26%] z-20 w-[min(17rem,54%)] rounded-2xl border border-orange/60 bg-[#10182b] p-4 text-sm shadow-xl max-md:inset-x-0 max-md:left-auto max-md:top-[1%] max-md:mx-auto max-md:w-[min(20rem,92%)]">
+          <span aria-hidden className="absolute -right-2 top-10 size-4 rotate-45 border-r border-t border-orange/60 bg-[#10182b] max-md:hidden" />
           <p className="font-semibold text-orange">Astronaut</p>
           <p className="mt-1 text-ink2">Hi, welcome to Space Mission Design! Launch real rockets, fly Apollo to the Moon, or design your own mission. New here?</p>
           <GameButton className="mt-3" variant="primary" icon={<HelpCircle className="size-4" />} onClick={(e) => { e.stopPropagation(); stopVoice(); setOpen(false); setTour(true); }}>Show me how to play</GameButton>
