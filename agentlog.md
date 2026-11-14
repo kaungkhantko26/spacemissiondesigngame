@@ -159,3 +159,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Sound samples: preloadSfx reads public/sfx/manifest.json (empty by default) so missing optional recordings no longer 404 in the console.
 - Reverted the Webb photo backdrop to the original dark starfield (removed public/bg). Smoother transitions: page changes fade/slide/unblur (framer-motion), flight camera zoom-out to the whole Earth starts earlier and spreads over a longer climb, stars fade in gradually. Warp control is now large one-tap buttons (1x 2x 5x 10x 50x).
 - Menu greeting bubble moved beside the astronaut (left of him, with a tail) so it no longer covers the head and hand; stacks above the astronaut on small screens.
+- Stale-deploy 404s: deploy-pages.sh now keeps the previous _next/static assets on gh-pages, and GameShell reloads once when a /_next/static script fails to load.
