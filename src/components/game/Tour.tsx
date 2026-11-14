@@ -60,7 +60,7 @@ export function Tour({ steps, onDone, onSkip, doneLabel = "Done" }: { steps: Tou
   return (
     <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label="Guided tour">
       {box ? <div aria-hidden className="pointer-events-none absolute rounded-lg border-2 border-orange transition-all duration-200" style={{ left: box.x, top: box.y, width: box.w, height: box.h, boxShadow: "0 0 0 9999px rgba(3,6,14,.72)" }} /> : <div aria-hidden className="absolute inset-0 bg-[#03060e]/75" />}
-      <div ref={card} tabIndex={-1} className="absolute rounded-xl border border-orange/60 bg-[#10182b] p-4 text-sm shadow-2xl outline-none" style={{ left, top, width: CW }}>
+      <div ref={card} tabIndex={-1} className="absolute max-h-[calc(100vh-1.5rem)] overflow-y-auto rounded-xl border border-orange/60 bg-[#10182b] p-4 text-sm shadow-2xl outline-none" style={{ left, top: Math.max(12, Math.min(top, vp.h - 120)), width: CW }}>
         <p className="hud-label !text-orange">Tour · {i + 1} / {steps.length}</p>
         <h2 className="mt-1 font-display text-xl font-bold">{step.title}</h2>
         <p className="mt-1.5 text-ink2">{step.body}</p>

@@ -44,7 +44,7 @@ const UP = new Vector3(0, 1, 0);
 const nearStart = (traj: Trajectory): [number, number, number] => { const c = traj.sample(0).craft; return [c[0] + traj.earthR * 0.6, c[1] + traj.earthR * 0.5, c[2] + traj.earthR * 1.1]; };
 
 /** Apollo-style spacecraft (command module, service module, engine bell, high-gain dish, RCS quads), nose along +Y, about 2 units long. */
-function SpacecraftModel() {
+export function SpacecraftModel() {
   return (
     <group>
       <mesh position={[0, 0.78, 0]}><coneGeometry args={[0.3, 0.55, 20]} /><meshStandardMaterial color="#d9d6cf" metalness={0.5} roughness={0.35} emissive="#3a3935" /></mesh>
@@ -212,12 +212,12 @@ function World({ traj, head, labels }: { traj: Trajectory; head: Playhead; label
       <primitive object={trail} />
       {moon && <group ref={moonGroup} visible={false}><primitive object={captureRing} /><primitive object={relTrail} /></group>}
       <group ref={earth}>
-        {moon ? <PlanetModel kind="earth" radius={traj.earthR} /> : <mesh scale={traj.viewRadius * 0.022}><sphereGeometry args={[1, 16, 16]} /><meshBasicMaterial color="#4f9dff" /></mesh>}
+        {moon ? <PlanetModel kind="earth" radius={traj.earthR} /> : <PlanetModel kind="earth" radius={traj.viewRadius * 0.024} />}
       </group>
       <group ref={target}>
-        {moon ? <PlanetModel kind="moon" radius={traj.targetR} /> : <mesh scale={traj.viewRadius * 0.026}><sphereGeometry args={[1, 16, 16]} /><meshBasicMaterial color="#e8a35a" /></mesh>}
+        {moon ? <PlanetModel kind="moon" radius={traj.targetR} /> : <PlanetModel kind={/mars/i.test(traj.targetName) ? "mars" : "deepspace"} radius={traj.viewRadius * 0.028} />}
       </group>
-      {!moon && <mesh scale={traj.viewRadius * 0.035}><sphereGeometry args={[1, 16, 16]} /><meshBasicMaterial color="#ffd27a" /></mesh>}
+      {!moon && <PlanetModel kind="sun" radius={traj.viewRadius * 0.04} />}
       <mesh ref={flash} visible={false}><sphereGeometry args={[1, 16, 16]} /><meshBasicMaterial color="#fff4c2" transparent depthWrite={false} /></mesh>
       <mesh ref={fire} visible={false}><sphereGeometry args={[1, 16, 16]} /><meshBasicMaterial color="#ff6a1a" transparent depthWrite={false} /></mesh>
       <group ref={craft}><SpacecraftModel /></group>

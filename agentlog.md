@@ -165,3 +165,26 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Manual pilot fixes: guidance cue clamped to the reachable pitch range (-5..95; it asked for -17 at the top), arrow keys/Space work even when the throttle slider or a button has focus, held pitch keys release on window blur/tab change. Verified by a scripted manual Pilot flight in the browser; bot flights 34/36 (2 pre-existing Saturn V orbit-on-Commander failures).
 - Toasts redesigned: top-centre card above all overlays (z-90) with tone icon + label, timer line, spring in/out, dismiss button (was a green box at bottom-right that sat under the flight bar).
 - Manual flying: first-time Flight School spotlight tour on the pad (Pilot/Commander; stored in localStorage smd-manual-school), keyboard help overlay on H, key hints on every control, M mutes, and a failure coach (src/game/launch/coach.ts) that explains why it failed and lists what to do with the keys.
+
+## Session: second review, first work-order batch
+- New `src/game/instruments.ts`: curation layer (measures, orbiter vs contact, shared package id, what the mass covers, basis source/name) over the extracted NASA instruments; `hardware()` counts shared packages once (Lunar Prospector MAG + ER = 5 kg / 4.5 W, not 10 / 9); camera mass = periscope + rest (12 kg); NSSDCA catalog links.
+- Engine/ops: the Moon contract needs magnetic-vector AND electron-spectrum measurements (an electric-field detector or dust monitor no longer qualifies); contact instruments (Spirit Mossbauer) are blocked from orbiters; coverage needs an actual magnetometer; quick start picks MAG + ER.
+- Architect UI: per-instrument measurement, fit-to-contract label, mass-scope note, source link; "Assumptions and sources" in the design review.
+- Team Up labels honest: Lunar Landing -> Lunar Orbit Mission; Mars and Telescope marked planned with a "Playable" note; results for Moon missions need the lunar-orbit capture (TLI alone shows "lunar leg not flown").
+- Tests: `instruments.test.ts` added; game/review tests updated. Not done yet (review work order): one saved mission lifecycle (ascent -> operations), real archived MAG/ER target layer, same-seed comparison, learner testing.
+
+## Session: saved mission lifecycle
+- `src/game/mission.ts`: one persisted mission record (localStorage `smd-mission`) from Architect to report: ascent -> transit -> operating -> complete/lost, with the Design, ascent result, transit (cruise/insertion, who paid the departure burn) and a snapshot of running operations.
+- Architect records the real ascent (grade, score, failure) and, for the Moon, the transfer and capture; the Moon "science ops" dice are no longer rolled there. After capture the player takes over in Mission Control. Mars/others keep the old odds-based result and say so.
+- Mission Control starts from lunar orbit (`createOpsFromMission`): propellant = design budget minus capture, minus departure only when the spacecraft (not the launcher) flew it. Saved every 3 s, "Resume operations" after reload, report shows the mission record, "Fly operations again" replays with new dice. The old simulated-launch run is kept as a labelled practice run.
+- Menu: "Your mission" card (single orange action, 4 steps, Resume/Report states); menu items describe what they do; layout tightened into three columns.
+- Tests: `mission.test.ts`. Verified end to end in a browser: Architect -> ascent -> capture -> Take over -> operations -> reload -> Resume.
+- Real NASA data: public/data/lp-mag-37km-2deg.json built by scripts/build_lp_field.py from PDS PPI LP-L-MAG-5-SURFACE-FIELD-MAP-V1.0 (total field, 37 km, 2-degree cells; 4547 of 16200 cells have data); src/game/lunarField.ts + SurveyMap.tsx (map + target store). NOT yet wired into Architect/ops/report.
+- Mars/Sun/Earth in the heliocentric trajectory view are now textured/glowing bodies; muted/secondary text tokens brightened; Settings On/Off switches redesigned. axe contrast check: 0 violations on 8 pages.
+
+## Session: survey target layer
+- Architect: "Survey targets" section (Moon): pick up to 3 10-degree regions on the real archived Lunar Prospector 37 km field map (SurveyMap); launch is blocked until one is chosen; "Build it for me" preselects the strongest 3. Targets saved in the mission record.
+- Ops: coverage = mean progress over the chosen regions (region-specific rates), replaces the global counter when targets exist; auto-plan now clears safe mode (it used to loop on "cannot enable science while in safe mode").
+- Report: survey map showing returned/observed/unobserved cells plus "What we can learn from this" (src/game/learn.ts: data findings vs the archive, design cause-and-effect, key ideas, caveat). Landmarks (Mare Ingenii, Reiner Gamma) are approximate general knowledge, labelled as such.
+- Mission Control orbit view: one 3-D canvas with the real textured Moon/Earth and the spacecraft model instead of SVG circles.
+- Still open from the review: same-seed replay comparison, chemical demo design as quick start, learner testing, recording.

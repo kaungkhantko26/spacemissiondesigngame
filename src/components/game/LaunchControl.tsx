@@ -157,7 +157,7 @@ const B = ({ label, onClick, disabled, children, on, ...rest }: { label: string;
     className={cn("inline-flex h-10 items-center gap-1.5 rounded-md border px-3 font-display text-sm uppercase tracking-wider transition disabled:opacity-35", on ? "border-orange bg-orange/15 text-orange" : "border-[var(--border)] bg-panel text-ink2 hover:text-ink")}>{children}</button>
 );
 
-export function AscentFlight({ session, onExit, onAgain, onContinue, continueLabel, exitLabel }: { session: LaunchSession; onExit: () => void; onAgain: () => void; onContinue?: () => void; continueLabel?: string; exitLabel?: string }) {
+export function AscentFlight({ session, onExit, onAgain, onContinue, continueLabel, exitLabel, onLunarResult }: { session: LaunchSession; onExit: () => void; onAgain: () => void; onContinue?: () => void; onLunarResult?: (r: { captured: boolean }) => void; continueLabel?: string; exitLabel?: string }) {
   const reduced = useUIStore((s) => s.reducedMotion);
   const rules = session.flight.rules;
   const canvas = useRef<HTMLCanvasElement>(null), wrap = useRef<HTMLDivElement>(null);
@@ -297,7 +297,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   const pitchErr = s.cue - s.pitch;
   const result = showResult ? scoreFlight(f) : null;
   const held = (key: "up" | "down") => ({ onPointerDown: () => session.hold(key, true), onPointerUp: () => session.hold(key, false), onPointerLeave: () => session.hold(key, false), onPointerCancel: () => session.hold(key, false) });
-  if (leg) return <MoonLeg flight={f} onAgain={onAgain} onExit={onExit} />;
+  if (leg) return <MoonLeg flight={f} onAgain={onAgain} onExit={onExit} onResult={onLunarResult} />;
   return (
     <main className="relative flex min-h-[calc(100vh-70px)] flex-1 flex-col">
       {school && <Tour steps={MANUAL_TOUR.filter((st) => st.target !== "[data-tour=cue]" || rules.guideCue)} doneLabel="Start flying" onDone={() => { setSchool(false); try { window.localStorage.setItem("smd-manual-school", "1"); } catch { /* ignore */ } }} onSkip={() => { setSchool(false); try { window.localStorage.setItem("smd-manual-school", "1"); } catch { /* ignore */ } }} />}
@@ -306,7 +306,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
       <div ref={wrap} className="absolute inset-0"><canvas ref={canvas} className="h-full w-full" aria-label="Rocket flight view" role="img" /></div>
 
       {/* telemetry */}
-      <dl className="pointer-events-none relative z-10 m-3 w-52 space-y-1.5 rounded-md border border-[var(--border)] bg-bg/80 p-3 font-display text-sm tracking-wider" aria-label="Flight telemetry" data-tour="telemetry">
+      <dl className="relative z-10 m-2 max-h-[46vh] w-52 space-y-1.5 overflow-y-auto max-sm:w-[46vw] max-sm:text-xs sm:m-3 rounded-md border border-[var(--border)] bg-bg/80 p-3 font-display text-sm tracking-wider" aria-label="Flight telemetry" data-tour="telemetry">
         <div><dt className="hud-label">Mission clock</dt><dd className="text-xl tabular-nums text-orange">{clock(s.t)}</dd></div>
         <div className="grid grid-cols-2 gap-x-2">
           <div><dt className="hud-label">Altitude</dt><dd className="tabular-nums">{tel.alt >= 100_000 ? fmt(tel.alt / 1000, 1) + " km" : tel.alt >= 1000 ? fmt(tel.alt / 1000, 2) + " km" : fmt(tel.alt) + " m"}</dd></div>
@@ -332,7 +332,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
       </dl>
 
       {/* milestones */}
-      <ol className="pointer-events-none absolute right-3 top-3 z-10 w-64 space-y-1 rounded-md border border-[var(--border)] bg-bg/80 p-3 text-sm" data-tour="milestones" aria-label="Mission milestones">
+      <ol className="absolute right-2 top-2 z-10 max-h-[46vh] w-64 space-y-1 overflow-y-auto max-sm:w-[44vw] max-sm:text-xs sm:right-3 sm:top-3 rounded-md border border-[var(--border)] bg-bg/80 p-3 text-sm" data-tour="milestones" aria-label="Mission milestones">
         {milestonesFor(f).map(([key, label]) => (
           <li key={key} className={cn("flex items-center gap-2", s.ms[key] !== undefined ? "text-ok" : "text-muted")}>
             <span aria-hidden className="grid size-4 place-items-center rounded-sm border text-[10px]">{s.ms[key] !== undefined ? "✓" : ""}</span>{label}
@@ -343,7 +343,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
 
       {/* pad overlay */}
       {!s.running && s.t <= -LAUNCH.countdownS + 0.01 && s.phase === "countdown" && (
-        <div data-tour="pad" className="relative z-10 mx-auto mt-24 max-w-md rounded-lg border border-[var(--border-strong)] bg-bg/85 p-5 text-center">
+        <div data-tour="pad" className="relative z-10 mx-auto mt-24 max-h-[50vh] max-w-md overflow-y-auto rounded-lg max-sm:mt-4 border border-[var(--border-strong)] bg-bg/85 p-5 text-center">
           <p className="hud-label !text-orange">{f.rocket.name} on the pad · {f.site.location.split(",")[0]}</p>
           <h2 className="mt-1 text-3xl font-bold">All systems go?</h2>
           <p className="mt-2 text-sm text-ink2">{rules.name}: {rules.tagline}. {f.mission === "moon" ? `Mission: parking orbit above ${rules.minPerigeeKm} km, then translunar injection to the Moon.` : `Orbit: lowest point above ${rules.minPerigeeKm} km.`}</p>
@@ -386,8 +386,9 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
 
       {/* result */}
       {result && (
-        <div className="absolute inset-0 z-20 grid place-items-center bg-black/55 p-4">
-          <GlassPanel active className="enter w-full max-w-xl p-6" role="dialog" aria-modal="true" aria-label="Flight result">
+        <div className="absolute inset-0 z-20 overflow-y-auto bg-black/55 p-3 sm:p-4">
+          <div className="grid min-h-full place-items-center">
+          <GlassPanel active className="enter w-full max-w-xl p-4 sm:p-6" role="dialog" aria-modal="true" aria-label="Flight result">
             <p className="hud-label">{f.rocket.name} · {f.rules.name} · {f.site.location.split(",")[0]}</p>
             <h2 className={cn("mt-1 text-4xl font-bold", result.ok ? "text-ok" : "text-bad")}>{result.ok ? (f.mission === "moon" ? "Translunar injection complete" : "Orbit achieved") : "Mission lost"}</h2>
             <p className="mt-1 text-sm text-ink2">{result.ok ? (f.mission === "moon" ? `${f.rocket.name} put the spacecraft on a ${fmt(tel.apoKm)} km-apogee transfer to the Moon at ${clock(f.t)} (window error ${Math.abs(tel.tliErrDeg ?? 0).toFixed(1)}°). Now coast to the Moon and capture into lunar orbit.` : `You reached a ${fmt(tel.periKm)} × ${fmt(tel.apoKm)} km orbit in ${clock(f.t)}.`) : f.failure}</p>
@@ -416,6 +417,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
               {result.ok && !onContinue && f.mission === "orbit" && <Link href="/design" className="inline-flex items-center rounded-md border border-[var(--border-strong)] bg-panel px-4 py-2.5 font-display text-sm uppercase tracking-wider text-ink hover:border-ink2">Next: design the Moon mission</Link>}
             </div>
           </GlassPanel>
+          </div>
         </div>
       )}
     </main>

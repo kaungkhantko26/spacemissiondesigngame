@@ -12,9 +12,13 @@ import { buildTrajectory } from "@/game/trajectory";
 import { TrajectorySim } from "./TrajectorySim";
 import { AscentFlight } from "./LaunchControl";
 import { LaunchSession } from "@/game/launch/session";
-import { RULES, type Difficulty } from "@/game/launch/core";
+import { RULES, scoreFlight, type Difficulty } from "@/game/launch/core";
+import { useMission } from "@/game/mission";
+import { MAX_TARGETS, placeLabel, strongestTiles, tileBounds, TILE_DEG, useTargets } from "@/game/lunarField";
+import { SurveyMap, useLunarField } from "./SurveyMap";
 import { useLaunchSetup } from "@/game/launch/store";
 import { CraftPreview } from "./CraftPreview";
+import { catalogUrl, curationOf, requiredMeasures, suitability } from "@/game/instruments";
 import { usePartThumbs } from "./partThumbs";
 
 const fmt = (n: number, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d });
@@ -59,6 +63,9 @@ export function DesignStudio() {
   const [flight, setFlight] = useState<MissionResult | null>(null);
   const dest = ev.destination;
   const maxProp = 40_000;
+  const { field, failed: fieldFailed, tiles } = useLunarField();
+  const targets = useTargets(), targetIds = targets.ids;
+  const needTargets = dest.id === "moon" && field !== null && targetIds.length < 1; // a survey needs somewhere to look
 
   const [ascent, setAscent] = useState<{ session: LaunchSession; n: number } | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -69,6 +76,7 @@ export function DesignStudio() {
     // Full Moon mission (parking orbit → TLI burn) when asked for, the target is the Moon and the rocket has the performance.
     const mission = setup.mission === "moon" && canFlyMoon(ev) ? "moon" : "orbit";
     setAttempt(n);
+    useMission.getState().start(design, n, dest.id === "moon" ? targetIds : []); // one saved mission from here to the final report
     setAscent({ n, session: new LaunchSession(setup.difficulty, setup.siteId, ev.vehicle.id, 1000 + n * 7919, Math.min(ev.wetKg, ev.vehicle.leo_capacity_kg), mission) });
   };
   const onLaunch = () => startAscent(attempt + 1);
@@ -81,12 +89,20 @@ export function DesignStudio() {
     r.phases[0] = { ...r.phases[0], probability: 1, story: tli
       ? `${f.rocket.name} reached a ${(f.park?.periKm ?? 0).toFixed(0)} × ${(f.park?.apoKm ?? 0).toFixed(0)} km parking orbit and the upper stage completed translunar injection (apogee ${f.tel.apoKm.toFixed(0)} km) — ${f.rules.name} launch from ${site}.`
       : `Reached a ${f.tel.periKm.toFixed(0)} × ${f.tel.apoKm.toFixed(0)} km orbit — ${f.rules.name} launch from ${site}.` };
+    // Record what really happened so Mission Control can take over from lunar orbit instead of starting a second launch.
+    const sc = scoreFlight(f);
+    useMission.getState().setAscent({ ok: sc.ok, mission: f.mission, difficulty: ascent.session.difficulty, siteId: f.site.id, rocket: f.rocket.name, score: sc.score, grade: sc.grade, flightS: f.t, failure: f.failure, apoKm: f.tel.apoKm, tliErrDeg: f.tliErr === null ? null : (f.tliErr * 180) / Math.PI });
+    if (ev.destination.kind === "moon") {
+      useMission.getState().setTransit({ cruiseOk: !!r.phases[1]?.passed, insertionOk: !!r.phases[2]?.passed, transferDays: ev.cruiseDays, departureBy: f.mission === "moon" ? "launcher" : "spacecraft" });
+    }
     setFromTli(tli); setFlight(r); setAscent(null);
   };
+  /** A failed ascent ends the saved mission; leaving or retrying must say so. */
+  const loseIfFailed = () => { const f = ascent?.session.flight; if (f && f.phase === "failed") useMission.getState().lose(f.failure ?? "Launch failure."); };
   if (ascent && !flight) {
-    return <AscentFlight key={ascent.n} session={ascent.session} onExit={() => setAscent(null)} onAgain={() => startAscent(ascent.n + 1)} onContinue={finishAscent} continueLabel={`fly to the ${ev.destination.name}`} exitLabel="Back to design" />;
+    return <AscentFlight key={ascent.n} session={ascent.session} onExit={() => { loseIfFailed(); setAscent(null); }} onAgain={() => { loseIfFailed(); startAscent(ascent.n + 1); }} onContinue={finishAscent} continueLabel={`fly to the ${ev.destination.name}`} exitLabel="Back to design" />;
   }
-  if (flight) return <FlightView ev={ev} result={flight} fromTli={fromTli} onAgain={() => { setFlight(null); redesign(); }} onRetry={() => { setFlight(null); startAscent(attempt + 1); }} />;
+  if (flight) return <FlightView ev={ev} result={flight} fromTli={fromTli} handoff={ev.destination.kind === "moon"} onAgain={() => { setFlight(null); redesign(); }} onRetry={() => { setFlight(null); startAscent(attempt + 1); }} />;
 
   return (
     <ScreenContainer title="Mission Architect" subtitle="Real orbital physics, real launch records, real NASA instruments — balance them all." actions={<div className="flex gap-2"><GameButton variant="ghost" icon={<RotateCcw className="size-4" />} onClick={reset}>Reset</GameButton><BackButton href="/menu" label="Main menu" /></div>}>
@@ -96,7 +112,7 @@ export function DesignStudio() {
           <p className="font-display text-lg font-bold uppercase tracking-wide">1 Pick Moon or Mars · 2 Build it for me · 3 Launch from Earth</p>
           <p className="text-xs text-ink2">“Build it for me” picks the most reliable rocket, engine, power, antenna and instruments for {dest.name}. Tweak anything below afterwards.</p>
         </div>
-        <GameButton variant="primary" icon={<Wand2 className="size-5" />} onClick={() => setQsFailed(!quickStart(design.destinationId))}>Build it for me</GameButton>
+        <GameButton variant="primary" icon={<Wand2 className="size-5" />} onClick={() => { setQsFailed(!quickStart(design.destinationId)); if (dest.id === "moon" && tiles.length && targetIds.length < 1) targets.set(strongestTiles(tiles).map((t) => t.id)); }}>Build it for me</GameButton>
         {qsFailed && <p role="status" className="w-full text-xs text-bad">Couldn’t find a working build automatically — adjust the sections below.</p>}
       </GlassPanel>
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
@@ -172,25 +188,44 @@ export function DesignStudio() {
           <Section n={6} title="Science instruments" hint="Real instruments from NASA's NSSDC catalog, with the mass (and power, where stated) quoted from NASA's descriptions.">
             <ul className="grid gap-2 sm:grid-cols-2">
               {DATASET.instruments.map((i) => {
-                const wanted = dest.wants.includes(i.tag);
+                const su = suitability(i, dest), cu = curationOf(i), url = catalogUrl(i);
+                const tone = su.kind === "suited" ? "text-ok" : su.kind === "unsuitable" ? "text-bad" : su.kind === "supporting" ? "text-warn" : "text-muted";
                 return (
                   <li key={i.id}><Pick on={design.instrumentIds.includes(i.id)} onClick={() => toggleInstrument(i.id)} className="w-full">
                     <div className="flex gap-3"><PartImg k={`ins:${i.id}`} thumbs={thumbs} w={60} h={60} /><div className="min-w-0 flex-1">
-                    <div className="flex justify-between gap-2"><span className="text-sm font-semibold">{i.name}</span>{wanted && <span className="hud-label !text-ok">wanted ×{GAME.wantedBonus}</span>}</div>
-                    <p className="text-xs text-ink2">{i.mission} · {i.mass_kg} kg · {i.power_w ?? GAME.defaultInstrumentPowerW} W{i.power_w === null && <GameChip />}</p>
-                    <p className="text-xs capitalize text-muted">{i.tag}</p></div></div>
-                  </Pick></li>
+                    <div className="flex justify-between gap-2"><span className="text-sm font-semibold">{i.name}</span>{su.kind === "suited" && <span className="hud-label !text-ok">fits contract</span>}</div>
+                    <p className="text-xs text-ink2">{i.mission} · {cu.packageId ? `${i.mass_kg} kg · ${i.power_w} W (shared package)` : `${cu.massKg ?? i.mass_kg} kg · ${i.power_w ?? GAME.defaultInstrumentPowerW} W`}{i.power_w === null && <GameChip />}</p>
+                    <p className="text-xs capitalize text-muted">{cu.measures.map((m) => m.replace(/-/g, " ")).join(" · ") || i.tag}</p>
+                    <p className={cn("text-xs", tone)}>{su.label}</p></div></div>
+                  </Pick>
+                  <p className="mt-1 px-1 text-[11px] leading-snug text-muted">{MASS_LABEL[cu.massScope]}{cu.note ? ` · ${cu.note}` : ""}{cu.basis === "name" ? " · measurement type inferred from the name." : ""}{url && <> <a className="underline hover:text-ink" href={url} target="_blank" rel="noreferrer">NASA catalog entry</a></>}</p></li>
                 );
               })}
             </ul>
           </Section>
 
-          <Section n={7} title="Engineering margin" hint="Contingency mass makes every phase more reliable — at the cost of mass and money.">
+          {dest.id === "moon" && (
+            <Section n={7} title="Survey targets" hint={`Pick up to ${MAX_TARGETS} regions (10° x 10°) to survey. The colours are real: the magnetic field Lunar Prospector measured at 37 km altitude. Dark areas have no archived data and cannot be chosen.`}>
+              {field ? (
+                <>
+                  <SurveyMap field={field} tiles={tiles} selected={targetIds} onToggle={targets.toggle} />
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                    <GameButton variant="outline" onClick={() => targets.set(strongestTiles(tiles).map((t) => t.id))}>Suggest the strongest {MAX_TARGETS}</GameButton>
+                    <GameButton variant="ghost" onClick={targets.clear} disabled={!targetIds.length}>Clear</GameButton>
+                    <span className="text-ink2">{targetIds.length} of {MAX_TARGETS} chosen</span>
+                  </div>
+                  {targetIds.length > 0 && <ol className="mt-2 grid gap-1 text-xs text-ink2">{targetIds.map((id, i) => { const t = tiles.find((x) => x.id === id), bd = tileBounds(id)!; return <li key={id}><b className="text-orange">{i + 1}</b> {placeLabel(bd.lat0 + TILE_DEG / 2, bd.lon0 + TILE_DEG / 2)} · mean {t?.meanNT.toFixed(1)} nT · {t?.valid} of 25 cells have archived data</li>; })}</ol>}
+                  <p className="mt-2 text-[11px] text-muted">{field.meta.title}. Source: {field.meta.source}. {field.meta.caveat}</p>
+                </>
+              ) : fieldFailed ? <p className="text-sm text-warn">The archived map could not be loaded. The mission will use the simplified global coverage counter instead.</p> : <p className="text-sm text-muted">Loading the archived map…</p>}
+            </Section>
+          )}
+          <Section n={dest.id === "moon" ? 8 : 7} title="Engineering margin" hint="Contingency mass makes every phase more reliable — at the cost of mass and money.">
             <Slider label="Design margin" value={design.marginPct} min={0} max={30} unit="%" onChange={(v) => patch({ marginPct: v })} />
           </Section>
         </div>
 
-        <aside className="space-y-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto"><CraftPreview ev={ev} className="h-64" /><ReviewPanel ev={ev} onLaunch={onLaunch} /></aside>
+        <aside className="space-y-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto"><CraftPreview ev={ev} className="h-64" /><ReviewPanel ev={ev} needTargets={needTargets} onLaunch={onLaunch} /></aside>
       </div>
       <p className="text-center text-xs text-muted">Data: <a className="underline" href={DATASET.provenance.dataset}>space-mission-dataset</a> (NASA, JPL, Launch Library 2). Items marked “game” are balance values, not real data.</p>
     </ScreenContainer>
@@ -223,7 +258,8 @@ function LaunchSetupFields({ ev }: { ev: Evaluation }) {
 }
 const stateText: Record<Check["state"], string> = { ok: "OK", warn: "Tight", bad: "Fail" };
 const stateColor = { ok: "text-ok", warn: "text-warn", bad: "text-bad" } as const;
-function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void }) {
+const MASS_LABEL = { full: "Mass: whole instrument", "shared-package": "Mass: shared electronics package, counted once", "sensor-only": "Mass: sensor only, electronics not included", "electronics-only": "Mass: electronics board only (estimate)", derived: "Mass: derived from the source's parts" } as const;
+function ReviewPanel({ ev, onLaunch, needTargets }: { ev: Evaluation; onLaunch: () => void; needTargets: boolean }) {
   const p = ev.probabilities;
   return (
     <GlassPanel active={ev.goNoGo} className="p-4">
@@ -253,27 +289,38 @@ function ReviewPanel({ ev, onLaunch }: { ev: Evaluation; onLaunch: () => void })
           <tr><td>Orbit average (60/40 mix)</td><td className="text-right">{fmt(ev.ops.avgGen)} W</td><td className="text-right">{fmt(ev.ops.avgLoad)} W</td></tr>
         </tbody></table>
         <p className="mt-1 text-muted">Same model Mission Control uses: arrays derated for pointing and off in eclipse; RTGs constant. Architect&apos;s headline power figure is the nominal full-Sun output.</p></details>
+      <details className="mt-3 text-xs text-ink2"><summary className="cursor-pointer">Assumptions and sources</summary>
+        <ul className="mt-1 max-h-72 space-y-1 overflow-y-auto pr-1">
+          <li><b className="text-ink">Real, from NASA or Launch Library 2:</b> instrument masses and powers as quoted, planetary constants, launch vehicle data. Launch Library 2 is not a NASA source.</li>
+          <li><b className="text-ink">Game values:</b> prices other than launch, array and battery masses, reliability model, science points and the {ev.destination.id === "moon" ? "survey goals" : "mission goals"}. Where a source gives no power, a default is used (marked GAME).</li>
+          <li><b className="text-ink">Simplifications:</b> {ev.electric ? "low-thrust transfer uses an approximate model; " : ""}coverage is a scalar progress counter, not a mapped survey; the survey does not use real NASA measurements yet.</li>
+          {requiredMeasures(ev.destination).length > 0 && <li><b className="text-ink">Contract needs:</b> {requiredMeasures(ev.destination).map((m) => m.replace("-", " ")).join(" + ")}.</li>}
+          {ev.instruments.map((i) => <li key={i.id}><b className="text-ink">{i.name}:</b> {MASS_LABEL[curationOf(i).massScope]}{curationOf(i).note ? `. ${curationOf(i).note}` : ""}</li>)}
+        </ul></details>
       <details className="mt-3 text-xs text-ink2"><summary className="cursor-pointer">Cost breakdown</summary>
         <ul className="mt-1 space-y-0.5">{Object.entries(ev.costBreakdown).map(([k, v]) => <li key={k} className="flex justify-between"><span>{k}</span><span className="tabular-nums">{usd(v)}</span></li>)}</ul></details>
       <LaunchSetupFields ev={ev} />
-      <GameButton variant="primary" className="mt-4 w-full py-3 text-lg" disabled={!ev.goNoGo} icon={<Rocket className="size-5" />} onClick={onLaunch}>{ev.goNoGo ? "Go for launch" : "No-go"}</GameButton>
+      <GameButton variant="primary" className="mt-4 w-full py-3 text-lg" disabled={!ev.goNoGo || needTargets} icon={<Rocket className="size-5" />} onClick={onLaunch}>{!ev.goNoGo ? "No-go" : needTargets ? "Pick a survey target first" : "Go for launch"}</GameButton>
       {!ev.goNoGo && <p className="mt-2 text-center text-xs text-bad" role="status">Fix the failing checks to unlock launch.</p>}
       {ev.destination.id === "moon" && <Link href="/mission-control" className="mt-2 block rounded-lg border border-[var(--border)] px-4 py-2 text-center text-sm text-ink2 transition hover:border-orange hover:text-ink">Or fly it live in Mission Control →</Link>}
     </GlassPanel>
   );
 }
 
-function FlightView({ ev, result, fromTli, onAgain, onRetry }: { ev: Evaluation; result: MissionResult; fromTli: boolean; onAgain: () => void; onRetry: () => void }) {
-  const failIndex = (() => { const i = result.phases.findIndex((p) => !p.passed); return i === -1 ? null : (i as 0 | 1 | 2 | 3); })();
+function FlightView({ ev, result, fromTli, handoff, onAgain, onRetry }: { ev: Evaluation; result: MissionResult; fromTli: boolean; handoff: boolean; onAgain: () => void; onRetry: () => void }) {
+  // Moon missions hand over to Mission Control at lunar orbit: the "science ops" dice are not rolled here any more, operations are flown for real.
+  const phases = handoff ? result.phases.slice(0, 3) : result.phases;
+  const captured = handoff && phases.length === 3 && phases.every((p) => p.passed);
+  const failIndex = (() => { const i = phases.findIndex((p) => !p.passed); return i === -1 ? null : (i as 0 | 1 | 2 | 3); })();
   const traj = useMemo(() => buildTrajectory(ev.destination, failIndex), [ev.destination, failIndex]);
   const [u, setU] = useState(0);
   const [seenEnd, setSeenEnd] = useState(false);
   const [crew, setCrew] = useState(false);
   const onUpdate = useCallback((nu: number, d: boolean) => { setU(nu); if (d) setSeenEnd(true); }, []);
-  const revealed = result.phases.filter((_, i) => seenEnd || u >= traj.reveal[i] - 1e-6);
+  const revealed = phases.filter((_, i) => seenEnd || u >= traj.reveal[i] - 1e-6);
   const finished = seenEnd;
   return (
-    <ScreenContainer title={finished ? (result.success ? "Mission success" : "Mission lost") : "Mission in progress"} subtitle={`${ev.destination.name} · ${ev.vehicle.name} · ${ev.design.propulsionId === "chem" ? "chemical" : ev.electric?.name}`}>
+    <ScreenContainer title={finished ? (handoff ? (captured ? "Lunar orbit achieved" : "Mission lost") : result.success ? "Mission success" : "Mission lost") : "Mission in progress"} subtitle={`${ev.destination.name} · ${ev.vehicle.name} · ${ev.design.propulsionId === "chem" ? "chemical" : ev.electric?.name}`}>
       <div className="grid gap-4 xl:grid-cols-[minmax(320px,430px)_1fr]">
         <GlassPanel className="p-5">
           <ol className="space-y-3" aria-live="polite">
@@ -285,7 +332,24 @@ function FlightView({ ev, result, fromTli, onAgain, onRetry }: { ev: Evaluation;
             ))}
             {!finished && <li className="text-sm text-muted">Tracking spacecraft…</li>}
           </ol>
-          {finished && (
+          {finished && handoff && (
+            <div className="enter mt-6 border-t border-[var(--border)] pt-4">
+              <p className="text-lg">{captured ? "Lunar orbit achieved. Mission Control takes over from here: no second launch." : `Mission lost during ${phases[phases.length - 1].label.split(" · ")[0].toLowerCase()}.`}</p>
+              <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Launch</dt><dd className="text-base">{useMission.getState().record?.ascent?.grade ?? "-"} · {useMission.getState().record?.ascent?.score ?? 0}</dd></div>
+                <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Transfer</dt><dd className="text-base">{fmt(ev.cruiseDays, 1)} days</dd></div>
+                <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Cost</dt><dd className="text-base">{usd(ev.costUsd)}</dd></div>
+              </dl>
+              {captured && <p className="mt-2 text-xs text-ink2">Saved as mission {useMission.getState().record?.id}. Your propellant, payload and design carry over; the operations phase is flown, not rolled.</p>}
+              <div className="mt-5 flex flex-wrap gap-2">
+                {captured && <Link href="/mission-control" className="inline-flex items-center rounded-lg border border-orange bg-orange px-4 py-2 font-display font-bold text-[#1a0b00] shadow-[0_3px_0_#b4501a]">Take over in Mission Control</Link>}
+                <GameButton variant={captured ? "outline" : "primary"} icon={<Pencil className="size-4" />} onClick={onAgain}>Redesign</GameButton>
+                <GameButton variant="outline" icon={<RotateCcw className="size-4" />} onClick={onRetry}>Fly again (new dice)</GameButton>
+                <GameButton variant="ghost" onClick={() => setCrew((c) => !c)}>{crew ? "Back to trajectory" : "Meet the commander"}</GameButton>
+              </div>
+            </div>
+          )}
+          {finished && !handoff && (
             <div className="enter mt-6 border-t border-[var(--border)] pt-4">
               <p className="text-lg">{result.headline}</p>
               <div className="mt-3 flex items-end gap-6">
@@ -297,6 +361,7 @@ function FlightView({ ev, result, fromTli, onAgain, onRetry }: { ev: Evaluation;
                 <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Science goal</dt><dd className="text-base">{fmt(result.scienceFraction * 100)} %</dd></div>
                 <div className="rounded-md bg-white/5 p-2"><dt className="text-muted">Cost</dt><dd className="text-base">{usd(ev.costUsd)}</dd></div>
               </dl>
+              <p className="mt-2 text-xs text-muted">Simplified odds-based result: operations for this destination are rolled with dice, not flown.</p>
               <div className="mt-5 flex flex-wrap gap-2">
                 <GameButton variant="primary" icon={<Pencil className="size-4" />} onClick={onAgain}>Redesign</GameButton>
                 <GameButton variant="outline" icon={<RotateCcw className="size-4" />} onClick={onRetry}>Fly again (new dice)</GameButton>

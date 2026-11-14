@@ -1,5 +1,6 @@
 import { OPS } from "./ops/core";
 import { OPS_DUTY } from "./ops/model";
+import { curationOf, hardware, measuresOf, requiredMeasures } from "./instruments";
 import { ANTENNAS, DATASET, GAME, destinationById, instrumentById, launchReliability, vehicleById, type Antenna, type Destination, type Instrument, type Vehicle, type ElectricThruster } from "./data";
 import { deltaV, linkRate, planTransfer, type TransferPlan } from "./physics";
 import { opsPower, requiredObserveFrac, sustainableObserveFrac, type OpsPower } from "./ops/model";
@@ -52,7 +53,8 @@ export function evaluate(d: Design): Evaluation {
   const prop = Math.max(0, d.propellantKg);
 
   // ---- Mass ----
-  const instrumentKg = instruments.reduce((s, i) => s + i.mass_kg, 0);
+  const hw = hardware(instruments); // shared packages (e.g. Lunar Prospector MAG + ER) count once
+  const instrumentKg = hw.massKg;
   const powerKg = d.solarAreaM2 * GAME.solar.kgPerM2 + d.rtgUnits * GAME.rtg.kg;
   const propulsionKg = electric
     ? n * (GAME.electric.thrusterKg + (GAME.electric.ppuKgPerKw * electric.power_w) / 1000)
@@ -72,7 +74,7 @@ export function evaluate(d: Design): Evaluation {
 
   // ---- Power ----
   const commsDrawW = (antenna.txW / GAME.comms.amplifierEff) * GAME.comms.duty;
-  const powerLoadW = GAME.busPowerW + instruments.reduce((s, i) => s + instrumentPower(i), 0) + commsDrawW;
+  const powerLoadW = GAME.busPowerW + hw.powerW + commsDrawW;
   const solarEff = GAME.solar.efficiency * GAME.solar.degradation;
   const solarGenW = plan.irradiance * d.solarAreaM2 * solarEff, rtgGenW = d.rtgUnits * GAME.rtg.watts;
   const powerGenW = solarGenW + rtgGenW;
@@ -89,7 +91,7 @@ export function evaluate(d: Design): Evaluation {
 
   // ---- Link & science ----
   const linkBps = linkRate(antenna.dishM, antenna.txW, plan.linkDistanceM, antenna.maxBps);
-  const requiredBps = instruments.reduce((s, i) => s + instrumentKbps(i) * 1000, 0);
+  const requiredBps = hw.kbps * 1000;
   const dataFraction = requiredBps === 0 ? 0 : Math.min(1, linkBps / requiredBps);
   const seen = new Map<string, number>();
   let rawScience = 0;
@@ -102,10 +104,10 @@ export function evaluate(d: Design): Evaluation {
   const science = rawScience * dataFraction;
 
   // ---- Operations readiness (same model Mission Control uses)
-  const instKbps = instruments.reduce((a, i) => a + instrumentKbps(i), 0);
-  const opsModel = opsPower({ solarW: solarGenW, rtgW: rtgGenW, instW: instruments.reduce((a, i) => a + instrumentPower(i), 0) * OPS.loadScale, txW: antenna.txW });
+  const instKbps = hw.kbps;
+  const opsModel = opsPower({ solarW: solarGenW, rtgW: rtgGenW, instW: hw.powerW * OPS.loadScale, txW: antenna.txW });
   const observeFrac = sustainableObserveFrac(instKbps, linkBps);
-  const hasFieldsInst = instruments.some((i) => i.tag === "fields");
+  const hasFieldsInst = instruments.some((i) => measuresOf(i).includes("magnetic-vector")); // the survey needs an actual magnetometer, not any "fields" tag
 
   // ---- Cost (launch price = dataset; the rest = game values) ----
   const dryNoTanks = dryKg - tankKg;
@@ -145,11 +147,19 @@ export function evaluate(d: Design): Evaluation {
   add("budget", "Budget", usd(costUsd), `≤ ${usd(destination.budgetUsd)}`, costUsd > destination.budgetUsd ? "bad" : costUsd > destination.budgetUsd * 0.95 ? "warn" : "ok",
     costUsd > destination.budgetUsd ? "Over budget — launch price is real data; other prices are game values." : "Funded.");
   add("payload", "Instruments", `${instruments.length}`, "≥ 1", instruments.length === 0 ? "bad" : "ok", instruments.length === 0 ? "A mission with no science is just expensive space junk." : `${instruments.length} real NASA instrument(s) aboard.`);
-  if (destination.requires) {
+  const needM = requiredMeasures(destination);
+  if (needM.length) { // measurement capabilities, not broad tags: an electric-field detector is not a magnetometer
+    const have = new Set(instruments.flatMap((i) => measuresOf(i)));
+    const missing = needM.filter((m) => !have.has(m));
+    add("contract", "Required measurements", missing.length ? `missing ${missing.map((m) => m.replace("-", " ")).join(", ")}` : needM.map((m) => m.replace("-", " ")).join(" + "), needM.map((m) => m.replace("-", " ")).join(" + "), missing.length ? "bad" : "ok",
+      missing.length ? `The ${destination.name} survey needs a magnetic-field measurement and an electron measurement. Missing: ${missing.map((m) => m.replace("-", " ")).join(", ")}. A generic "fields" or "particles" instrument does not count.` : "The instruments can make the measurements the contract asks for.");
+  } else if (destination.requires) {
     const has = instruments.some((i) => i.tag === destination.requires);
     add("contract", "Required payload", has ? `${destination.requires} instrument` : "missing", `${destination.requires} instrument`, has ? "ok" : "bad",
-      has ? "Contract payload aboard." : `The ${destination.name} contract requires a ${destination.requires} instrument (e.g. a magnetometer); without one the survey cannot be completed.`);
+      has ? "Contract payload aboard." : `The ${destination.name} contract requires a ${destination.requires} instrument; without one the survey cannot be completed.`);
   }
+  const contact = instruments.filter((i) => curationOf(i).deployment === "contact");
+  if (contact.length) add("payload", "Orbiter-compatible instruments", `${contact.length} surface-only`, "0", "bad", `${contact.map((i) => i.name).join(", ")} works on a rover's arm, not from orbit. Remove it, or this mission cannot use it.`);
   if (instruments.length > 0 && destination.kind === "moon") { // the operations model (Mission Control) exists for the Moon
     const ratio = opsModel.avgLoad > 0 ? opsModel.avgGen / opsModel.avgLoad : 9;
     add("ops-power", "Sustained power (orbit avg)", `${fmt(opsModel.avgGen)} W in`, `≥ ${fmt(opsModel.avgLoad)} W out`, ratio < 1 ? "bad" : ratio < 1.15 ? "warn" : "ok",

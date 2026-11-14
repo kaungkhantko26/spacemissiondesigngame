@@ -4,7 +4,8 @@ import { DATASET, DESTINATIONS } from "@/game/data";
 import { planTransfer } from "@/game/physics";
 
 const inst = (tag: string) => DATASET.instruments.find((i) => i.tag === tag)!.id;
-const moonDesign = (): Design => ({ ...DEFAULT_DESIGN, instrumentIds: [inst("fields"), inst("particles")], propellantKg: 1, solarAreaM2: 30, antennaId: "high" });
+const LP_MAG = "nmc_exp_1998_001a_05", LP_ER = "nmc_exp_1998_001a_06"; // the Moon contract needs a magnetometer AND an electron reflectometer
+const moonDesign = (): Design => ({ ...DEFAULT_DESIGN, instrumentIds: [LP_MAG, LP_ER], propellantKg: 1, solarAreaM2: 30, antennaId: "high" });
 const filled = (d: Design): Design => {
   const probe = evaluate({ ...d, propellantKg: 0 });
   return { ...d, propellantKg: Math.ceil(solvePropellant(probe.dryKg, probe.dvRequired, probe.isp)! * 1.2) };

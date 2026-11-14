@@ -110,6 +110,8 @@ export interface Mission {
   id: Id;
   name: string;
   summary: string;
+  /** What is actually playable today, shown on the mission card so the name never over-promises. */
+  playable?: string;
   category: string;
   body: "moon" | "earth" | "mars" | "deepspace" | "telescope";
   supportedDifficulties: DifficultyId[];
