@@ -259,7 +259,8 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement | null)?.closest("input,select,textarea")) return;
+      // typing fields keep their keys, but a focused slider or button must not steal the flight controls (arrows pitch, Space stages)
+      if ((e.target as HTMLElement | null)?.closest("input:not([type=range]),select,textarea")) return;
       const k = e.key.toLowerCase();
       if (k === "arrowup") { session.hold("up", true); e.preventDefault(); }
       else if (k === "arrowdown") { session.hold("down", true); e.preventDefault(); }
@@ -272,9 +273,10 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
       else if (k === "p") togglePause();
       else if (["1", "2", "3", "4", "5"].includes(k)) setWarp([1, 2, 5, 10, 50][Number(k) - 1]);
     };
-    const up = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (k === "arrowup") session.hold("up", false); if (k === "arrowdown") session.hold("down", false); };
-    window.addEventListener("keydown", down); window.addEventListener("keyup", up);
-    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
+    const up = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (k === "arrowup") session.hold("up", false); if (k === "arrowdown") session.hold("down", false); if (k === " " && !(e.target as HTMLElement | null)?.closest("input:not([type=range]),select,textarea")) e.preventDefault(); /* a focused button must not also "click" on Space */ };
+    const release = () => { session.hold("up", false); session.hold("down", false); }; // keys held while the window loses focus would otherwise stay pressed
+    window.addEventListener("keydown", down); window.addEventListener("keyup", up); window.addEventListener("blur", release); document.addEventListener("visibilitychange", release);
+    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); window.removeEventListener("blur", release); document.removeEventListener("visibilitychange", release); };
   }, [session, toggleAuto, togglePause, setWarp]);
 
   const qLim = LAUNCH.qDesignPa * rules.qLimitFactor, qFrac = tel.q / qLim;
