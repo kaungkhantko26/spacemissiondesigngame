@@ -236,7 +236,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     const c = audioContext();
     if (!voice || !c) { engine.current?.silence(); return; }
     if (!engine.current) engine.current = new RocketSound(c);
-    engine.current.update(s.throttle, s.tel.alt, s.tel.q, s.running && s.engineOn && s.warp <= 2 && s.phase !== "failed");
+    engine.current.update(s.throttle, s.tel.alt, s.tel.q, s.running && s.engineOn && s.warp <= 2 && s.phase !== "failed", !s.running);
   }, [s.throttle, s.tel.alt, s.tel.q, s.running, s.engineOn, s.warp, s.phase, voice]);
   useEffect(() => {
     if (!voice) return;

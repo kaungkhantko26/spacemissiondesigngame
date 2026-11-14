@@ -1,5 +1,7 @@
 "use client";
+import { useState } from "react";
 import { CanvasTexture, SRGBColorSpace } from "three";
+import { drawFlag, useFlag, type CustomFlag } from "@/game/flags";
 
 /** Cosmetic gear: procedural accessories + suit-pattern textures (no extra model files). All positions are bone-relative. */
 
@@ -35,6 +37,68 @@ export function patternTexture(kind: string): CanvasTexture | null {
 }
 
 const Glow = ({ color, i = 1.2 }: { color: string; i?: number }) => <meshStandardMaterial color={color} emissive={color} emissiveIntensity={i} roughness={0.4} />;
+/** Cloth texture drawn from a flag (or a patch emblem); a class so the canvas and texture are updated through methods. */
+class Cloth {
+  canvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
+  tex: CanvasTexture | null = null;
+  constructor(w: number, h: number) { if (this.canvas) { this.canvas.width = w; this.canvas.height = h; this.tex = new CanvasTexture(this.canvas); this.tex.colorSpace = SRGBColorSpace; } }
+  flag(id: string, custom: CustomFlag) {
+    const c = this.canvas, ctx = c?.getContext("2d"); if (!c || !ctx || !this.tex) return;
+    const draw = () => { drawFlag(ctx, c.width, c.height, id, custom, draw); if (this.tex) this.tex.needsUpdate = true; };
+    draw();
+  }
+  patch(kind: string, color: string, accent: string, custom: CustomFlag) {
+    const c = this.canvas, ctx = c?.getContext("2d"); if (!c || !ctx || !this.tex) return;
+    const R = c.width / 2;
+    const draw = () => {
+      ctx.clearRect(0, 0, c.width, c.height); ctx.save(); ctx.beginPath(); ctx.arc(R, R, R - 4, 0, 7); ctx.clip();
+      if (kind === "patch-nasa") drawFlag(ctx, c.width, c.height, "nasa", custom, draw);
+      else if (kind === "patch-myanmar") drawFlag(ctx, c.width, c.height, "myanmar", custom, draw);
+      else { ctx.fillStyle = color; ctx.fillRect(0, 0, c.width, c.height); ctx.fillStyle = accent; ctx.beginPath();
+        if (kind === "patch-earth") { ctx.arc(R, R, R * 0.5, 0, 7); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = R * 0.07; ctx.beginPath(); ctx.ellipse(R, R, R * 0.5, R * 0.2, 0, 0, 7); ctx.stroke(); }
+        else for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? R * 0.22 : R * 0.55; ctx[i ? "lineTo" : "moveTo"](R + rr * Math.cos(a), R + rr * Math.sin(a)); } ctx.fill(); }
+      ctx.restore(); ctx.lineWidth = R * 0.1; ctx.strokeStyle = accent; ctx.beginPath(); ctx.arc(R, R, R - 6, 0, 7); ctx.stroke();
+      if (this.tex) this.tex.needsUpdate = true;
+    };
+    draw();
+  }
+}
+/** Shoulder flag cloth following the player's chosen flag. */
+function FlagCloth() {
+  const flagId = useFlag((s) => s.flagId), custom = useFlag((s) => s.custom);
+  const [cloth] = useState(() => new Cloth(384, 250));
+  cloth.flag(flagId, custom);
+  return <mesh position={[-0.17, 0.42, 0]}><planeGeometry args={[0.34, 0.22]} /><meshStandardMaterial map={cloth.tex} side={2} roughness={0.8} emissive="#ffffff" emissiveMap={cloth.tex} emissiveIntensity={0.35} /></mesh>;
+}
+/** Round chest patch with an emblem. */
+export function PatchGear({ kind, color, accent }: { kind: string; color: string; accent: string }) {
+  const custom = useFlag((s) => s.custom);
+  const [cloth] = useState(() => new Cloth(256, 256));
+  cloth.patch(kind, color, accent, custom);
+  return <mesh position={[0, 0, 0]}><circleGeometry args={[0.115, 40]} /><meshStandardMaterial map={cloth.tex} roughness={0.7} emissive="#ffffff" emissiveMap={cloth.tex} emissiveIntensity={0.3} /></mesh>;
+}
+/** Back-mounted add-on modules (the suit's own life-support pack is part of the model). Origin = the pack bone, +z toward the viewer. */
+export function BackpackGear({ kind, color, accent }: { kind: string; color: string; accent: string }) {
+  switch (kind) {
+    case "pack-jet": return (
+      <group position={[0, 0.1, -0.2]}>
+        {[-1, 1].map((x) => <group key={x} position={[x * 0.17, -0.06, 0]}><mesh><cylinderGeometry args={[0.07, 0.07, 0.42, 16]} /><Metal color={color} /></mesh><mesh position={[0, -0.27, 0]}><cylinderGeometry args={[0.07, 0.1, 0.14, 16]} /><Metal color="#3a4252" /></mesh><mesh position={[0, -0.36, 0]}><coneGeometry args={[0.07, 0.2, 16]} /><Glow color={accent} i={2.4} /></mesh></group>)}
+        <mesh position={[0, 0.02, 0]}><boxGeometry args={[0.3, 0.08, 0.1]} /><Metal color="#3a4252" /></mesh>
+      </group>);
+    case "pack-solar": return (
+      <group position={[0, 0.1, -0.2]}>
+        {[-1, 1].map((x) => <group key={x} position={[x * 0.3, 0, 0]} rotation={[0, x * -0.25, 0]}><mesh><boxGeometry args={[0.42, 0.55, 0.012]} /><meshStandardMaterial color="#10264f" metalness={0.6} roughness={0.25} emissive={color} emissiveIntensity={0.25} /></mesh>{[-0.14, 0, 0.14].map((px) => <mesh key={px} position={[px, 0, 0.008]}><boxGeometry args={[0.005, 0.55, 0.003]} /><Metal color={accent} /></mesh>)}</group>)}
+        <mesh><boxGeometry args={[0.2, 0.12, 0.08]} /><Metal color="#3a4252" /></mesh>
+      </group>);
+    case "pack-telescope": return (
+      <group position={[0, 0.2, -0.2]} rotation={[-0.5, 0, 0]}>
+        <mesh><cylinderGeometry args={[0.07, 0.07, 0.42, 20]} /><Metal color={color} /></mesh>
+        <mesh position={[0, 0.25, 0]}><cylinderGeometry args={[0.16, 0.07, 0.07, 24, 1, true]} /><meshStandardMaterial color={accent} metalness={0.5} roughness={0.3} side={2} /></mesh>
+        <mesh position={[0, -0.18, 0]}><boxGeometry args={[0.26, 0.1, 0.12]} /><Metal color="#3a4252" /></mesh>
+      </group>);
+    default: return null;
+  }
+}
 const Metal = ({ color }: { color: string }) => <meshStandardMaterial color={color} metalness={0.7} roughness={0.3} />;
 
 export function Headgear({ kind, color }: { kind: string; color: string }) {
@@ -67,8 +131,7 @@ export function ShoulderGear({ kind, color, side }: { kind: string; color: strin
     case "shoulder-flag": return side === -1 ? (
       <group position={[-0.3, 0.05, -0.05]}>
         <mesh position={[0, 0.25, 0]}><cylinderGeometry args={[0.01, 0.01, 0.5, 6]} /><Metal color="#e8eef7" /></mesh>
-        <mesh position={[-0.13, 0.42, 0]}><boxGeometry args={[0.26, 0.17, 0.01]} /><meshStandardMaterial color={color} side={2} /></mesh>
-        <mesh position={[-0.05, 0.42, 0.006]}><boxGeometry args={[0.1, 0.17, 0.005]} /><meshStandardMaterial color="#0b3d91" /></mesh>
+        <FlagCloth />
       </group>) : null;
     case "shoulder-pads": return (
       <mesh position={[side * 0.3, 0.02, 0]} scale={[1.2, 0.7, 1.1]}><sphereGeometry args={[0.2, 16, 12]} /><meshStandardMaterial color={color} metalness={0.5} roughness={0.35} /></mesh>);

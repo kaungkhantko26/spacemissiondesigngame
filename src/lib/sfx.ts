@@ -45,7 +45,6 @@ export class RocketSound {
   private sub: GainNode;
   private rattle: GainNode;
   private stops: (() => void)[] = [];
-  private level = 0;
   private samp: { g: GainNode; lp: BiquadFilterNode } | null = null;
   constructor(c: AudioContext) {
     this.c = c;
@@ -64,7 +63,7 @@ export class RocketSound {
     // max-Q buffeting: amplitude-chopped noise
     const buf = loop(c, noise(c, "white", 2)), bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 260; bp.Q.value = 1.2;
     this.rattle = c.createGain(); this.rattle.gain.value = 0;
-    const chop = c.createOscillator(), chopAmt = c.createGain(); chop.frequency.value = 17; chopAmt.gain.value = 0.5; chop.connect(chopAmt); chopAmt.connect(this.rattle.gain);
+    const chop = c.createOscillator(), chopAmt = c.createGain(); chop.frequency.value = 17; chopAmt.gain.value = 0; // the chopped "shaking" noise is gone for good chop.connect(chopAmt); chopAmt.connect(this.rattle.gain);
     buf.connect(bp); bp.connect(this.rattle); this.rattle.connect(this.master);
     void preloadSfx().then(() => { // a recorded engine loop, when provided, takes over from the synthesised layers
       const b = sample("engine"); if (!b || this.samp) return;
@@ -74,26 +73,22 @@ export class RocketSound {
     });
     for (const n of [brown, white, flutter, o1, o2, buf, chop]) { n.start(); this.stops.push(() => { try { n.stop(); } catch { /* already stopped */ } }); }
   }
-  /** Called ~10x a second. throttle 0..1 (0 = engine off), alt in metres, q in Pa. */
-  update(throttle: number, alt: number, q: number, on: boolean) {
+  /** Called whenever the flight state changes. throttle 0..1, alt in metres, q in Pa. `fast` = the game was paused: cut the sound quickly. The fade itself is done by the audio engine, so it always finishes even if update() is never called again. */
+  update(throttle: number, alt: number, q: number, on: boolean, fast = false) {
     const t = this.c.currentTime, air = Math.exp(-Math.max(0, alt) / 7500); // outside air thins with height
-    const thrust = on ? Math.max(0.12, throttle) : 0;
-    const exterior = 0.22 + 0.78 * air; // in vacuum only the structure-borne rumble remains
-    const target = thrust * (on ? 1 : 0);
-    // slow and steady: the sound builds gently and, when the engine cuts out, trails away over a few seconds (an outro) instead of stopping dead
-    this.level += (target - this.level) * (target > this.level ? 0.12 : 0.045);
-    const v = this.level;
-    this.master.gain.setTargetAtTime(Math.min(0.3, v * 0.3 * (0.45 + 0.55 * exterior) + 0.0005), t, 0.35);
+    const v = on ? Math.max(0.12, throttle) : 0, exterior = 0.22 + 0.78 * air; // in vacuum only the structure-borne rumble remains
+    const tc = on ? 0.55 : fast ? 0.12 : 0.8; // slow build, long outro at engine cutoff, quick stop on pause
     const synth = this.samp ? 0 : 1;
-    if (this.samp) { this.samp.g.gain.setTargetAtTime(v, t, 0.4); this.samp.lp.frequency.setTargetAtTime(900 + 9000 * exterior, t, 0.3); }
-    this.rumble.gain.setTargetAtTime(0.55 * v * synth, t, 0.3);
-    this.rumbleLp.frequency.setTargetAtTime(90 + 220 * exterior * (0.4 + 0.6 * v), t, 0.4);
-    this.hiss.gain.setTargetAtTime(0.02 * v * exterior * synth, t, 0.4);
+    this.master.gain.setTargetAtTime(Math.min(0.3, v * 0.3 * (0.45 + 0.55 * exterior) + 0.0005), t, tc);
+    if (this.samp) { this.samp.g.gain.setTargetAtTime(v, t, tc); this.samp.lp.frequency.setTargetAtTime(900 + 9000 * exterior, t, 0.4); }
+    this.rumble.gain.setTargetAtTime(0.4 * v * synth, t, tc);
+    this.rumbleLp.frequency.setTargetAtTime(70 + 50 * exterior * v, t, 0.4);
+    this.hiss.gain.setTargetAtTime(0, t, tc);
     this.hissBp.frequency.setTargetAtTime(500 + 900 * v, t, 0.3);
-    this.sub.gain.setTargetAtTime(0.4 * v * synth, t, 0.3);
-    this.rattle.gain.setTargetAtTime(Math.min(0.08, (q / 30000) * 0.08) * (v > 0.05 ? 1 : 0), t, 0.3);
+    this.sub.gain.setTargetAtTime(0.4 * v * synth, t, tc);
+    this.rattle.gain.setTargetAtTime(0, t, tc);
   }
-  silence() { this.master.gain.setTargetAtTime(0, this.c.currentTime, 0.1); this.level = 0; }
+  silence() { this.master.gain.setTargetAtTime(0, this.c.currentTime, 0.1);}
   dispose() { this.silence(); setTimeout(() => this.stops.forEach((s) => s()), 400); }
 }
 

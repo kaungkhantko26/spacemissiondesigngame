@@ -11,6 +11,7 @@ import {
 import { Astronaut, Scene3D, PlanetModel } from "@/components/three/lazy";
 import { IdBadge } from "./IdBadge";
 import { AvatarEditor } from "./AvatarEditor";
+import { FlagEditor } from "./FlagEditor";
 import { useProgress, withUnlocks } from "@/game/progress";
 import { AstronautGuide, TestVoiceButton, TutorialButton } from "./MenuGuide";
 import { ProfileWidget } from "@/components/shell/GameShell";
@@ -209,10 +210,10 @@ export function useLook() {
     const eq = { ...profile.equipped };
     const p = byId(previewId);
     if (p) eq[p.category] = p.id;
-    const suit = byId(eq.suit), helmet = byId(eq.helmet), pack = byId(eq.backpack);
+    const suit = byId(eq.suit), helmet = byId(eq.helmet), pack = byId(eq.backpack), patch = byId(eq.patch);
     const pat = byId(eq.pattern), head = byId(eq.headgear), sh = byId(eq.shoulder), bt = byId(eq.boots);
     return {
-      suit: suit?.color ?? "#e8eef7", accent: suit?.accent ?? "#168bff", helmet: helmet?.color ?? "#4fc3f7", pack: pack?.color ?? "#9fb3c8",
+      suit: suit?.color ?? "#e8eef7", accent: suit?.accent ?? "#168bff", helmet: helmet?.color ?? "#4fc3f7", pack: pack?.color ?? "#9fb3c8", packKind: pack?.id, packAccent: pack?.accent, patchKind: patch?.id, patchColor: patch?.color, patchAccent: patch?.accent,
       pattern: pat?.id, patternColor: pat?.color, headgear: head?.id, headgearColor: head?.color,
       shoulder: sh?.id, shoulderColor: sh?.color, boots: bt?.id, bootsColor: bt?.color,
     };
@@ -225,6 +226,7 @@ export function ProfileScreen() {
   const look = useLook();
   const items = useItems();
   const patchItem = items.find((c) => c.id === profile.equipped.patch && c.unlocked);
+  const [tab, setTab] = useState<"overview" | "picture" | "flag">("overview");
   const h = profile.history;
   return (
     <ScreenContainer title="Profile" actions={<BackButton href="/menu" label="Main menu" />}>
@@ -238,8 +240,13 @@ export function ProfileScreen() {
               <XPProgressBar className="mt-3 max-w-md" xp={profile.progression.xp} max={profile.progression.xpForNextLevel} />
             </div>
           </GlassPanel>
-          <AvatarEditor name={profile.username} />
-          <div className="grid items-start gap-4 md:grid-cols-[300px_1fr]">
+          <div role="tablist" aria-label="Profile sections" className="flex gap-2">
+            {([["overview", "Overview"], ["picture", "Profile picture"], ["flag", "Flag"]] as const).map(([id, label]) => (
+              <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={cn("rounded-md border px-4 py-1.5 text-sm", tab === id ? "border-orange bg-orange/10 text-orange" : "border-white/15 text-ink2 hover:text-ink")}>{label}</button>))}
+          </div>
+          {tab === "picture" && <AvatarEditor name={profile.username} />}
+          {tab === "flag" && <FlagEditor />}
+          {tab === "overview" && <div className="grid items-start gap-4 md:grid-cols-[300px_1fr]">
             <IdBadge profile={profile} patch={patchItem ? { name: patchItem.name, color: patchItem.color, accent: patchItem.accent } : null} suit={look.suit} />
             <div className="grid content-start gap-4">
               <GlassPanel className="p-5">
@@ -262,7 +269,7 @@ export function ProfileScreen() {
                 </ul>
               </GlassPanel>
             </div>
-          </div>
+          </div>}
         </div>
         <GlassPanel className="flex h-[min(620px,calc(100vh-200px))] min-h-[420px] flex-col p-3 lg:sticky lg:top-4">
           <h2 className="px-2 pt-2 text-xl font-bold">Character preview</h2>

@@ -64,7 +64,7 @@ export function MoonLeg({ flight, onAgain, onExit }: { flight: Flight; onAgain: 
     if (names.length) useUIStore.getState().toast(`Cosmetic unlocked: ${names.join(", ")}`, "success");
   }, [seenEnd, plan.loiOk, flight.rules]);
   useEffect(() => { // the engine falls silent when the playback pauses or ends
-    const id = setInterval(() => { if (performance.now() - lastMove.current > 500) engine.current?.silence(); }, 250);
+    const id = setInterval(() => { if (performance.now() - lastMove.current > 500) { engine.current?.silence(); hum.current?.set(false); } }, 250);
     return () => clearInterval(id);
   }, []);
   useEffect(() => () => { stopVoice(); engine.current?.dispose(); hum.current?.dispose(); engine.current = null; hum.current = null; }, []);
