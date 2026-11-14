@@ -64,10 +64,10 @@ export function MissionSelectScreen() {
         </GlassPanel>
         <div className="grid gap-4">
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {missions.map((m) => {
+            {missions.map((m, i) => {
               const a = missionAvailability(m, difficultyId, count);
               return (
-                <li key={m.id}>
+                <li key={m.id} className="enter lift" style={{ animationDelay: `${i * 70}ms` }}>
                   <button onClick={() => a.available && setMission(m.id)} aria-disabled={!a.available} aria-pressed={missionId === m.id}
                     className={cn("h-full w-full text-left", !a.available && "cursor-not-allowed")}>
                     <GlassPanel active={missionId === m.id} className={cn("flex h-full flex-col overflow-hidden", !a.available && "opacity-60")}>

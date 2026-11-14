@@ -14,29 +14,45 @@ import type { AttributeKey, CosmeticCategory, CosmeticItem } from "@/types";
 import { progressionService } from "@/services/mocks";
 import type { UpgradeOption } from "@/types";
 
-const MESSAGES = ["Preparing Mission Control", "Loading Astronaut Assets", "Initializing Space Environment", "Preparing Mission Interface"];
+const CHECKS = ["Life support", "Comms uplink", "Guidance computer", "Crew suits", "Launch window"];
 
-/* ---------- Splash ---------- */
+/* ---------- Splash: pre-launch checklist + countdown ---------- */
 export function SplashScreen() {
   const router = useRouter();
-  const [i, setI] = useState(0);
+  const [step, setStep] = useState(0); // 0..CHECKS.length = checks done, then countdown
   useEffect(() => {
-    const m = setInterval(() => setI((x) => (x + 1) % MESSAGES.length), 700);
-    // Real init work: fonts + 3D chunk. Progress is unmeasurable => indeterminate bar.
+    const t = setInterval(() => setStep((x) => Math.min(x + 1, CHECKS.length + 3)), 520);
+    // Real init work: fonts + 3D chunk. Never blocks on the animation alone.
     const ready = Promise.all([document.fonts?.ready, import("@/components/three")]).catch(() => null);
-    const min = new Promise((r) => setTimeout(r, 2200));
+    const min = new Promise((r) => setTimeout(r, 4000));
     Promise.all([ready, min]).then(() => { useUIStore.getState().set({ booted: true }); router.replace("/menu"); });
-    return () => clearInterval(m);
+    return () => clearInterval(t);
   }, [router]);
+  const count = step - CHECKS.length; // 0 → "3", 1 → "2", 2 → "1", 3 → liftoff
   return (
-    <main className="relative grid min-h-screen place-items-center px-6 text-center">
-      <div className="max-w-xl">
-        <div className="mx-auto mb-4 h-56 w-56"><Scene3D camera={[0, 1.2, 4.5]} label="Astronaut mascot"><Astronaut suit="#e8eef7" pose="wave" position={[0, -1, 0]} /></Scene3D></div>
-        <h1 className="text-5xl font-bold md:text-7xl"><span className="text-orange">Space Mission</span><br />Design Game</h1>
-        <p className="mt-2 text-ink2">Build the crew. Design the mission. Explore space.</p>
-        <div className="mt-8"><LoadingBar /></div>
-        <p className="mt-3 text-sm text-cyan" role="status">{MESSAGES[i]}…</p>
-        <p className="mt-10 text-xs text-muted">NASA Space Apps Challenge 2026 · Prototype with mock data</p>
+    <main className="relative grid min-h-screen place-items-center px-6">
+      <div className="grid w-full max-w-4xl items-center gap-8 md:grid-cols-[1fr_1.1fr]">
+        <div className="mx-auto h-64 w-64 md:h-80 md:w-80"><Scene3D camera={[0, 1.2, 4.5]} label="Astronaut mascot"><Astronaut suit="#e8eef7" pose="wave" position={[0, -1, 0]} /></Scene3D></div>
+        <div>
+          <p className="hud-label !text-orange !tracking-[.3em]">Pre-launch sequence</p>
+          <h1 className="mt-1 text-5xl font-bold md:text-6xl"><span className="text-orange">Space Mission</span><br />Design Game</h1>
+          <ul className="mt-6 space-y-2 font-display text-lg tracking-wider" role="status" aria-live="polite">
+            {CHECKS.map((c, i) => (
+              <li key={c} className={cn("flex items-center gap-3 transition-opacity duration-300", i <= step ? "opacity-100" : "opacity-25")}>
+                <span aria-hidden className={cn("grid size-5 place-items-center rounded-sm border text-xs", i < step ? "border-ok text-ok" : "border-white/20 text-muted")}>{i < step ? "✓" : ""}</span>
+                <span className="uppercase">{c}</span><span className="ml-auto text-xs text-muted">{i < step ? "GO" : i === step ? "…" : ""}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-6 flex items-end gap-4">
+            <span className="font-display text-7xl font-bold leading-none text-orange tabular-nums" aria-hidden>
+              {count < 0 ? "T-" : count < 3 ? 3 - count : "↑"}
+            </span>
+            <span className="hud-label pb-2">{count < 0 ? "Standing by" : count < 3 ? "Terminal count" : "Liftoff"}</span>
+          </div>
+          <div className="mt-4"><LoadingBar /></div>
+          <p className="mt-6 text-xs text-muted">NASA Space Apps Challenge 2026 · Prototype with mock data</p>
+        </div>
       </div>
     </main>
   );
@@ -51,8 +67,40 @@ const MENU = [
   { href: LIVE ? "/play/stats" : "/stats", label: "Stats", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+type Pose = "idle" | "wave" | "ready" | "celebrate";
+const HOVER_POSE: Record<string, Pose> = { Cosmetics: "celebrate", Stats: "ready", Profile: "idle", Settings: "idle" };
+
+function MissionClock() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(new Date());
+    const first = setTimeout(tick, 0); const t = setInterval(tick, 1000);
+    return () => { clearTimeout(first); clearInterval(t); };
+  }, []);
+  const hms = now ? now.toISOString().slice(11, 19) : "--:--:--";
+  return (
+    <dl className="flex flex-wrap gap-x-6 gap-y-1 font-display text-sm tracking-wider" aria-label="Mission control status">
+      {[["UTC", hms], ["Orbit", "LEO · 408 km"], ["Station", "Nominal"], ["Crews online", "1,284"]].map(([k, v]) => (
+        <div key={k} className="flex items-baseline gap-2"><dt className="hud-label">{k}</dt><dd className="tabular-nums text-ink">{v}</dd></div>
+      ))}
+    </dl>
+  );
+}
+
 export function MenuScreen() {
   const profile = usePlayerStore((s) => s.profile);
+  const router = useRouter();
+  const [pose, setPose] = useState<Pose>("wave");
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || t?.closest("input,textarea,select")) return;
+      const item = MENU[Number(e.key) - 1];
+      if (item) router.push(item.href);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [router]);
   return (
     <main className="relative flex min-h-screen flex-1 flex-col">
       <div className="absolute inset-0 opacity-90" aria-hidden>
@@ -60,24 +108,30 @@ export function MenuScreen() {
           <PlanetModel kind="earth" radius={2.2} position={[4.2, 1.4, -5]} />
         </Scene3D>
       </div>
-      <div className="relative z-10 flex justify-end p-4 md:p-8"><ProfileWidget profile={profile} /></div>
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-bg/60 px-4 py-3 md:px-8">
+        <MissionClock /><ProfileWidget profile={profile} />
+      </div>
       <div className="relative z-10 grid flex-1 items-center gap-6 px-6 pb-10 md:grid-cols-2 md:px-16">
         <div>
           <p className="hud-label !text-orange !tracking-[.3em]">NASA SPACE APPS CHALLENGE 2026</p>
           <h1 className="mt-2 text-5xl font-bold leading-tight md:text-7xl"><span className="text-orange">Space Mission</span><br />Design Game</h1>
           <nav aria-label="Main menu" className="mt-8 flex max-w-sm flex-col gap-3">
-            {MENU.map((m) => (
-              <Link key={m.href} href={m.href}
-                className={cn("group flex items-center gap-3 rounded-lg border px-5 py-3 font-display tracking-wide transition duration-150",
+            {MENU.map((m, i) => (
+              <Link key={m.href} href={m.href} style={{ animationDelay: `${i * 70}ms` }}
+                onMouseEnter={() => setPose(HOVER_POSE[m.label] ?? "wave")} onFocus={() => setPose(HOVER_POSE[m.label] ?? "wave")}
+                onMouseLeave={() => setPose("wave")} onBlur={() => setPose("wave")}
+                className={cn("enter group flex items-center gap-3 rounded-lg border px-5 py-3 font-display tracking-wide transition duration-150 hover:translate-x-1",
                   m.primary ? "border-orange bg-orange shadow-[0_4px_0_#b4501a] py-4 text-lg font-bold text-[#1a0b00]"
                     : "border-[var(--border)] bg-panel hover:border-[var(--border-strong)]")}>
                 <m.icon className="size-5" aria-hidden />{m.label.toUpperCase()}
+                <kbd aria-label={`Shortcut ${i + 1}`} className={cn("ml-auto rounded-sm border px-1.5 text-xs", m.primary ? "border-black/30" : "border-white/20 text-muted")}>{i + 1}</kbd>
               </Link>
             ))}
           </nav>
+          <p className="hud-label mt-4">Press 1–5 to jump</p>
         </div>
         <div className="h-[380px] md:h-[560px]">
-          <Scene3D camera={[0, 1, 5]} label="Your astronaut"><Astronaut suit="#e8eef7" pose="wave" position={[0, -1.2, 0]} scale={1.2} /></Scene3D>
+          <Scene3D camera={[0, 1, 5]} label="Your astronaut"><Astronaut suit="#e8eef7" pose={pose} position={[0, -1.2, 0]} scale={1.2} /></Scene3D>
         </div>
       </div>
     </main>
@@ -176,10 +230,10 @@ export function CosmeticsScreen() {
             ))}
           </div>
           <ul className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            {list.map((c) => {
+            {list.map((c, i) => {
               const isEq = profile.equipped[c.category] === c.id;
               return (
-                <li key={c.id}>
+                <li key={c.id} className="enter lift" style={{ animationDelay: `${i * 50}ms` }}>
                   <button onClick={() => preview(c.id)} aria-pressed={previewId === c.id}
                     className={cn("w-full rounded-lg border bg-panel p-3 text-left transition", previewId === c.id ? "border-orange" : "border-white/10 hover:border-cyan/50")}>
                     <div className="mb-2 grid h-20 place-items-center rounded-lg" style={{ background: `linear-gradient(135deg, ${c.color}, ${c.accent})` }}>
