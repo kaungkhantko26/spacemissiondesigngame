@@ -161,3 +161,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Menu greeting bubble moved beside the astronaut (left of him, with a tail) so it no longer covers the head and hand; stacks above the astronaut on small screens.
 - Stale-deploy 404s: deploy-pages.sh now keeps the previous _next/static assets on gh-pages, and GameShell reloads once when a /_next/static script fails to load.
 - Greeting bubble anchored next to the astronaut (right-[53%], top-[20%]) instead of the far left of the panel.
+- Greeting bubble now at torso height to the left of the astronaut (not above him).
