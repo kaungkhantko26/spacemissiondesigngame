@@ -12,6 +12,7 @@ import { Astronaut, Scene3D, PlanetModel } from "@/components/three/lazy";
 import { IdBadge } from "./IdBadge";
 import { AvatarEditor } from "./AvatarEditor";
 import { FlagEditor } from "./FlagEditor";
+import { MAX_NAME, useIdentity } from "@/game/identity";
 import { useProgress, withUnlocks } from "@/game/progress";
 import { AstronautGuide, TestVoiceButton, TutorialButton } from "./MenuGuide";
 import { ProfileWidget } from "@/components/shell/GameShell";
@@ -227,6 +228,13 @@ export function ProfileScreen() {
   const items = useItems();
   const patchItem = items.find((c) => c.id === profile.equipped.patch && c.unlocked);
   const [tab, setTab] = useState<"overview" | "picture" | "flag">("overview");
+  const [editing, setEditing] = useState(false), [draft, setDraft] = useState("");
+  const saveName = () => {
+    useIdentity.getState().setName(draft);
+    const n = useIdentity.getState().name;
+    if (n) usePlayerStore.setState((st) => ({ profile: { ...st.profile, username: n } }));
+    setEditing(false);
+  };
   const h = profile.history;
   return (
     <ScreenContainer title="Profile" actions={<BackButton href="/menu" label="Main menu" />}>
@@ -235,7 +243,17 @@ export function ProfileScreen() {
           <GlassPanel className="flex flex-wrap items-center gap-4 p-5">
             <PlayerAvatar player={profile} size={72} />
             <div className="flex-1">
-              <h2 className="text-2xl font-bold">{profile.username} <LevelBadge level={profile.progression.level} /></h2>
+              <h2 className="flex flex-wrap items-center gap-2 text-2xl font-bold">
+                {editing ? (
+                  <form onSubmit={(e) => { e.preventDefault(); saveName(); }} className="flex items-center gap-2">
+                    <input autoFocus aria-label="Display name" value={draft} maxLength={MAX_NAME} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setEditing(false); }}
+                      className="w-52 rounded-md border border-orange bg-bg px-2 py-0.5 text-xl outline-none" />
+                    <GameButton type="submit" variant="primary">Save</GameButton>
+                    <GameButton type="button" variant="outline" onClick={() => setEditing(false)}>Cancel</GameButton>
+                  </form>
+                ) : (<>{profile.username} <LevelBadge level={profile.progression.level} />
+                  <button type="button" onClick={() => { setDraft(profile.username); setEditing(true); }} className="rounded-md border border-white/15 px-2 py-0.5 text-xs font-normal text-ink2 hover:text-ink">Edit name</button></>)}
+              </h2>
               <p className="text-sm text-muted">Player ID {profile.playerCode} · Mock identity (no real auth)</p>
               <XPProgressBar className="mt-3 max-w-md" xp={profile.progression.xp} max={profile.progression.xpForNextLevel} />
             </div>
@@ -274,7 +292,7 @@ export function ProfileScreen() {
         <GlassPanel className="flex h-[min(620px,calc(100vh-200px))] min-h-[420px] flex-col p-3 lg:sticky lg:top-4">
           <h2 className="px-2 pt-2 text-xl font-bold">Character preview</h2>
           <p className="px-2 text-xs text-muted">Drag to rotate · scroll to zoom</p>
-          <div className="min-h-0 flex-1"><Scene3D controls camera={[0, 1, 5]} label="Interactive astronaut preview"><Astronaut {...look} position={[0, -1, 0]} /></Scene3D></div>
+          <div className="min-h-0 flex-1"><Scene3D controls camera={[0, 1, 6.2]} label="Interactive astronaut preview"><Astronaut {...look} position={[0, -1, 0]} /></Scene3D></div>
         </GlassPanel>
       </div>
     </ScreenContainer>

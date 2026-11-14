@@ -1,19 +1,38 @@
 "use client";
 import { useRef, useState } from "react";
+import { useAvatar } from "@/game/avatar";
+import { Download, Link2, Share2 } from "lucide-react";
+import { AvatarArt } from "@/components/ui/AvatarArt";
 import { PlayerAvatar } from "@/components/ui";
+import { encodeCard, renderCardPng, type CardData } from "@/lib/idcard";
 import { useUIStore } from "@/stores";
 import { FlagView } from "@/components/ui/FlagView";
 import { useFlag } from "@/game/flags";
 import type { PlayerProfile } from "@/types";
 
 /** Crew ID badge hanging from a lanyard. Idles with a slow pendulum swing; drag the card sideways and let go to make it swing back. */
-export function IdBadge({ profile, patch, suit }: { profile: PlayerProfile; patch?: { name: string; color: string; accent: string } | null; suit?: string }) {
+export function IdBadge({ profile, patch: patchProp, suit: suitProp, card, actions }: { profile?: PlayerProfile; patch?: { name: string; color: string; accent: string } | null; suit?: string; card?: CardData; actions?: boolean }) {
   const reduced = useUIStore((s) => s.reducedMotion);
-  const flagId = useFlag((s) => s.flagId), custom = useFlag((s) => s.custom);
+  const flagStore = useFlag((s) => s.flagId), customStore = useFlag((s) => s.custom), avatarStore = useAvatar();
+  const [note, setNote] = useState("");
   const [angle, setAngle] = useState(0);
   const [drag, setDrag] = useState(false);
   const start = useRef(0);
-  const bars = Array.from(profile.playerCode.replace(/\D/g, "").padEnd(8, "7"), (d, i) => 1 + ((Number(d) + i) % 4));
+  const flagId = card?.flagId ?? flagStore, custom = card?.custom ?? customStore, patch = card ? card.patch : patchProp, suit = card?.suit ?? suitProp;
+  const view = card ?? (profile ? { name: profile.username, level: profile.progression.level, missions: profile.history.completed, code: profile.playerCode, avatar: { template: avatarStore.template, bg: avatarStore.bg, fg: avatarStore.fg, frame: avatarStore.frame, shape: avatarStore.shape }, flagId, custom, patch, suit } satisfies CardData : null);
+  if (!view) return null;
+  const share = async (mode: "link" | "image" | "native") => {
+    const url = `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/id/?c=${encodeCard(view)}`;
+    try {
+      if (mode === "image") {
+        const blob = await renderCardPng(view), a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `crew-id-${view.code}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); setNote("Saved as an image.");
+      } else if (mode === "native" && typeof navigator.share === "function") {
+        const file = new File([await renderCardPng(view)], `crew-id-${view.code}.png`, { type: "image/png" });
+        await navigator.share(navigator.canShare?.({ files: [file] }) ? { title: "My crew ID", text: `${view.name} · ${view.code}`, url, files: [file] } : { title: "My crew ID", text: `${view.name} · ${view.code}`, url });
+      } else { await navigator.clipboard.writeText(url); setNote("Link copied. Anyone with it can see this card."); }
+    } catch (e) { if (!(e instanceof DOMException && e.name === "AbortError")) setNote("Could not do that here. Try Save image."); }
+  };
+  const bars = Array.from(view.code.replace(/\D/g, "").padEnd(8, "7"), (d, i) => 1 + ((Number(d) + i) % 4));
   const onDown = (e: React.PointerEvent) => { start.current = e.clientX; setDrag(true); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); };
   const onMove = (e: React.PointerEvent) => { if (drag) setAngle(Math.max(-18, Math.min(18, (e.clientX - start.current) * 0.16))); };
   const onUp = () => { setDrag(false); setAngle(0); };
@@ -31,7 +50,7 @@ export function IdBadge({ profile, patch, suit }: { profile: PlayerProfile; patc
       </svg>
       {/* swinging card, hinged at the clip */}
       <div className="-mt-[6px] flex justify-center" style={{ perspective: 900 }}>
-        <div role="img" aria-label={`ID badge for ${profile.username}`} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+        <div role="img" aria-label={`ID badge for ${view.name}`} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
           className="relative w-[216px] cursor-grab touch-none active:cursor-grabbing"
           style={{ transformOrigin: "50% -14px", transform: drag ? `rotate(${angle}deg)` : undefined, animation: drag || reduced ? undefined : "idswing 4.6s ease-in-out infinite", transition: drag ? "none" : "transform .9s cubic-bezier(.2,1.6,.4,1)" }}>
           <div className="relative overflow-hidden rounded-2xl border border-white/20 shadow-[0_18px_40px_rgba(0,0,0,.55)]" style={{ background: "linear-gradient(160deg,#17233c 0%,#0d1526 55%,#1b2a48 100%)" }}>
@@ -40,26 +59,35 @@ export function IdBadge({ profile, patch, suit }: { profile: PlayerProfile; patc
             {patch && <span role="img" aria-label={`${patch.name} patch`} title={patch.name} className="absolute right-2.5 top-[104px] grid size-9 place-items-center rounded-full border-2 text-sm" style={{ background: patch.color, borderColor: patch.accent, color: patch.accent }}>★</span>}
             <div className="flex items-center justify-center gap-1.5 pt-2 text-[9px] font-semibold uppercase tracking-[.22em] text-orange"><span aria-hidden className="size-1.5 rotate-45 bg-orange" />Space Mission Design</div>
             <div className="mt-2.5 grid place-items-center">
-              <div className="rounded-full p-1" style={{ background: "conic-gradient(from 200deg,#ff8a3d,#ffd27a,#4fc3f7,#ff8a3d)" }}><div className="rounded-full bg-[#0d1526] p-1"><PlayerAvatar player={profile} size={104} /></div></div>
+              <div className="rounded-full p-1" style={{ background: "conic-gradient(from 200deg,#ff8a3d,#ffd27a,#4fc3f7,#ff8a3d)" }}><div className="rounded-full bg-[#0d1526] p-1">{card || view.avatar.template !== "initial" || view.avatar.bg !== "#168BFF" || view.avatar.shape !== "circle" || view.avatar.frame !== "none" || view.avatar.fg !== "#04101F" ? <AvatarArt style={view.avatar} name={view.name} size={104} /> : profile ? <PlayerAvatar player={profile} size={104} /> : null}</div></div>
             </div>
             <div className="px-4 pt-3 text-center">
-              <p className="font-display text-2xl font-bold leading-tight">{profile.username}</p>
+              <p className="font-display text-2xl font-bold leading-tight">{view.name}</p>
               <p className="text-[10px] uppercase tracking-[.25em] text-ink2">Mission Commander</p>
               <div className="mt-1.5 flex justify-center"><FlagView id={flagId} custom={custom} width={34} label="Your flag" /></div>
             </div>
             <dl className="mx-4 mt-3 grid grid-cols-2 gap-2 text-center text-[10px]">
-              <div className="rounded-md bg-white/5 py-1.5"><dt className="uppercase tracking-wider text-muted">Level</dt><dd className="font-display text-base font-bold text-gold">{profile.progression.level}</dd></div>
-              <div className="rounded-md bg-white/5 py-1.5"><dt className="uppercase tracking-wider text-muted">Missions</dt><dd className="font-display text-base font-bold">{profile.history.completed}</dd></div>
+              <div className="rounded-md bg-white/5 py-1.5"><dt className="uppercase tracking-wider text-muted">Level</dt><dd className="font-display text-base font-bold text-gold">{view.level}</dd></div>
+              <div className="rounded-md bg-white/5 py-1.5"><dt className="uppercase tracking-wider text-muted">Missions</dt><dd className="font-display text-base font-bold">{view.missions}</dd></div>
             </dl>
             <div className="mx-4 mt-3 flex items-end justify-between gap-2">
-              <div><p className="text-[9px] uppercase tracking-wider text-muted">Crew ID</p><p className="font-mono text-sm font-bold tracking-wider">{profile.playerCode}</p></div>
+              <div><p className="text-[9px] uppercase tracking-wider text-muted">Crew ID</p><p className="font-mono text-sm font-bold tracking-wider">{view.code}</p></div>
               <div aria-hidden className="flex h-7 items-end gap-[2px]">{bars.concat(bars).map((w, i) => <span key={i} className="bg-white/85" style={{ width: w, height: 14 + ((i * 7) % 14) }} />)}</div>
             </div>
             <div aria-hidden className="mt-3 h-2.5 w-full" style={{ background: `repeating-linear-gradient(135deg,${suit ?? "#ff8a3d"} 0 10px,#10182b 10px 20px)` }} />
           </div>
         </div>
       </div>
-      <p className="mt-3 text-center text-[11px] text-muted">Drag the badge and let go</p>
+      {!card && actions !== false ? (
+        <div className="mt-3 grid gap-2 px-4">
+          <div className="flex flex-wrap justify-center gap-2">
+            <button type="button" onClick={() => void share("image")} className="inline-flex items-center gap-1.5 rounded-md border border-white/15 px-3 py-1.5 text-xs text-ink2 hover:text-ink"><Download className="size-3.5" />Save image</button>
+            {typeof navigator !== "undefined" && typeof navigator.share === "function" && <button type="button" onClick={() => void share("native")} className="inline-flex items-center gap-1.5 rounded-md border border-orange px-3 py-1.5 text-xs text-orange"><Share2 className="size-3.5" />Share</button>}
+            <button type="button" onClick={() => void share("link")} className="inline-flex items-center gap-1.5 rounded-md border border-white/15 px-3 py-1.5 text-xs text-ink2 hover:text-ink"><Link2 className="size-3.5" />Copy link</button>
+          </div>
+          <p role="status" className="min-h-4 text-center text-[11px] text-muted">{note || "Drag the badge and let go"}</p>
+        </div>
+      ) : <p className="mt-3 text-center text-[11px] text-muted">Drag the badge and let go</p>}
     </section>
   );
 }

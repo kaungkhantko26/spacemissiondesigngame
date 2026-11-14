@@ -11,6 +11,7 @@ import { GlobalSound } from "./GlobalSound";
 import { useProgress } from "@/game/progress";
 import { useAvatar } from "@/game/avatar";
 import { useFlag } from "@/game/flags";
+import { useIdentity } from "@/game/identity";
 
 const BARE = ["/", "/splash", "/menu", "/mission/gameplay", "/mission/loading"];
 
@@ -21,6 +22,7 @@ export function GameShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { // restore saved cosmetics, progress and profile picture from this browser
     void useAvatar.persist.rehydrate(); void useFlag.persist.rehydrate();
+    void Promise.resolve(useIdentity.persist.rehydrate()).then(() => { const n = useIdentity.getState().name; if (n) usePlayerStore.setState((st) => ({ profile: { ...st.profile, username: n } })); });
     void Promise.resolve(useProgress.persist.rehydrate()).then(() => {
       const saved = useProgress.getState().equipped;
       usePlayerStore.setState((st) => ({ profile: { ...st.profile, equipped: { ...st.profile.equipped, ...saved } } }));
