@@ -72,3 +72,6 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - `src/components/live/Design.tsx`: rewritten on his DesignStudio look (exports `Section/Pick/Slider/GameChip` from DesignStudio.tsx). Sections are view-only unless your seat owns the field. Review panel is the server's preview.
 - `src/components/live/Report.tsx`: replays the flight on his `TrajectorySim`, then score/XP/objectives/lessons/real instruments/challenges.
 - Deleted `Ops.tsx`, `OpsScene.tsx`, `/mission/ops`. Frontend dataset.json must stay in sync with backend `server/data/mdesign.json`.
+
+## 2026-11-14 — Live Mission Select restyled to match mock
+- `LiveMissionSelect` now uses the mock layout: 3D `PlanetModel` per card, type · players · XP line, difficulties line, locked ⚠ notes, coming-soon cards with globes, bottom details panel (brief, goals, crew, XP). Live data/flow unchanged.

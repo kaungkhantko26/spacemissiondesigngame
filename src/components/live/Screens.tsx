@@ -128,19 +128,49 @@ export function LiveMissionSelect() {
               </button>); })}
           </div>
         </GlassPanel>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {cat.missions.map((x) => { const ok = x.difficulties.includes(d); return (
-            <button key={x.id} disabled={!ok} onClick={() => setM(x.id)} className="text-left disabled:cursor-not-allowed">
-              <GlassPanel active={m === x.id} className={cn("h-full p-4", !ok && "opacity-50")}>
-                <p className="font-display text-lg font-bold">{x.name}</p><p className="text-sm text-ink2">{x.tagline}</p>
-                <p className="mt-2 text-xs text-muted">{ok ? `Budget $${Math.round((cat.design.destinations.find((dd) => dd.id === x.destinationId)?.budgetUsd ?? 0) / 1e6)}M · ${x.baseXP} base XP` : `🔒 ${x.lockedReason[d] ?? "Not available on this difficulty"}`}</p>
-              </GlassPanel></button>); })}
-          {cat.comingSoon.map((x) => (
-            <GlassPanel key={x.id} className="h-full p-4 opacity-50"><p className="font-display text-lg font-bold">{x.name}</p>
-              <p className="text-sm text-ink2">{x.tagline}</p><p className="mt-2 text-xs text-gold">Coming soon</p></GlassPanel>))}
+        <div className="grid gap-4">
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {cat.missions.map((x, i) => { const ok = x.difficulties.includes(d); return (
+              <li key={x.id} className="enter lift" style={{ animationDelay: `${i * 70}ms` }}>
+                <button onClick={() => ok && setM(x.id)} aria-disabled={!ok} aria-pressed={m === x.id} className={cn("h-full w-full text-left", !ok && "cursor-not-allowed")}>
+                  <GlassPanel active={m === x.id} className={cn("flex h-full flex-col overflow-hidden", !ok && "opacity-60")}>
+                    <div className="h-28"><Scene3D stars={false} camera={[0, 0, 4]} label={`${x.name} preview`}><PlanetModel kind={x.body} radius={1.3} /></Scene3D></div>
+                    <div className="flex flex-1 flex-col gap-1 p-3">
+                      <p className="font-display font-bold">{x.name} {!ok && <Lock className="inline size-4" aria-label="Unavailable" />}</p>
+                      <p className="text-xs text-ink2">{x.tagline}</p>
+                      <p className="text-xs text-muted">{x.type} · {x.slots.length} players · {x.baseXP} base XP</p>
+                      <p className="text-xs text-muted">Difficulties: {x.difficulties.join(", ")}</p>
+                      {!ok && <p className="mt-auto text-xs text-warn">⚠ {x.lockedReason[d] ?? "Not available on this difficulty"}</p>}
+                    </div>
+                  </GlassPanel>
+                </button>
+              </li>); })}
+            {cat.comingSoon.map((x, i) => (
+              <li key={x.id} className="enter" style={{ animationDelay: `${(cat.missions.length + i) * 70}ms` }}>
+                <GlassPanel className="flex h-full flex-col overflow-hidden opacity-60">
+                  <div className="h-28"><Scene3D stars={false} camera={[0, 0, 4]} label={`${x.name} preview`}><PlanetModel kind={x.body} radius={1.3} /></Scene3D></div>
+                  <div className="flex flex-1 flex-col gap-1 p-3">
+                    <p className="font-display font-bold">{x.name} <Lock className="inline size-4" aria-label="Unavailable" /></p>
+                    <p className="text-xs text-ink2">{x.tagline}</p>
+                    <p className="text-xs text-muted">{x.category}</p>
+                    <p className="mt-auto text-xs text-warn">⚠ {x.note || "Coming soon"}</p>
+                  </div>
+                </GlassPanel>
+              </li>))}
+          </ul>
+          <GlassPanel className="p-4">
+            {sel ? (
+              <div className="grid gap-3 md:grid-cols-3">
+                <div><h2 className="text-xl font-bold">{sel.name}</h2><p className="text-sm text-ink2">{sel.brief}</p></div>
+                <div><p className="text-sm font-semibold">Goals</p><ul className="list-disc pl-5 text-sm text-ink2">{sel.objectives.map((o, j) => <li key={j}>{o.label}</li>)}</ul></div>
+                <div className="text-sm text-ink2"><p className="font-semibold text-ink">Crew & rewards</p>
+                  <p>{sel.slots.map((sl) => sl.role).join(", ")}</p>
+                  <p>{sel.baseXP} base XP ({cat.difficulties[d].xpMult}× on {cat.difficulties[d].label})</p></div>
+              </div>
+            ) : <p className="text-sm text-muted">Select an available mission to see details.</p>}
+          </GlassPanel>
+          <div className="flex justify-end"><GameButton variant="primary" disabled={!valid} onClick={() => g.setup(m, d).then(() => router.push("/mission/briefing")).catch(() => {})}>Continue to Briefing</GameButton></div>
         </div>
-      </div>
-      <div className="flex justify-end"><GameButton variant="primary" disabled={!valid} onClick={() => g.setup(m, d).then(() => router.push("/mission/briefing")).catch(() => {})}>Continue to Briefing</GameButton></div>
     </ScreenContainer>
   );
 }
