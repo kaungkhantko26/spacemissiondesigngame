@@ -2,14 +2,14 @@
 /** Live (real-backend) versions of the main flow screens, in the existing UI style. */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Crown, Lock, Wifi, WifiOff } from "lucide-react";
+import { AlertTriangle, Check, Copy, Crown, Globe, KeyRound, Lock, Plus, Wifi, WifiOff } from "lucide-react";
 import { create } from "zustand";
 import { BackButton, GameButton, GlassPanel, PlayerAvatar, ScreenContainer, StatBar, StatusPill } from "@/components/ui";
 import { useGame } from "@/live/store";
 import { Design } from "./Design";
 import { Report } from "./Report";
-import { Portrait } from "./Portrait";
-import { Scene3D, PlanetModel } from "@/components/three/lazy";
+import { Portrait, lookOf } from "./Portrait";
+import { Scene3D, PlanetModel, Astronaut, CrewLineup, MissionHangar } from "@/components/three/lazy";
 import { cn } from "@/lib/mission";
 import type { Difficulty, Room } from "@/live/types";
 
@@ -51,17 +51,22 @@ export function LiveTeam() {
   const go = (p: Promise<unknown>) => p.then(() => router.push("/team/lobby")).catch(() => {});
   const input = "rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-white";
   return (
-    <ScreenContainer title="Team Up" subtitle="Create a room or join your crew with a 4-letter code." actions={<BackButton href="/menu" label="Main menu" />}>
+    <ScreenContainer title="Team Up" subtitle="Create a lobby or join one with a 4-letter code." actions={<BackButton href="/menu" label="Main menu" />}>
       <ErrorBar />
+      <GlassPanel className="flex flex-wrap items-center gap-3 p-4"><span className="text-sm text-ink2">Your callsign</span>
+        <input className={cn(input, "flex-1")} maxLength={20} value={name} onChange={(e) => setName(e.target.value)} />
+        <GameButton variant="outline" onClick={() => swallow(g.rename(name))}>Save name</GameButton></GlassPanel>
       <div className="grid gap-4 md:grid-cols-3">
-        <GlassPanel className="grid h-fit gap-3 p-6"><h2 className="text-xl font-bold">Your callsign</h2>
-          <input className={input} maxLength={20} value={name} onChange={(e) => setName(e.target.value)} />
-          <GameButton variant="outline" onClick={() => swallow(g.rename(name))}>Save name</GameButton></GlassPanel>
-        <GlassPanel className="grid h-fit gap-3 p-6"><h2 className="text-xl font-bold">Create Lobby</h2><p className="text-sm text-ink2">Host a crew of up to four players.</p>
-          <GameButton variant="primary" onClick={() => void go(g.createRoom())}>Create room</GameButton></GlassPanel>
-        <GlassPanel className="grid h-fit gap-3 p-6"><h2 className="text-xl font-bold">Join with Code</h2>
-          <input className={cn(input, "uppercase tracking-widest")} placeholder="ABCD" maxLength={4} value={code} onChange={(e) => setCode(e.target.value)} />
-          <GameButton variant="primary" disabled={code.length < 4} onClick={() => void go(g.joinRoom(code))}>Join</GameButton></GlassPanel>
+        <GlassPanel className="h-full p-6"><Plus className="size-8 text-cyan" aria-hidden /><h2 className="mt-3 text-xl font-bold">Create Lobby</h2>
+          <p className="mt-1 text-sm text-ink2">Host a four-player crew.</p>
+          <GameButton className="mt-4" variant="primary" onClick={() => void go(g.createRoom())}>Create room</GameButton></GlassPanel>
+        <GlassPanel className="h-full p-6"><KeyRound className="size-8 text-cyan" aria-hidden /><h2 className="mt-3 text-xl font-bold">Join with Code</h2>
+          <p className="mt-1 text-sm text-ink2">Enter the room code from a friend.</p>
+          <input className={cn(input, "mt-3 w-full uppercase tracking-widest")} placeholder="ABCD" maxLength={4} value={code} onChange={(e) => setCode(e.target.value)} />
+          <GameButton className="mt-3" variant="primary" disabled={code.length < 4} onClick={() => void go(g.joinRoom(code))}>Join</GameButton></GlassPanel>
+        <GlassPanel className="h-full p-6 opacity-60"><Globe className="size-8 text-cyan" aria-hidden />
+          <h2 className="mt-3 text-xl font-bold">Public Lobbies <span className="ml-1 rounded bg-gold/20 px-2 text-xs text-gold">Coming soon</span></h2>
+          <p className="mt-1 text-sm text-ink2">Browse open crews.</p></GlassPanel>
       </div>
     </ScreenContainer>
   );
@@ -178,6 +183,10 @@ export function LiveMissionSelect() {
 }
 
 /* ---------- Briefing ---------- */
+function MissionSummary({ name, label }: { name: string; label: string }) {
+  return <GlassPanel className="p-4 text-sm"><p className="font-display text-lg font-bold">{name}</p><p className="text-ink2 capitalize">Difficulty: {label}</p></GlassPanel>;
+}
+
 export function LiveBriefing() {
   const g = useGame(); const { ready, room, host } = useGate("setup"); const cat = g.catalog;
   if (!ready || !room || !cat) return <Wait />;
@@ -187,20 +196,24 @@ export function LiveBriefing() {
   const ch = mission.challenges.hard;
   const dst = cat.design.destinations.find((x) => x.id === mission.destinationId);
   const budget = (dst?.budgetUsd ?? 0) * cat.difficulties[d].budgetMult; const deadline = Math.round((dst?.deadlineDays ?? 0) * cat.difficulties[d].deadlineMult);
+  const reward = (id: string) => cat.cosmetics.items.find((c) => c.id === id)?.name ?? id;
   return (
     <ScreenContainer step={3} title="Mission Briefing" subtitle={`${mission.name} · ${cat.difficulties[d].label} · ${cat.difficulties[d].xpMult}× XP`} actions={<BackButton href="/mission/select" />}>
       <ErrorBar />
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-        <GlassPanel className="space-y-3 p-5"><p className="text-ink2">{mission.brief}</p>
-          <h2 className="text-xl font-bold">Objectives</h2>
+      <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
+        <GlassPanel className="p-5"><p className="mb-3 text-sm text-ink2">{mission.brief}</p>
+          <h2 className="mb-2 text-xl font-bold">Objectives</h2>
           <ul className="list-disc pl-5 text-ink2">{mission.objectives.map((o) => <li key={o.id}>{o.label}{o.required ? " *" : ""}</li>)}</ul>
-          <p className="text-xs text-muted">Budget ${Math.round(budget / 1e6)}M · deadline {deadline} days · * required</p></GlassPanel>
+          <p className="mt-2 text-xs text-muted">Budget ${Math.round(budget / 1e6)}M · deadline {deadline} days · * required</p>
+          <h2 className="mb-2 mt-5 text-xl font-bold">Possible rewards</h2>
+          <ul className="text-sm text-ink2"><li>★ {Math.round(mission.baseXP * cat.difficulties[d].xpMult)} XP</li>
+            {d === "hard" && ch?.tiers.map((t) => <li key={t.need}>🎖 {reward(t.reward)} ({t.need}/{ch.list.length} challenges)</li>)}</ul></GlassPanel>
         <div className="grid h-fit gap-3">
-          {mods.length === 0 ? <GlassPanel className="p-5"><p className="font-bold text-ok">✓ No modifiers active</p></GlassPanel>
-            : mods.map((x) => x && <GlassPanel key={x.id} className="p-4"><p className="font-bold text-orange">{x.name}</p><p className="text-sm text-ink2">{x.desc}</p></GlassPanel>)}
-          {d === "hard" && ch && <GlassPanel className="border-gold/50 p-4"><h2 className="font-bold text-gold">Time attack — {ch.timeLimitMin} min</h2>
+          {mods.length === 0 ? <GlassPanel className="p-6"><p className="font-display text-lg font-bold text-ok">✓ No modifiers active</p><p className="text-sm text-ink2">Easy mode runs without mission modifiers.</p></GlassPanel>
+            : <ul className="grid gap-3 sm:grid-cols-2">{mods.map((x) => x && <li key={x.id}><GlassPanel className="h-full p-4"><AlertTriangle className="size-6 text-orange" aria-hidden /><p className="mt-2 font-bold">{x.name}</p><p className="text-sm text-ink2">{x.desc}</p></GlassPanel></li>)}</ul>}
+          {d === "hard" && ch && <GlassPanel className="border-gold/50 p-4"><h2 className="font-bold text-gold">Hard-mode challenges — {ch.timeLimitMin} min</h2>
             <ul className="list-disc pl-5 text-sm text-ink2">{ch.list.map((c) => <li key={c.id}>{c.name} — {c.desc}</li>)}</ul>
-            <p className="mt-2 text-xs text-muted">Beat {ch.tiers.map((t) => `${t.need}/${ch.list.length}`).join(" or ")} in time for exclusive cosmetics (first attempt only).</p></GlassPanel>}
+            <p className="mt-2 text-xs text-muted">Complete challenges for exclusive cosmetics (first attempt only).</p></GlassPanel>}
         </div>
       </div>
       <div className="flex justify-end">{host ? <GameButton variant="primary" onClick={() => swallow(g.startRoles())}>Continue to Roles</GameButton> : <p className="text-sm text-ink2">Waiting for the host…</p>}</div>
@@ -215,18 +228,29 @@ const holder = (room: Room, slot: string) => { const s = room.slots.find((x) => 
 export function LiveRoles() {
   const router = useRouter(); const g = useGame(); const { ready, room, profile } = useGate("roles"); const { slot, set } = usePick();
   if (!ready || !room || !g.catalog || !profile) return <Wait />;
-  const cat = g.catalog;
+  const cat = g.catalog; const mission = cat.missions.find((x) => x.id === room.missionId);
+  const focus = room.slots.find((x) => x.slot === slot); const detail = focus && cat.roles.find((r) => r.id === focus.role);
   return (
     <ScreenContainer step={4} title="Role Assignment" subtitle="Choose the seat you'll fly. Roles unclaimed by players are run by AI crew." actions={<BackButton href="/team/lobby" />}>
       <ErrorBar />
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {room.slots.map((s) => { const role = cat.roles.find((r) => r.id === s.role)!; const mine = s.playerId === profile.id; const taken = !!s.playerId && !mine; return (
-          <li key={s.slot}><button disabled={taken} onClick={() => set(s.slot)} className="w-full text-left disabled:cursor-not-allowed">
-            <GlassPanel active={slot === s.slot || mine} className={cn("p-4", taken && "opacity-60")}>
-              <p className="text-2xl">{role.icon}</p><p className="font-display text-lg font-bold">{role.label}</p><p className="text-sm text-ink2">{role.desc}</p>
-              <p className="mt-2 text-xs text-muted">{holder(room, s.slot)}{mine && s.characterId ? " — you ✓" : ""}</p>
-            </GlassPanel></button></li>); })}
-      </ul>
+      <div className="grid gap-4 lg:grid-cols-[260px_1fr_300px]">
+        <div className="grid h-fit gap-3">
+          <MissionSummary name={mission?.name ?? ""} label={room.difficulty ?? ""} />
+          <GlassPanel className="p-4 text-sm"><p className="mb-2 font-semibold">Crew slots</p>
+            <ul className="grid gap-1">{room.slots.map((s) => <li key={s.slot} className="flex justify-between"><span>{holder(room, s.slot)}</span><span className="text-ink2 capitalize">{cat.roles.find((r) => r.id === s.role)?.label}{s.characterId ? " ✓" : ""}</span></li>)}</ul></GlassPanel>
+        </div>
+        <ul className="grid h-fit gap-3 sm:grid-cols-2">
+          {room.slots.map((s) => { const role = cat.roles.find((r) => r.id === s.role)!; const mine = s.playerId === profile.id; const taken = !!s.playerId && !mine; return (
+            <li key={s.slot}><button disabled={taken} onClick={() => set(s.slot)} aria-pressed={slot === s.slot || mine} className="w-full text-left disabled:cursor-not-allowed">
+              <GlassPanel active={slot === s.slot || mine} className={cn("p-4", taken && "opacity-60")}>
+                <p className="text-2xl">{role.icon}</p><p className="font-display text-lg font-bold">{role.label}</p><p className="text-sm text-ink2">{role.desc}</p>
+                <p className="mt-2 text-xs text-muted">{holder(room, s.slot)}{mine && s.characterId ? " — you ✓" : ""} · {taken ? "Full" : "Available"}</p>
+              </GlassPanel></button></li>); })}
+        </ul>
+        <GlassPanel className="h-fit p-4">
+          {detail ? <><h2 className="text-lg font-bold">{detail.label}</h2><ul className="mt-2 list-disc pl-5 text-sm text-ink2">{detail.controls.map((x) => <li key={x}>{x}</li>)}</ul></> : <p className="text-sm text-muted">Select a role to see its responsibilities.</p>}
+        </GlassPanel>
+      </div>
       <div className="flex justify-end"><GameButton variant="primary" disabled={!slot} onClick={() => router.push("/mission/characters")}>Continue to Characters</GameButton></div>
     </ScreenContainer>
   );
@@ -234,32 +258,51 @@ export function LiveRoles() {
 
 export function LiveCharacters() {
   const router = useRouter(); const g = useGame(); const { ready, room, profile } = useGate("roles"); const { slot } = usePick();
+  const [view, setView] = useState<string | null>(null); const [cmp, setCmp] = useState<string | null>(null);
   if (!ready || !room || !g.catalog || !profile) return <Wait />;
   const cat = g.catalog; const diff = room.difficulty!;
   const s = room.slots.find((x) => x.slot === slot);
   if (!s) return <ScreenContainer title="Character Selection"><GameButton onClick={() => router.push("/mission/roles")}>Choose a role first</GameButton></ScreenContainer>;
+  const mission = cat.missions.find((x) => x.id === room.missionId);
   const mineNow = s.playerId === profile.id ? s.characterId : null;
+  const roster = cat.characters.filter((c) => c.role === s.role);
+  const shown = roster.find((c) => c.id === (view ?? mineNow ?? roster[0]?.id)) ?? roster[0];
+  const other = roster.find((c) => c.id === cmp);
+  const tp = cat.traitPreview[diff][shown.id]; const look = lookOf(shown.id, shown.role);
+  const last = (n: string) => n.split(" ").slice(-1)[0];
   return (
     <ScreenContainer step={5} title="Character Selection" subtitle={`${cat.roles.find((r) => r.id === s.role)?.label} · perks and flaws shown for ${cat.difficulties[diff].label}`} actions={<BackButton href="/mission/roles" />}>
       <ErrorBar />
-      <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {cat.characters.filter((c) => c.role === s.role).map((c) => { const tp = cat.traitPreview[diff][c.id]; return (
-          <li key={c.id}><button className="w-full text-left" onClick={() => swallow(g.claim(s.slot, c.id))}>
-            <GlassPanel active={mineNow === c.id} className="h-full space-y-2 p-4">
-              <div className="flex gap-3">
-                <Portrait id={c.id} role={c.role} size={92} />
-                <div className="min-w-0 flex-1">
-                  <p className="font-display text-lg font-bold">{c.name} <span className="text-sm font-normal text-ink2">{c.title}</span></p>
-                  <p className="mb-1 text-xs text-ink2">{c.bio}</p>
-                  <div className="grid gap-1">{cat.stats.map((st) => <StatBar key={st.id} label={st.label} value={c.stats[st.id]} max={10} />)}</div>
-                </div>
-              </div>
-              {tp?.perks.map((p) => <p key={p.id} className="text-xs text-ok">＋ <b>{p.label}</b>: {p.effects.map((e) => e.text).join(", ")}</p>)}
-              {tp?.flaw && <p className={cn("text-xs", tp.flaw.active ? "text-bad" : "text-muted")}>− <b>{tp.flaw.label}</b>{tp.flaw.active ? "" : " (dormant)"}: {tp.flaw.effects.map((e) => e.text).join(", ")}</p>}
-              {mineNow === c.id && <p className="text-xs font-bold text-orange">✓ Selected</p>}
-            </GlassPanel></button></li>); })}
-      </ul>
-      <div className="flex justify-end"><GameButton variant="primary" disabled={!mineNow} onClick={() => router.push("/mission/confirm")}>Continue</GameButton></div>
+      <div className="grid gap-4 lg:grid-cols-[240px_1fr_360px]">
+        <div className="grid h-fit gap-3"><MissionSummary name={mission?.name ?? ""} label={diff} />
+          <GlassPanel className="p-4 text-sm"><p className="mb-1 font-semibold">Crew</p>{room.slots.map((x) => { const ch = cat.characters.find((c) => c.id === x.characterId); return <p key={x.slot} className="flex justify-between"><span>{holder(room, x.slot)}</span><span className="text-ink2">{ch ? last(ch.name) : "—"}{x.characterId ? " ✓" : ""}</span></p>; })}</GlassPanel></div>
+        <GlassPanel className="flex min-h-[460px] flex-col p-3">
+          <div className="min-h-0 flex-1"><Scene3D controls camera={[0, 1, 5]} label={`${shown.name} 3D preview`}><Astronaut suit={look.suit} skin={look.skin} accent={look.accent} position={[0, -1, 0]} /></Scene3D></div>
+          <div className="px-2 pb-2"><h2 className="text-2xl font-bold">{shown.name}</h2><p className="text-cyan">{shown.title}</p><p className="text-sm text-ink2">{shown.bio}</p></div>
+        </GlassPanel>
+        <div className="grid h-fit gap-3">
+          <GlassPanel className="p-3"><ul role="listbox" aria-label="Character roster" className="grid gap-2">
+            {roster.map((c) => (
+              <li key={c.id} role="option" aria-selected={c.id === shown.id}>
+                <button onClick={() => setView(c.id)} className={cn("flex w-full items-center gap-3 rounded-lg border p-2 text-left", c.id === shown.id ? "border-cyan bg-cyan/10" : "border-white/10")}>
+                  <span className="size-8 rounded-full" style={{ background: lookOf(c.id, c.role).suit }} aria-hidden /><span><span className="block text-sm font-semibold">{c.name}</span><span className="text-xs text-muted">{c.title}</span></span>
+                  {mineNow === c.id && <Check className="ml-auto size-4 text-ok" aria-label="Selected" />}
+                </button>
+              </li>))}</ul></GlassPanel>
+          <GlassPanel className="space-y-2 p-4">
+            <div className="flex gap-3"><Portrait id={shown.id} role={shown.role} size={92} />
+              <div className="grid min-w-0 flex-1 gap-1">{cat.stats.map((st) => <StatBar key={st.id} label={st.label} value={shown.stats[st.id]} max={10} />)}</div></div>
+            {tp?.perks.map((p) => <p key={p.id} className="text-xs text-ok">＋ <b>{p.label}</b>: {p.effects.map((e) => e.text).join(", ")}</p>)}
+            {tp?.flaw && <p className={cn("text-xs", tp.flaw.active ? "text-bad" : "text-muted")}>− <b>{tp.flaw.label}</b>{tp.flaw.active ? "" : " (dormant)"}: {tp.flaw.effects.map((e) => e.text).join(", ")}</p>}
+            <div className="flex items-center gap-2 text-xs"><label htmlFor="cmp" className="text-muted">Compare with</label>
+              <select id="cmp" value={cmp ?? ""} onChange={(e) => setCmp(e.target.value || null)} className="rounded bg-black/40 px-2 py-1">
+                <option value="">—</option>{roster.filter((c) => c.id !== shown.id).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+            {other && <ul className="text-xs text-ink2">{cat.stats.map((st) => { const dd = shown.stats[st.id] - other.stats[st.id]; return <li key={st.id} className="flex justify-between"><span>{st.label}</span><span className={dd > 0 ? "text-ok" : dd < 0 ? "text-bad" : ""}>{dd > 0 ? `+${dd}` : dd} vs {last(other.name)}</span></li>; })}</ul>}
+          </GlassPanel>
+          <GameButton variant="primary" disabled={mineNow === shown.id} onClick={() => swallow(g.claim(s.slot, shown.id))}>{mineNow === shown.id ? "✓ Selected" : mineNow ? "Switch to this character" : "Confirm selection"}</GameButton>
+        </div>
+      </div>
+      <div className="flex justify-end"><GameButton variant="primary" disabled={!mineNow} onClick={() => router.push("/mission/confirm")}>Review Crew</GameButton></div>
     </ScreenContainer>
   );
 }
@@ -267,15 +310,28 @@ export function LiveCharacters() {
 export function LiveConfirm() {
   const g = useGame(); const { ready, room, host } = useGate("roles");
   if (!ready || !room || !g.catalog) return <Wait />;
-  const cat = g.catalog; const mission = cat.missions.find((x) => x.id === room.missionId);
+  const cat = g.catalog; const mission = cat.missions.find((x) => x.id === room.missionId); const d = room.difficulty;
+  const mods = d ? (mission?.modifiers[d] ?? []).map((id) => cat.modifiers.find((x) => x.id === id)?.name).filter(Boolean) : [];
+  const crew = room.slots.map((s) => ({ s, ch: cat.characters.find((c) => c.id === s.characterId), role: cat.roles.find((r) => r.id === s.role) }));
+  const complete = crew.every((x) => x.ch);
   return (
-    <ScreenContainer step={6} title="Confirm Crew" subtitle={`${mission?.name} · ${room.difficulty}`} actions={<BackButton href="/mission/characters" />}>
+    <ScreenContainer step={6} title="Crew Ready" subtitle={`${mission?.name} · ${d}`} actions={<BackButton href="/mission/characters" label="Edit crew" />}>
       <ErrorBar />
-      <GlassPanel className="p-4"><ul className="grid gap-2 sm:grid-cols-2">
-        {room.slots.map((s) => { const ch = cat.characters.find((c) => c.id === s.characterId);
-          return <li key={s.slot} className="text-sm"><b>{cat.roles.find((r) => r.id === s.role)?.label}</b> — {holder(room, s.slot)}{ch ? ` as ${ch.name}` : s.playerId ? " (choosing…)" : ""}</li>; })}
-      </ul></GlassPanel>
-      <div className="flex justify-end">{host ? <GameButton variant="primary" onClick={() => swallow(g.startDesign())}>Start designing 🚀</GameButton> : <p className="text-sm text-ink2">Waiting for the host to start…</p>}</div>
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <GlassPanel className="h-[380px] overflow-hidden p-0">
+          <Scene3D light="hangar" camera={[0, 0.8, 6.5]} label="Crew lineup in hangar"><MissionHangar />
+            <CrewLineup crew={crew.map((x) => x.ch ? { ...lookOf(x.ch.id, x.ch.role), pose: "ready" as const } : null)} /></Scene3D>
+        </GlassPanel>
+        <GlassPanel className="p-4 text-sm"><h2 className="font-display text-xl font-bold">{mission?.name}</h2>
+          <p className="capitalize text-ink2">{d && cat.difficulties[d].label} · {d && cat.difficulties[d].xpMult}× XP</p>
+          <p className="mt-2 text-muted">Modifiers: {mods.join(", ") || "None"}</p>
+          <ul className="mt-3 grid gap-2">{crew.map(({ s, ch, role }) => { const m = room.members.find((x) => x.id === s.playerId); return (
+            <li key={s.slot} className="flex items-center gap-2 rounded-lg bg-white/5 p-2"><PlayerAvatar player={{ username: m?.name ?? "AI", avatarColor: colorOf(m?.id ?? s.slot) }} size={28} />
+              <span className="flex-1">{holder(room, s.slot)}<span className="block text-xs text-muted">{role?.label} · {ch?.name ?? (s.playerId ? "choosing…" : "No character")}</span></span>
+              {ch && <span className="text-xs text-ok">✓</span>}</li>); })}</ul></GlassPanel>
+      </div>
+      {!complete && <p role="status" className="text-sm text-warn">⚠ Every seat needs a character before launch.</p>}
+      <div className="flex justify-end">{host ? <GameButton variant="primary" disabled={!complete} onClick={() => swallow(g.startDesign())}>Start designing 🚀</GameButton> : <p className="text-sm text-ink2">Waiting for the host to start…</p>}</div>
     </ScreenContainer>
   );
 }

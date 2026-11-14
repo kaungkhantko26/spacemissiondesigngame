@@ -40,3 +40,9 @@ export function Portrait({ id, role, size = 96 }: { id: string; role: keyof type
     </svg>
   );
 }
+
+/** Same seed as the portrait, so the 3D astronaut matches the face you picked. */
+export function lookOf(id: string, role: keyof typeof SUIT) {
+  const h = hash(id);
+  return { suit: SUIT[role] ?? "#888", skin: SKIN[h % SKIN.length], accent: HAIR[(h >>> 3) % HAIR.length] };
+}

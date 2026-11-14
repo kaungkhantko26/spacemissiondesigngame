@@ -75,3 +75,10 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 
 ## 2026-11-14 — Live Mission Select restyled to match mock
 - `LiveMissionSelect` now uses the mock layout: 3D `PlanetModel` per card, type · players · XP line, difficulties line, locked ⚠ notes, coming-soon cards with globes, bottom details panel (brief, goals, crew, XP). Live data/flow unchanged.
+
+## 2026-11-14 — All live screens restyled to match his mock UI
+- Team: icon cards (Create / Join / Public Lobbies coming soon) + callsign bar.
+- Briefing: objectives + possible rewards left, modifier icon cards + hard challenges right.
+- Roles: 3-column (mission summary + crew slots | role cards | responsibilities panel).
+- Characters: 3-column with 3D Astronaut preview (colours seeded from the same id as the portrait via `lookOf`), roster, stats + portrait, perks/flaw, compare dropdown, Confirm selection.
+- Confirm: hangar scene with CrewLineup + crew summary panel.
