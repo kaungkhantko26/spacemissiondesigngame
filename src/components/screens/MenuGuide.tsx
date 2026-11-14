@@ -2,8 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HelpCircle } from "lucide-react";
-import { useProgress } from "@react-three/drei";
-import { preloadAstronaut } from "@/components/three/lazy";
+import { preloadAstronaut, useAstronautReady } from "@/components/three/lazy";
+import { asset } from "@/lib/asset";
 import { GameButton } from "@/components/ui";
 import { useUIStore } from "@/stores";
 import { Tour, setPendingTour, type TourStep } from "@/components/game/Tour";
@@ -39,12 +39,15 @@ export function AstronautGuide({ children }: { children: React.ReactNode }) {
     });
   };
   const leave = () => { hide.current = setTimeout(() => setOpen(false), 600); };
-  const { active, progress } = useProgress();
+  const ready = useAstronautReady((st) => st.ready);
   useEffect(() => { preloadAstronaut(); installVoiceUnlock(); return () => { if (hide.current) clearTimeout(hide.current); stopVoice(); }; }, []);
   return (
     <div data-tour="astronaut" className="relative h-full" onMouseEnter={greet} onMouseLeave={leave} onClick={greet}>
       {children}
-      {active && progress < 100 && <div role="status" className="pointer-events-none absolute inset-x-0 top-1/2 mx-auto w-48 -translate-y-1/2 text-center text-xs text-ink2"><div className="mb-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-orange transition-all" style={{ width: `${Math.round(progress)}%` }} /></div>Loading your astronaut… {Math.round(progress)}%</div>}
+      {!ready && (
+        // eslint-disable-next-line @next/next/no-img-element -- static export, tiny poster shown until the live 3D model has downloaded
+        <img src={asset("/models/astronaut-poster.webp")} alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full object-contain object-right-bottom" />
+      )}
       {open && !tour && (
         <div role="status" className="absolute inset-x-0 top-[4%] z-20 mx-auto w-[min(22rem,90%)] rounded-2xl border border-orange/60 bg-[#10182b] p-4 text-sm shadow-xl">
           <p className="font-semibold text-orange">Astronaut</p>
