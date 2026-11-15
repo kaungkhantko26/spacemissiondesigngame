@@ -155,20 +155,50 @@ export function drawComplex(ctx: CanvasRenderingContext2D, s: Scene, padAngle: n
   ctx.save(); ctx.translate(padX, padY); ctx.rotate(padAngle);
   const a = Math.min(1, u * 300 / 30);
   ctx.globalAlpha = a;
-  // support buildings and tanks behind the pad (haze-tinted)
+  // A compact but legible launch campus: service tower, cryogenic storage, integration hall and road network.
   const body = (col: string) => rgb(mix(c(col), b.horizon, b.haze * 0.25));
-  ctx.fillStyle = body("#c9ccd2"); ctx.fillRect(-1300 * u, -62 * u, 150 * u, 62 * u); ctx.fillStyle = body("#a7acb6"); ctx.fillRect(-1300 * u, -62 * u, 150 * u, 6 * u);
-  ctx.fillStyle = "#242b36"; ctx.fillRect(-1245 * u, -50 * u, 38 * u, 50 * u);
-  ctx.fillStyle = body("#dcdfe4"); ctx.beginPath(); ctx.arc(520 * u, -30 * u, 20 * u, 0, 7); ctx.fill();
-  ctx.fillRect(560 * u, -34 * u, 70 * u, 24 * u); ctx.strokeStyle = body("#8a909c"); ctx.lineWidth = Math.max(1, 1.5 * u); for (const lx of [508, 532]) { ctx.beginPath(); ctx.moveTo(lx * u, -12 * u); ctx.lineTo((lx - 4) * u, 0); ctx.stroke(); }
+  const line = (col: string, width: number) => { ctx.strokeStyle = body(col); ctx.lineWidth = Math.max(1, width * u); };
+  // Vehicle integration building with roof ribs, loading doors and lit windows.
+  ctx.fillStyle = body("#c9ccd2"); ctx.fillRect(-1450 * u, -74 * u, 340 * u, 74 * u);
+  ctx.fillStyle = body("#a7acb6"); ctx.fillRect(-1450 * u, -78 * u, 340 * u, 7 * u);
+  ctx.fillStyle = "rgba(29,39,52,.88)"; ctx.fillRect(-1390 * u, -56 * u, 48 * u, 56 * u);
+  for (let i = 0; i < 7; i++) { ctx.fillStyle = i % 3 === 0 ? "rgba(255,205,123,.8)" : "rgba(147,203,224,.62)"; ctx.fillRect((-1305 + i * 25) * u, -53 * u, 9 * u, 8 * u); }
+  line("#edf0f3", 2); for (let x = -1430; x < -1110; x += 40) { ctx.beginPath(); ctx.moveTo(x * u, -70 * u); ctx.lineTo(x * u, -4 * u); ctx.stroke(); }
+  // Strongback / service tower: lattice legs, cross bracing, access decks and retractable umbilicals.
+  ctx.fillStyle = body("#9da6b2"); ctx.fillRect(-85 * u, -315 * u, 18 * u, 315 * u); ctx.fillRect(87 * u, -315 * u, 18 * u, 315 * u);
+  line("#697583", 3); ctx.beginPath(); ctx.moveTo(-86 * u, -315 * u); ctx.lineTo(105 * u, -315 * u); ctx.moveTo(-86 * u, 0); ctx.lineTo(105 * u, 0); ctx.stroke();
+  for (let y = -300; y < 0; y += 38) {
+    ctx.beginPath(); ctx.moveTo(-85 * u, y * u); ctx.lineTo(104 * u, (y - 38) * u); ctx.moveTo(104 * u, y * u); ctx.lineTo(-85 * u, (y - 38) * u); ctx.stroke();
+    ctx.fillStyle = body("#c7cbd0"); ctx.fillRect(-96 * u, y * u, 210 * u, 3 * u);
+  }
+  // Crew access arm and two service platforms reach toward the rocket.
+  ctx.fillStyle = body("#d5d9df"); ctx.fillRect(-68 * u, -224 * u, 125 * u, 10 * u); ctx.fillRect(-68 * u, -133 * u, 125 * u, 8 * u);
+  ctx.fillStyle = "#e6e8e8"; ctx.fillRect(45 * u, -231 * u, 42 * u, 7 * u);
+  ctx.fillStyle = "#f1bd55"; ctx.fillRect(-93 * u, -324 * u, 28 * u, 10 * u);
+  // Cryogenic tanks and pipe runs, with distinct domed tops and safety bands.
+  const tank = (x: number, h: number, w: number, color: string) => {
+    ctx.fillStyle = body(color); ctx.fillRect(x * u, -h * u, w * u, h * u);
+    ctx.beginPath(); ctx.ellipse((x + w / 2) * u, -h * u, w * u / 2, 7 * u, 0, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.28)"; ctx.fillRect((x + 3) * u, (-h + 12) * u, 3 * u, (h - 20) * u);
+    ctx.fillStyle = "#e1ad52"; ctx.fillRect(x * u, (-h + 13) * u, w * u, 5 * u);
+  };
+  tank(-590, 92, 48, "#e7e9e9"); tank(-520, 72, 42, "#c6d7df"); tank(500, 58, 34, "#d6d9dc");
+  line("#8a909c", 3); ctx.beginPath(); ctx.moveTo(-566 * u, -92 * u); ctx.lineTo(-566 * u, -125 * u); ctx.lineTo(-270 * u, -125 * u); ctx.lineTo(-270 * u, -230 * u); ctx.stroke();
+  // Low mission support buildings, rooftop antennas and apron lights.
+  ctx.fillStyle = body("#dcdfe4"); ctx.fillRect(520 * u, -34 * u, 170 * u, 34 * u); ctx.fillRect(700 * u, -48 * u, 130 * u, 48 * u);
+  ctx.fillStyle = "rgba(33,47,60,.8)"; for (let x = 535; x < 680; x += 28) ctx.fillRect(x * u, -22 * u, 15 * u, 10 * u);
+  line("#8a909c", 2); for (const lx of [508, 532, 702, 820]) { ctx.beginPath(); ctx.moveTo(lx * u, -12 * u); ctx.lineTo((lx - 4) * u, 0); ctx.stroke(); }
   ctx.fillStyle = body("#b6bbc4"); ctx.fillRect(-420 * u, -48 * u, 6 * u, 48 * u); ctx.beginPath(); ctx.ellipse(-417 * u, -52 * u, 24 * u, 9 * u, 0, 0, 7); ctx.fill();
-  // lightning masts
-  ctx.strokeStyle = body("#9aa2b0"); ctx.lineWidth = Math.max(1, 1.4 * u);
-  for (const mx of [-190, 160, 320]) { ctx.beginPath(); ctx.moveTo(mx * u, 0); ctx.lineTo(mx * u, -140 * u); ctx.stroke(); ctx.fillStyle = "#ff4b3a"; ctx.beginPath(); ctx.arc(mx * u, -141 * u, Math.max(1.2, 2 * u), 0, 7); ctx.fill(); }
-  // concrete apron, flame trench, access road
-  ctx.fillStyle = "#9aa0a8"; ctx.fillRect(-150 * u, 0, 300 * u, 6 * u);
-  ctx.fillStyle = "#6e747e"; ctx.fillRect(150 * u, 1 * u, 700 * u, 4 * u);
-  ctx.fillStyle = "#14171d"; ctx.fillRect(-28 * u, 0, 56 * u, 12 * u);
+  // Lightning masts with aviation beacons.
+  line("#9aa2b0", 1.4);
+  for (const mx of [-190, 160, 320]) { ctx.beginPath(); ctx.moveTo(mx * u, 0); ctx.lineTo(mx * u, -175 * u); ctx.lineTo((mx + 16) * u, -205 * u); ctx.stroke(); ctx.fillStyle = "#ff4b3a"; ctx.beginPath(); ctx.arc(mx * u, -207 * u, Math.max(1.2, 2.5 * u), 0, 7); ctx.fill(); }
+  // Concrete apron, striped safety perimeter, flame trench and branching access road.
+  ctx.fillStyle = "#9aa0a8"; ctx.fillRect(-210 * u, 0, 420 * u, 8 * u);
+  ctx.fillStyle = "rgba(248,190,73,.9)"; ctx.fillRect(-205 * u, 8 * u, 410 * u, 3 * u);
+  ctx.fillStyle = "#6e747e"; ctx.fillRect(210 * u, 1 * u, 700 * u, 5 * u); ctx.fillRect(-850 * u, 1 * u, 640 * u, 5 * u);
+  ctx.fillStyle = "#14171d"; ctx.fillRect(-34 * u, 0, 68 * u, 17 * u);
+  ctx.fillStyle = "#b9bdc2"; ctx.fillRect(-200 * u, -2 * u, 400 * u, 2 * u);
+  for (const x of [-180, -120, 120, 180]) { ctx.fillStyle = "#f1bd55"; ctx.beginPath(); ctx.arc(x * u, -5 * u, Math.max(1, 3 * u), 0, 7); ctx.fill(); }
   ctx.restore();
 }
 

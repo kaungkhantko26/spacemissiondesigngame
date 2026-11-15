@@ -1,4 +1,9 @@
 # Agent Log
+## Session 5 — Spaceport environment design refresh
+- Reworked the pad-local launch complex in `launchScenery.ts` into a more detailed mission campus: integration hall with windows/ribs, braced service tower and crew arms, banded cryogenic tanks and pipes, support buildings, beacons, safety perimeter, apron and branching access roads.
+- Kept the existing site-specific terrain, coastlines, vegetation, cloud layers and canvas rendering path; additions fade with the existing zoom/alpha behavior and remain within the same canvas.
+- Verification: `git diff --check` clean; no tests run.
+
 ## Session 1
 **Done:** scaffold (Next 16, Tailwind 4, R3F, Zustand), tokens, UI kit, shell, types, mock data + services, stores, 3D components, all 15 screens, tests, docs.
 **Tests:** vitest unit/UI tests pass; production build passes.
