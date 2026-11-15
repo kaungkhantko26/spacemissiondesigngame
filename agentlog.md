@@ -237,3 +237,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Launch Control camera: the zoomed-in view now locks onto the rocket (the smoothed follow lagged hundreds of km at orbital speed, so the rocket slid off screen and the Earth vanished) and the drag-pan is limited to about one screen from the framing so the view cannot be lost; Reset view still clears it.
 - Earth drag-rotate lag: the globe texture is now rendered at 160px while dragging (skipping frames while one is still computing) and at 512px once released, instead of 512px every 80 ms.
 - Launch camera: at partial zoom the rocket is now always kept within 45% of the view radius from the screen centre (it used to drift to the edge while the camera still framed the Earth).
+- Launch Control: the relights-left count is also shown on the Restart button ("N left"), since the telemetry panel row sat below the fold of its scroll area.
