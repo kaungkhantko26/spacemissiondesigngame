@@ -40,7 +40,12 @@ export function updateView(v: SceneView, f: Flight, dtReal: number, reduced: boo
   let lock = 0; // how tightly the camera is glued to the rocket (1 = no lag), so a close-up never drifts away at orbital speed
   if (v.zoom > 0) { // the player closes in on the rocket (only once the view has left the pad; fades in with the orbit view)
     const zz = v.zoom * smooth(s * 2.5); lock = zz;
-    if (zz > 0) { tLogE = lerp(tLogE, Math.log(Math.max(350_000, alt * 2.2)), zz); cx = lerp(cx, f.x, zz); cy = lerp(cy, f.y, zz); }
+    if (zz > 0) {
+      tLogE = lerp(tLogE, Math.log(Math.max(350_000, alt * 2.2)), zz); cx = lerp(cx, f.x, zz); cy = lerp(cy, f.y, zz);
+      // halfway zooms used to frame the Earth's middle and leave the rocket near the edge: keep it well inside the picture
+      const keep = Math.exp(tLogE) * 0.45, dx = f.x - cx, dy = f.y - cy, dd = Math.hypot(dx, dy);
+      if (dd > keep) { cx = f.x - (dx / dd) * keep; cy = f.y - (dy / dd) * keep; }
+    }
   }
   const k = 1 - Math.exp(-dtReal * (onPad ? 3 : 2.8));
   const lim = Math.exp(v.logE) * 1.1, pm = Math.hypot(v.panX, v.panY); // pan limit: the view can be nudged about one screen away, never off into empty space
