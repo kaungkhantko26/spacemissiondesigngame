@@ -12,11 +12,11 @@ export interface Biome {
 }
 const c = (hex: string): RGB => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
 export const BIOMES: Record<string, Biome> = {
-  ll2_pad_87: { id: "kennedy", name: "Florida coast", land: [c("#5d8a45"), c("#3f6a33")], hills: [{ amp: 40, freq: 900, color: c("#58774a"), p: 0.5 }], sea: { side: 1, shoreM: 520, shallow: c("#58b3bd"), deep: c("#1d5d8f") }, veg: "palm", vegDensity: 0.55, sand: false, zenith: c("#2f6fc9"), horizon: c("#d3e6f3"), glow: c("#ffd29a"), haze: 0.55, cloudiness: 0.7 },
+  ll2_pad_87: { id: "kennedy", name: "Kennedy coastal marsh", land: [c("#839272"), c("#626f53")], hills: [{ amp: 5, freq: 1800, color: c("#71866e"), p: 0.5 }], sea: { side: 1, shoreM: 1100, shallow: c("#58b3bd"), deep: c("#1d5d8f") }, veg: "scrub", vegDensity: 0.2, sand: false, zenith: c("#2f6fc9"), horizon: c("#d3e6f3"), glow: c("#ffd29a"), haze: 0.55, cloudiness: 0.7 },
   ll2_pad_16: { id: "vandenberg", name: "California coast range", land: [c("#9b8650"), c("#6f5e38")], hills: [{ amp: 1500, freq: 11000, color: c("#8d8a73"), p: 0.18 }, { amp: 700, freq: 6000, color: c("#8a7c52"), p: 0.35 }, { amp: 260, freq: 2600, color: c("#7d6e45"), p: 0.6 }], sea: { side: -1, shoreM: 640, shallow: c("#4f9db0"), deep: c("#1b4f7c") }, veg: "scrub", vegDensity: 0.3, sand: false, zenith: c("#2b66bd"), horizon: c("#d8e4ef"), glow: c("#ffcf94"), haze: 0.35, cloudiness: 0.35 },
-  ll2_pad_124: { id: "kourou", name: "Guiana rainforest coast", land: [c("#2f7131"), c("#1d4f24")], hills: [{ amp: 90, freq: 2200, color: c("#3b6b3a"), p: 0.4 }], sea: { side: 1, shoreM: 900, shallow: c("#6db39a"), deep: c("#27698a") }, veg: "jungle", vegDensity: 0.9, sand: false, zenith: c("#2f74cf"), horizon: c("#d6e9ef"), glow: c("#ffd8a6"), haze: 0.65, cloudiness: 0.85 },
+  ll2_pad_124: { id: "kourou", name: "Guiana forest clearing", land: [c("#628154"), c("#426646")], hills: [{ amp: 35, freq: 2200, color: c("#3b6b3a"), p: 0.4 }], sea: { side: 1, shoreM: 3000, shallow: c("#6db39a"), deep: c("#27698a") }, veg: "jungle", vegDensity: 0.55, sand: false, zenith: c("#2f74cf"), horizon: c("#d6e9ef"), glow: c("#ffd8a6"), haze: 0.65, cloudiness: 0.85 },
   ll2_pad_50: { id: "sriharikota", name: "Bay of Bengal sand spit", land: [c("#bfa772"), c("#92814f")], hills: [{ amp: 30, freq: 1200, color: c("#9d8c5f"), p: 0.5 }], sea: { side: 1, shoreM: 470, shallow: c("#63b8c0"), deep: c("#215f8a") }, veg: "palm", vegDensity: 0.25, sand: true, zenith: c("#3170c7"), horizon: c("#e0e8ee"), glow: c("#ffd199"), haze: 0.5, cloudiness: 0.5 },
-  ll2_pad_32: { id: "baikonur", name: "Kazakh steppe", land: [c("#aa9a66"), c("#86764e")], hills: [{ amp: 22, freq: 2400, color: c("#9a8b5f"), p: 0.45 }], veg: "scrub", vegDensity: 0.22, sand: true, zenith: c("#3a73c0"), horizon: c("#e3e4dc"), glow: c("#ffd9a4"), haze: 0.5, cloudiness: 0.3 },
+  ll2_pad_32: { id: "baikonur", name: "Baikonur dry steppe", land: [c("#aa9a66"), c("#86764e")], hills: [{ amp: 9, freq: 2400, color: c("#9a8b5f"), p: 0.45 }], veg: "scrub", vegDensity: 0.08, sand: true, zenith: c("#3a73c0"), horizon: c("#e3e4dc"), glow: c("#ffd9a4"), haze: 0.5, cloudiness: 0.3 },
 };
 export const biomeFor = (siteId: string): Biome => BIOMES[siteId] ?? BIOMES.ll2_pad_87;
 
@@ -26,6 +26,32 @@ const smooth = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t 
 export const hash = (n: number) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const noise = (x: number, seed: number) => (Math.sin(x + seed) * 0.5 + Math.sin(x * 2.37 + seed * 1.7) * 0.3 + Math.sin(x * 5.11 + seed * 0.6) * 0.2 + 1) / 2;
 const SPACE: RGB = [3, 6, 16];
+const terrainTiles = new Map<string, HTMLCanvasElement>();
+function terrainTile(b: Biome): HTMLCanvasElement {
+  const cached = terrainTiles.get(b.id);
+  if (cached) return cached;
+  const tile = document.createElement("canvas"); tile.width = tile.height = 256;
+  const context = tile.getContext("2d");
+  if (!context) return tile;
+  const image = context.createImageData(256, 256);
+  const seed = b.id.length * 19;
+  const field = (x: number, y: number, scale: number) => {
+    const fx = x / scale, fy = y / scale, ix = Math.floor(fx), iy = Math.floor(fy);
+    const tx = smooth(fx - ix), ty = smooth(fy - iy);
+    const at = (dx: number, dy: number) => hash((ix + dx) * 17.13 + (iy + dy) * 91.71 + seed);
+    return (at(0, 0) * (1 - tx) + at(1, 0) * tx) * (1 - ty) + (at(0, 1) * (1 - tx) + at(1, 1) * tx) * ty;
+  };
+  for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
+    const n = field(x, y, 70) * 0.55 + field(x, y, 22) * 0.3 + field(x, y, 5) * 0.15;
+    const dry = b.id === "baikonur" || b.id === "vandenberg" || b.id === "sriharikota";
+    const base = mix(b.land[1], b.land[0], Math.max(0, Math.min(1, n * 1.7 - 0.35)));
+    const grain = (hash(x * 8.21 + y * 33.7 + seed) - 0.5) * (dry ? 27 : 17);
+    const i = (y * 256 + x) * 4;
+    for (let ch = 0; ch < 3; ch++) image.data[i + ch] = Math.max(0, Math.min(255, base[ch] + grain));
+    image.data[i + 3] = 255;
+  }
+  context.putImageData(image, 0, 0); terrainTiles.set(b.id, tile); return tile;
+}
 
 /** Sky colour at height h (m) above the local ground: pale horizon → deep zenith → black above ~100 km. */
 export function skyAt(h: number, b: Biome): RGB {
@@ -78,6 +104,28 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, s: Scene, b: Biome, a
   const land = ctx.createLinearGradient(0, gy, 0, H);
   land.addColorStop(0, rgb(mix(b.land[0], b.horizon, b.haze * 0.7), s.alpha)); land.addColorStop(0.25, rgb(b.land[0], s.alpha)); land.addColorStop(1, rgb(b.land[1], s.alpha));
   ctx.fillStyle = land; ctx.fillRect(0, gy, W, below);
+  // Site-coloured multiscale ground texture breaks up the solid gradient while remaining stable during flight.
+  const pattern = ctx.createPattern(terrainTile(b), "repeat");
+  if (pattern) { ctx.save(); ctx.globalAlpha = s.alpha * 0.72; ctx.fillStyle = pattern; ctx.fillRect(0, gy, W, below); ctx.restore(); }
+  const shade = ctx.createLinearGradient(0, gy, 0, H);
+  shade.addColorStop(0, "rgba(255,247,215,.10)"); shade.addColorStop(0.52, "rgba(0,0,0,.04)"); shade.addColorStop(1, "rgba(12,19,20,.28)");
+  ctx.fillStyle = shade; ctx.fillRect(0, gy, W, below);
+  // Broad landforms visible around each complex, with depth-scaled shadows instead of uniform grass.
+  const features: Record<string, { light: string; dark: string; count: number }> = {
+    kennedy: { light: "#b5ad83", dark: "#456961", count: 75 },
+    vandenberg: { light: "#c3a77a", dark: "#5d5746", count: 100 },
+    kourou: { light: "#8a9e66", dark: "#244d37", count: 125 },
+    sriharikota: { light: "#dac493", dark: "#728e78", count: 85 },
+    baikonur: { light: "#c9b47f", dark: "#776e53", count: 95 },
+  };
+  const feature = features[b.id];
+  if (feature) for (let i = 0; i < feature.count; i++) {
+    const y = gy + below * Math.pow(hash(i * 12.7 + 4), 1.4);
+    const depth = (y - gy) / below, x = hash(i * 35.9 + 8) * W;
+    const radius = (9 + hash(i * 17.3 + 10) * 55) * (0.25 + depth * 1.8);
+    ctx.fillStyle = rgb(c(i % 3 === 0 ? feature.light : feature.dark), s.alpha * (0.05 + depth * 0.09));
+    ctx.beginPath(); ctx.ellipse(x, y, radius * (1.3 + hash(i + 5)), Math.max(1, radius * 0.19), -0.1, 0, 7); ctx.fill();
+  }
   // sea
   if (b.sea) {
     const side = b.sea.side, shoreX = s.anchorX + side * b.sea.shoreM * k;
@@ -98,6 +146,20 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, s: Scene, b: Biome, a
     // foam line along the shore
     ctx.strokeStyle = `rgba(255,255,255,${0.5 * s.alpha})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(shoreX, gy); ctx.lineTo(shoreX + slope * below, H); ctx.stroke();
   }
+  // Cleared launch compound seen in perspective; vegetation begins beyond the hardstand.
+  const apron = ctx.createLinearGradient(0, gy, 0, H);
+  apron.addColorStop(0, rgb(mix(c("#a9a9a1"), b.land[0], 0.18), s.alpha));
+  apron.addColorStop(1, rgb(mix(c("#747873"), b.land[1], 0.22), s.alpha));
+  ctx.fillStyle = apron; ctx.beginPath();
+  ctx.moveTo(s.anchorX - 235 * k, gy); ctx.lineTo(s.anchorX + 235 * k, gy);
+  ctx.lineTo(s.anchorX + 390 * k, H); ctx.lineTo(s.anchorX - 390 * k, H); ctx.closePath(); ctx.fill();
+  ctx.save(); ctx.clip();
+  if (pattern) { ctx.globalAlpha = s.alpha * 0.26; ctx.fillStyle = pattern; ctx.fillRect(0, gy, W, below); ctx.globalAlpha = 1; }
+  ctx.strokeStyle = `rgba(45,50,48,${0.11 * s.alpha})`; ctx.lineWidth = 1;
+  for (let t = 0.12; t < 1; t += 0.18) { const y = gy + below * t; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  ctx.restore();
+  ctx.strokeStyle = `rgba(230,225,205,${0.22 * s.alpha})`; ctx.lineWidth = Math.max(1, k);
+  for (const side of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s.anchorX + side * 235 * k, gy); ctx.lineTo(s.anchorX + side * 390 * k, H); ctx.stroke(); }
   // vegetation / dunes on the land side, drawn in perspective rows (nearer rows are bigger and slide faster)
   const rows = 26, vegFade = 1 - smooth(alt / 22000), shrink = 1 / (1 + alt / 3500);
   for (let r = rows - 1; r >= 0 && vegFade > 0.02; r--) {
@@ -106,6 +168,8 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, s: Scene, b: Biome, a
     const count = Math.round((5 + t * 9) * (b.veg === "none" ? 0 : b.vegDensity * 2.4) * Math.max(0.35, shrink));
     for (let i = 0; i < count; i++) {
       const x = aX + (hash(r * 31 + i * 7.3) - 0.5) * W * 2.4;
+      // The serviced launch pad is a cleared hardstand, not a meadow of trees.
+      if (Math.abs(x - s.anchorX) < Math.max(95, 260 * k) * (0.6 + t * 0.5)) continue;
       if (b.sea) { const sx = s.anchorX + b.sea.side * b.sea.shoreM * k + b.sea.side * 0.42 * (y - gy); if ((x - sx) * b.sea.side > -6 * sc) continue; }
       const size = (6 + hash(r * 9 + i) * 10) * sc * shrink * (b.veg === "jungle" ? 1.7 : b.veg === "palm" ? 1.1 : 0.8);
       if (x < -30 || x > W + 30) continue;
@@ -153,52 +217,72 @@ export function drawComplex(ctx: CanvasRenderingContext2D, s: Scene, padAngle: n
   const u = s.k;
   if (u * 300 < 4) return;
   ctx.save(); ctx.translate(padX, padY); ctx.rotate(padAngle);
-  const a = Math.min(1, u * 300 / 30);
-  ctx.globalAlpha = a;
-  // A compact but legible launch campus: service tower, cryogenic storage, integration hall and road network.
-  const body = (col: string) => rgb(mix(c(col), b.horizon, b.haze * 0.25));
-  const line = (col: string, width: number) => { ctx.strokeStyle = body(col); ctx.lineWidth = Math.max(1, width * u); };
-  // Vehicle integration building with roof ribs, loading doors and lit windows.
-  ctx.fillStyle = body("#c9ccd2"); ctx.fillRect(-1450 * u, -74 * u, 340 * u, 74 * u);
-  ctx.fillStyle = body("#a7acb6"); ctx.fillRect(-1450 * u, -78 * u, 340 * u, 7 * u);
-  ctx.fillStyle = "rgba(29,39,52,.88)"; ctx.fillRect(-1390 * u, -56 * u, 48 * u, 56 * u);
-  for (let i = 0; i < 7; i++) { ctx.fillStyle = i % 3 === 0 ? "rgba(255,205,123,.8)" : "rgba(147,203,224,.62)"; ctx.fillRect((-1305 + i * 25) * u, -53 * u, 9 * u, 8 * u); }
-  line("#edf0f3", 2); for (let x = -1430; x < -1110; x += 40) { ctx.beginPath(); ctx.moveTo(x * u, -70 * u); ctx.lineTo(x * u, -4 * u); ctx.stroke(); }
-  // Strongback / service tower: lattice legs, cross bracing, access decks and retractable umbilicals.
-  ctx.fillStyle = body("#9da6b2"); ctx.fillRect(-85 * u, -315 * u, 18 * u, 315 * u); ctx.fillRect(87 * u, -315 * u, 18 * u, 315 * u);
-  line("#697583", 3); ctx.beginPath(); ctx.moveTo(-86 * u, -315 * u); ctx.lineTo(105 * u, -315 * u); ctx.moveTo(-86 * u, 0); ctx.lineTo(105 * u, 0); ctx.stroke();
-  for (let y = -300; y < 0; y += 38) {
-    ctx.beginPath(); ctx.moveTo(-85 * u, y * u); ctx.lineTo(104 * u, (y - 38) * u); ctx.moveTo(104 * u, y * u); ctx.lineTo(-85 * u, (y - 38) * u); ctx.stroke();
-    ctx.fillStyle = body("#c7cbd0"); ctx.fillRect(-96 * u, y * u, 210 * u, 3 * u);
-  }
-  // Crew access arm and two service platforms reach toward the rocket.
-  ctx.fillStyle = body("#d5d9df"); ctx.fillRect(-68 * u, -224 * u, 125 * u, 10 * u); ctx.fillRect(-68 * u, -133 * u, 125 * u, 8 * u);
-  ctx.fillStyle = "#e6e8e8"; ctx.fillRect(45 * u, -231 * u, 42 * u, 7 * u);
-  ctx.fillStyle = "#f1bd55"; ctx.fillRect(-93 * u, -324 * u, 28 * u, 10 * u);
-  // Cryogenic tanks and pipe runs, with distinct domed tops and safety bands.
-  const tank = (x: number, h: number, w: number, color: string) => {
-    ctx.fillStyle = body(color); ctx.fillRect(x * u, -h * u, w * u, h * u);
-    ctx.beginPath(); ctx.ellipse((x + w / 2) * u, -h * u, w * u / 2, 7 * u, 0, Math.PI, 0); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,.28)"; ctx.fillRect((x + 3) * u, (-h + 12) * u, 3 * u, (h - 20) * u);
-    ctx.fillStyle = "#e1ad52"; ctx.fillRect(x * u, (-h + 13) * u, w * u, 5 * u);
+  ctx.globalAlpha = Math.min(1, u * 10);
+  const box = (x: number, y: number, w: number, h: number, color: string) => { ctx.fillStyle = color; ctx.fillRect(x * u, y * u, w * u, h * u); };
+  const stroke = (points: [number, number][], color: string, width = 2) => {
+    ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, width * u); ctx.beginPath();
+    points.forEach(([x, y], i) => i ? ctx.lineTo(x * u, y * u) : ctx.moveTo(x * u, y * u)); ctx.stroke();
   };
-  tank(-590, 92, 48, "#e7e9e9"); tank(-520, 72, 42, "#c6d7df"); tank(500, 58, 34, "#d6d9dc");
-  line("#8a909c", 3); ctx.beginPath(); ctx.moveTo(-566 * u, -92 * u); ctx.lineTo(-566 * u, -125 * u); ctx.lineTo(-270 * u, -125 * u); ctx.lineTo(-270 * u, -230 * u); ctx.stroke();
-  // Low mission support buildings, rooftop antennas and apron lights.
-  ctx.fillStyle = body("#dcdfe4"); ctx.fillRect(520 * u, -34 * u, 170 * u, 34 * u); ctx.fillRect(700 * u, -48 * u, 130 * u, 48 * u);
-  ctx.fillStyle = "rgba(33,47,60,.8)"; for (let x = 535; x < 680; x += 28) ctx.fillRect(x * u, -22 * u, 15 * u, 10 * u);
-  line("#8a909c", 2); for (const lx of [508, 532, 702, 820]) { ctx.beginPath(); ctx.moveTo(lx * u, -12 * u); ctx.lineTo((lx - 4) * u, 0); ctx.stroke(); }
-  ctx.fillStyle = body("#b6bbc4"); ctx.fillRect(-420 * u, -48 * u, 6 * u, 48 * u); ctx.beginPath(); ctx.ellipse(-417 * u, -52 * u, 24 * u, 9 * u, 0, 0, 7); ctx.fill();
-  // Lightning masts with aviation beacons.
-  line("#9aa2b0", 1.4);
-  for (const mx of [-190, 160, 320]) { ctx.beginPath(); ctx.moveTo(mx * u, 0); ctx.lineTo(mx * u, -175 * u); ctx.lineTo((mx + 16) * u, -205 * u); ctx.stroke(); ctx.fillStyle = "#ff4b3a"; ctx.beginPath(); ctx.arc(mx * u, -207 * u, Math.max(1.2, 2.5 * u), 0, 7); ctx.fill(); }
-  // Concrete apron, striped safety perimeter, flame trench and branching access road.
-  ctx.fillStyle = "#9aa0a8"; ctx.fillRect(-210 * u, 0, 420 * u, 8 * u);
-  ctx.fillStyle = "rgba(248,190,73,.9)"; ctx.fillRect(-205 * u, 8 * u, 410 * u, 3 * u);
-  ctx.fillStyle = "#6e747e"; ctx.fillRect(210 * u, 1 * u, 700 * u, 5 * u); ctx.fillRect(-850 * u, 1 * u, 640 * u, 5 * u);
-  ctx.fillStyle = "#14171d"; ctx.fillRect(-34 * u, 0, 68 * u, 17 * u);
-  ctx.fillStyle = "#b9bdc2"; ctx.fillRect(-200 * u, -2 * u, 400 * u, 2 * u);
-  for (const x of [-180, -120, 120, 180]) { ctx.fillStyle = "#f1bd55"; ctx.beginPath(); ctx.arc(x * u, -5 * u, Math.max(1, 3 * u), 0, 7); ctx.fill(); }
+  const tower = (x: number, height: number, width: number, color: string, bays = 7) => {
+    box(x, -height, width, height, color);
+    box(x + 4, -height + 5, width - 8, height - 10, "#64717c");
+    for (let i = 0; i <= bays; i++) {
+      const y = -height + i * height / bays;
+      box(x - 6, y, width + 12, 3, "#b8bec2");
+      if (i < bays) stroke([[x + 4, y], [x + width - 4, y + height / bays]], "#c4cbd0", 2);
+    }
+  };
+  const tank = (x: number, w: number, h: number) => {
+    box(x, -h, w, h, "#d8dfe1");
+    ctx.fillStyle = "#e9eeeb"; ctx.beginPath(); ctx.ellipse((x + w / 2) * u, -h * u, w * u / 2, 8 * u, 0, Math.PI, 0); ctx.fill();
+    box(x, -h + 15, w, 4, "#a1afb2");
+  };
+  const rail = (x0: number, x1: number) => {
+    for (const y of [3, 11]) stroke([[x0, y], [x1, y]], "#3a4143", 2);
+    for (let x = x0; x < x1; x += 16) box(x, 1, 5, 13, "#746b59");
+  };
+  // All sites have a cleared paved hardstand and a flame trench. The surrounding structures follow each real pad's layout.
+  box(-280, 0, 560, 10, "#a5a9a9"); box(-43, 1, 86, 17, "#25282b");
+  if (b.id === "kennedy") {
+    // LC-39A: raised pad and crawler ramp, fixed tower, water tower, Atlantic coastal marsh.
+    box(-180, -13, 360, 13, "#9ba1a4"); box(-40, -13, 80, 30, "#242729");
+    stroke([[-185, 0], [-520, 24]], "#8c9191", 16);
+    tower(-95, 118, 27, "#a8b0b3", 9);
+    for (const y of [-42, -73, -100]) stroke([[-68, y], [-13, y + 2]], "#c6cdca", 5);
+    tower(185, 63, 9, "#8c999d", 5); tank(171, 37, 13);
+    tank(-420, 31, 25); tank(-355, 27, 20);
+    for (const x of [-250, 150, 275]) { stroke([[x, 0], [x, -150], [x + 10, -174]], "#9ca7aa", 2); box(x + 7, -176, 5, 5, "#ef6046"); }
+  } else if (b.id === "vandenberg") {
+    // SLC-4E: austere Falcon pad on a dry coastal bluff, low horizontal processing buildings.
+    box(-460, -29, 170, 29, "#b1aca3"); box(-485, -32, 220, 5, "#777c79");
+    tank(230, 35, 22); tank(288, 30, 18);
+    stroke([[72, 0], [69, -62], [24, -72]], "#757d7e", 6);
+    for (const x of [-205, 170]) { stroke([[x, 0], [x, -105]], "#8e9899", 2); box(x - 3, -107, 6, 5, "#d45844"); }
+    stroke([[-560, 8], [-160, 8]], "#646b69", 8);
+  } else if (b.id === "kourou") {
+    // Ariane ELA-2: mobile service structure parked on rails by the forest clearing.
+    rail(-560, 150); tower(-245, 110, 64, "#bac3c0", 9);
+    box(-330, -32, 105, 32, "#cbd1ca"); box(-345, -36, 135, 5, "#838f8a");
+    tower(80, 84, 20, "#a9b4b0", 7);
+    stroke([[96, -59], [25, -59]], "#b9c2bb", 4);
+    tank(195, 30, 26); tank(245, 30, 26);
+  } else if (b.id === "sriharikota") {
+    // SDSC: rail-retracted mobile service tower on the narrow, sandy coastal island.
+    rail(-520, 125); tower(-280, 98, 77, "#adb8b4", 10);
+    box(-450, -24, 145, 24, "#d3d7cf"); box(-460, -28, 165, 5, "#818b86");
+    tower(73, 87, 18, "#9da9a5", 7); stroke([[82, -62], [20, -62]], "#d0d5cc", 4);
+    tank(200, 35, 28); tank(255, 33, 24);
+  } else {
+    // Site 1/5: Baikonur's open steppe, railway and opposed green Soyuz support arms.
+    rail(-650, -60); tower(-145, 66, 26, "#79908a", 5);
+    tower(120, 66, 26, "#79908a", 5);
+    stroke([[-126, -49], [-31, -30]], "#7b9a89", 8);
+    stroke([[126, -49], [31, -30]], "#7b9a89", 8);
+    box(-420, -26, 160, 26, "#a8a899"); box(-425, -30, 170, 5, "#777f76");
+    tank(240, 24, 19);
+  }
+  // Sparse fixed perimeter lights, outside the blast zone.
+  for (const x of [-275, 275]) { stroke([[x, 0], [x, -24]], "#777f80", 1); box(x - 2, -27, 5, 4, "#f4c471"); }
   ctx.restore();
 }
 

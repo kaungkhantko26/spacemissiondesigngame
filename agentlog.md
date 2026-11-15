@@ -6,6 +6,18 @@
 - Side info panel: new "Engine relights left" row in the telemetry panel (shown on a stage that can be cut and relit, also shown while the autopilot flies, since the player can take over at any time). Limit is `TLI.maxRestarts` (4 cuts, 3 relights); the UI now reads the constant instead of a hard-coded 4.
 - Orbit view zoom: `SceneView.zoom` (0 = automatic framing, 1 = close in on the rocket), mouse wheel / `+` `-` keys / zoom buttons, `0` resets. The HUD panels are fixed-size overlays, so they stay readable at any zoom (players no longer need browser zoom). Fades in with the orbit view; ignored on the pad.
 - Tests: two new cases in `launch.test.ts`. Not run with vitest (no node_modules in the agent workspace); the same scenarios were run on the compiled `core.ts` with Node and behaved as expected, and the baseline autopilot Moon flight still reaches translunar.
+
+## Session 7 — Ground shading and published launch environments
+- Added deterministic multiscale terrain textures, depth shading and a textured paved compound to every spaceport scene. These sit under the existing site-specific terrain colors, coast, vegetation and pad structures.
+- The textures are generated once per biome in the browser, then reused each frame; no new remote imagery requests or extra WebGL canvases.
+- Verified: TypeScript typecheck and targeted ESLint pass.
+
+## Session 6 — Real site references for launch scenery
+- Replaced the shared generic launch campus with five pad-specific silhouettes and a cleared hardstand: LC-39A raised pad/crawler ramp, Vandenberg transporter erector, ELA-2 rail/mobile service tower, Sriharikota rail/mobile service tower, and Baikonur support arms/rail.
+- Corrected immediate terrain cues (flat Kennedy marsh, distant Kourou coast, sparse Baikonur steppe) and removed the duplicate tower from `launchDraw.ts`.
+- Sources and schematic limitations recorded in `docs/spaceport-reference.md`.
+- Verified: TypeScript typecheck and targeted ESLint pass. `npm ci` is blocked by a pre-existing lockfile mismatch; installed dependencies without rewriting the lockfile for these checks.
+
 ## Session 5 — Spaceport environment design refresh
 - Reworked the pad-local launch complex in `launchScenery.ts` into a more detailed mission campus: integration hall with windows/ribs, braced service tower and crew arms, banded cryogenic tanks and pipes, support buildings, beacons, safety perimeter, apron and branching access roads.
 - Kept the existing site-specific terrain, coastlines, vegetation, cloud layers and canvas rendering path; additions fade with the existing zoom/alpha behavior and remain within the same canvas.
