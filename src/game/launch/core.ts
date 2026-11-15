@@ -49,7 +49,7 @@ export const RULES: Record<Difficulty, Rules> = {
 
 /* ---------- Rocket model built from a dataset vehicle ---------- */
 export interface StageSpec { propKg: number; dryKg: number; thrustSlN: number; thrustVacN: number; ispSl: number; ispVac: number; minThrottle: number }
-export interface Rocket { name: string; diameterM: number; lengthM: number; m0: number; payloadKg: number; capacityKg: number; s1: StageSpec; s2: StageSpec; s3?: StageSpec; stageNames: string[]; /** share of the full height still flying after stage 1 / stage 2 separate (for the sprite) */ stageFrac: [number, number]; dvIdeal: number; twr0: number; vehicle: Vehicle }
+export interface Rocket { name: string; diameterM: number; lengthM: number; m0: number; payloadKg: number; capacityKg: number; s1: StageSpec; s2: StageSpec; s3?: StageSpec; stageNames: string[]; /** share of the full height still flying after stage 1 / stage 2 separate (for the sprite) */ stageFrac: [number, number]; dvIdeal: number; twr0: number; vehicle: Vehicle; /** player-set limit on the engine throttle (1 = no limit) */ throttleCap?: number; /** share of the standard propellant loaded (1 = full) */ fuelLoad?: number }
 
 const ln = Math.log;
 function dvOf(m0: number, payload: number, a: number, k: number): { dv1: number; dv2: number; s1prop: number; s1dry: number; s2prop: number; s2dry: number } {
@@ -107,6 +107,35 @@ export function buildRocket(v: Vehicle, payloadKg: number): Rocket {
   };
 }
 
+/** Ideal (no gravity or drag loss) delta-v of the stack as loaded: each stage burns its propellant while carrying everything above it. */
+export function idealDv(r: Rocket): number {
+  const stages = [r.s1, r.s2, ...(r.s3 ? [r.s3] : [])], g0 = LAUNCH.g0;
+  let above = r.payloadKg, dv = 0;
+  const starts: number[] = [];
+  for (let i = stages.length - 1; i >= 0; i--) { above += stages[i].dryKg + stages[i].propKg; starts[i] = above; }
+  stages.forEach((st, i) => { const isp = i === 0 ? (st.ispSl + st.ispVac) / 2 : st.ispVac; dv += isp * g0 * Math.log(starts[i] / (starts[i] - st.propKg)); });
+  return dv;
+}
+/** Player configuration: load less propellant (lighter rocket, less delta-v) and/or limit the throttle. 1 and 1 leave the rocket exactly as built. */
+export function configureRocket(r: Rocket, cfg: { fuelPct?: number; throttleCap?: number }): Rocket {
+  const fuel = Math.min(1, Math.max(0.5, cfg.fuelPct ?? 1)), cap = Math.min(1, Math.max(0.4, cfg.throttleCap ?? 1));
+  if (fuel === 1 && cap === 1) return r;
+  const scale = (st: StageSpec): StageSpec => ({ ...st, propKg: st.propKg * fuel });
+  const out: Rocket = { ...r, s1: scale(r.s1), s2: scale(r.s2), s3: r.s3 ? scale(r.s3) : undefined, throttleCap: cap, fuelLoad: fuel };
+  const removed = r.s1.propKg + r.s2.propKg + (r.s3?.propKg ?? 0) - (out.s1.propKg + out.s2.propKg + (out.s3?.propKg ?? 0));
+  out.m0 = r.m0 - removed;
+  out.dvIdeal = idealDv(out);
+  out.twr0 = (out.s1.thrustSlN * cap) / (out.m0 * LAUNCH.g0);
+  return out;
+}
+
+/** Quick test flight with the Cadet autopilot: does this exact stack reach orbit? (Orbit missions only; the answer is for a clean autopilot flight, manual flying can do better or worse.) */
+export function autopilotReaches(rocket: Rocket, site: LaunchSite, maxT = 1200): { ok: boolean; reason: string | null } {
+  const f = createFlight(rocket, RULES.easy, site, 1, "orbit"), input = defaultInput(f.rules);
+  while (f.phase !== "orbit" && f.phase !== "failed" && f.t < maxT) { stepFlight(f, input); input.stage = false; input.cut = false; input.restart = false; }
+  return { ok: f.phase === "orbit", reason: f.failure };
+}
+
 /* ---------- Flight state ---------- */
 export type FlightPhase = "countdown" | "stage1" | "coast" | "stage2" | "orbit" | "parking" | "tli" | "translunar" | "failed";
 export type MissionKind = "orbit" | "moon";
@@ -143,7 +172,7 @@ export function createFlight(rocket: Rocket, rules: Rules, site: LaunchSite, see
   const f: Flight = {
     rocket, rules, site, seed, rng: seed >>> 0, t: -LAUNCH.countdownS, phase: "countdown", stage: 1, mission, sepFrom: 1, tliStartAngle: 0, tliErr: null,
     x: 0, y: earthRadius, vx: site.rotation_boost_m_s, vy: 0, theta0: 0, m: rocket.m0, prop1: rocket.s1.propKg, prop2: rocket.s2.propKg, prop3: rocket.s3?.propKg ?? 0,
-    pitch: 90, throttle: 1, engineOn: false, ignited: false, liftedOff: false, coastLeft: 0, fairing: true, thrustMult: 1, thrustMultUntil: 0, guidanceDownUntil: 0,
+    pitch: 90, throttle: rocket.throttleCap ?? 1, engineOn: false, ignited: false, liftedOff: false, coastLeft: 0, fairing: true, thrustMult: 1, thrustMultUntil: 0, guidanceDownUntil: 0,
     omega: site.rotation_boost_m_s / earthRadius, maxQ: 0, maxQt: 0, maxG: 0, maxQAlpha: 0, anomalies: { at: 0, kind: "none", done: false },
     milestones: {}, log: [], tel: undefined as unknown as Telemetry, failure: null, trail: [], debris: [], cutoffs: 0, kickDone: false, manualOverride: false, gOver: 0, park: null, tliRatio: null,
   };
@@ -273,6 +302,7 @@ export function stepFlight(f: Flight, input: Input, dt = LAUNCH.dt): void {
   if (apOn && rules.autopilot === "full" && f.stage === 1) f.throttle = maxQBucket(f, h0);
   else if (apOn && f.stage >= 2) f.throttle = f.engineOn ? clamp((LAUNCH.upperMaxG * LAUNCH.g0 * f.m) / Math.max(1, fullThrust(f, h0)), s.minThrottle, 1) : f.throttle;
   else f.throttle = clamp(input.throttle, 0, 1);
+  if (f.rocket.throttleCap !== undefined) f.throttle = Math.min(f.throttle, f.rocket.throttleCap); // the player-set throttle limit
   if (f.engineOn && f.stage === 1) f.throttle = clamp(f.throttle, s.minThrottle, 1);
   if (f.engineOn && f.stage >= 2 && f.throttle > 0) f.throttle = clamp(f.throttle, s.minThrottle, 1);
 
@@ -288,7 +318,7 @@ export function stepFlight(f: Flight, input: Input, dt = LAUNCH.dt): void {
     const auto = rules.autopilot === "full" && input.autopilot;
     const go = auto ? rem <= 0 && rem > -1 : input.restart;
     if (go && propOf(f) > 0 && f.cutoffs < TLI.maxRestarts) {
-      f.phase = "tli"; f.engineOn = true; f.tliErr = rem; f.throttle = 1;
+      f.phase = "tli"; f.engineOn = true; f.tliErr = rem; f.throttle = f.rocket.throttleCap ?? 1;
       mark(f, "tliStart", `TLI ignition — ${Math.abs(deg(rem)) <= deg(TLI.windowOkRad) ? "inside the window." : Math.abs(rem) < TLI.windowFailRad ? "window error " + deg(rem).toFixed(0) + "°, the Moon will be off-axis." : "OUTSIDE the window."}`, Math.abs(rem) <= TLI.windowOkRad ? "good" : "warn");
     }
   }
@@ -319,14 +349,14 @@ export function stepFlight(f: Flight, input: Input, dt = LAUNCH.dt): void {
     f.coastLeft -= dt;
     const ready = f.coastLeft <= 0;
     if (rules.autoStaging ? ready : input.stage) {
-      f.phase = "stage2"; f.stage = (f.sepFrom + 1) as 2 | 3; f.engineOn = true; f.throttle = Math.max(0.35, input.throttle);
+      f.phase = "stage2"; f.stage = (f.sepFrom + 1) as 2 | 3; f.engineOn = true; f.throttle = Math.min(f.rocket.throttleCap ?? 1, Math.max(0.35, input.throttle));
       mark(f, f.stage === 2 ? "ignition2" : "ignition3", `${f.rocket.stageNames[f.stage - 1]} ignition.`);
     }
   }
   // restart / cutoff
   if (isUpper(f) && (f.phase === "stage2" || f.phase === "tli")) {
     if (input.cut && f.engineOn) { f.engineOn = false; f.cutoffs++; mark(f, f.phase === "tli" ? "tliCut" : "seco" + f.cutoffs, f.phase === "tli" ? "TLI engine cutoff." : "Second engine cutoff (SECO)."); }
-    else if (f.phase === "stage2" && !f.engineOn && propOf(f) > 0 && input.restart && f.cutoffs > 0 && f.cutoffs < TLI.maxRestarts) { f.engineOn = true; f.throttle = Math.max(0.35, input.throttle); log(f, "Engine restart.", "info"); }
+    else if (f.phase === "stage2" && !f.engineOn && propOf(f) > 0 && input.restart && f.cutoffs > 0 && f.cutoffs < TLI.maxRestarts) { f.engineOn = true; f.throttle = Math.min(f.rocket.throttleCap ?? 1, Math.max(0.35, input.throttle)); log(f, "Engine restart.", "info"); }
   }
 
   // ---- forces

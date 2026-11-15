@@ -8,7 +8,7 @@ import { BackButton, GameButton, GlassPanel, ScreenContainer } from "@/component
 import { useUIStore } from "@/stores";
 import { cn } from "@/lib/mission";
 import { DATASET, vehicleById } from "@/game/data";
-import { LAUNCH, RULES, buildRocket, guidancePitch, scoreFlight, type Difficulty, type Flight } from "@/game/launch/core";
+import { LAUNCH, RULES, autopilotReaches, buildRocket, configureRocket, guidancePitch, scoreFlight, type Difficulty, type Flight } from "@/game/launch/core";
 import { MoonLeg } from "./MoonLeg";
 import { playVoice, primeVoice, stopVoice, audioContext, type VoiceId } from "@/lib/voice";
 import { RocketSound, playSfx } from "@/lib/sfx";
@@ -42,11 +42,21 @@ const Pick = ({ on, onClick, children, className }: { on: boolean; onClick: () =
 );
 
 function Briefing({ onStart }: { onStart: () => void }) {
-  const { difficulty, siteId, vehicleId, mission, set } = useLaunchSetup();
+  const { difficulty, siteId, vehicleId, mission, payloadPct, fuelPct, throttleCap, set } = useLaunchSetup();
   const rules = RULES[difficulty];
   const v = vehicleById(vehicleId) ?? DATASET.vehicles[0];
   const site = DATASET.launch_sites.find((s) => s.id === siteId) ?? DATASET.launch_sites[0];
-  const rocket = useMemo(() => buildRocket(v, payloadFor(v, rules.payloadFrac, mission)), [v, rules.payloadFrac, mission]);
+  const basePayload = payloadFor(v, rules.payloadFrac, mission);
+  const standard = buildRocket(v, basePayload);
+  // the configured stack, plus a quick autopilot test flight (orbit missions) so the verdict reflects what really happens, not a fixed delta-v number
+  const sim = useMemo(() => {
+    const r = configureRocket(buildRocket(v, Math.round(basePayload * payloadPct)), { fuelPct, throttleCap });
+    return { rocket: r, reach: mission === "orbit" && r.twr0 >= 1.05 ? autopilotReaches(r, site) : null };
+  }, [v, basePayload, payloadPct, fuelPct, throttleCap, mission, site]);
+  const rocket = sim.rocket;
+  const dvVerdict = mission === "moon"
+    ? (rocket.dvIdeal >= standard.dvIdeal * 0.97 ? "ok" : rocket.dvIdeal >= standard.dvIdeal * 0.92 ? "tight" : "bad")
+    : sim.reach ? (sim.reach.ok ? "ok" : "bad") : "bad";
   const canMoon = (x: { leo_capacity_kg: number; tli_payload_kg?: number }) => !!x.tli_payload_kg || x.leo_capacity_kg >= 20000;
   const [tour, setTour] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage is only readable after mount
@@ -100,6 +110,26 @@ function Briefing({ onStart }: { onStart: () => void }) {
                 </Pick></li>
               ))}
             </ul>
+          </Panel>
+          <Panel n={5} title="Configure spacecraft" hint="Tune the stack before rollout. Less payload or fuel makes the rocket lighter; a throttle limit makes the engines gentler. Too little fuel cannot reach orbit.">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm"><span className="flex justify-between"><span>Payload mass</span><span className="font-display tabular-nums text-ink">{fmt(Math.round(basePayload * payloadPct))} kg · {Math.round(payloadPct * 100)} %</span></span>
+                <input type="range" min={20} max={100} step={5} value={Math.round(payloadPct * 100)} onChange={(e) => set({ payloadPct: Number(e.target.value) / 100 })} className="mt-1 w-full" aria-label="Payload mass" /></label>
+              <label className="block text-sm"><span className="flex justify-between"><span>Fuel loaded</span><span className="font-display tabular-nums text-ink">{Math.round(fuelPct * 100)} %</span></span>
+                <input type="range" min={60} max={100} step={1} value={Math.round(fuelPct * 100)} onChange={(e) => set({ fuelPct: Number(e.target.value) / 100 })} className="mt-1 w-full" aria-label="Fuel loaded" /></label>
+              <label className="block text-sm"><span className="flex justify-between"><span>Throttle limit</span><span className="font-display tabular-nums text-ink">{Math.round(throttleCap * 100)} %</span></span>
+                <input type="range" min={50} max={100} step={1} value={Math.round(throttleCap * 100)} onChange={(e) => set({ throttleCap: Number(e.target.value) / 100 })} className="mt-1 w-full" aria-label="Throttle limit" /></label>
+              <div className="flex items-end"><GameButton variant="outline" onClick={() => set({ payloadPct: 1, fuelPct: 1, throttleCap: 1 })} disabled={payloadPct === 1 && fuelPct === 1 && throttleCap === 1}>Reset to standard</GameButton></div>
+            </div>
+            <dl className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              {[["Liftoff mass", `${fmt(rocket.m0 / 1000)} t`], ["Thrust / weight", rocket.twr0.toFixed(2)], ["Ideal Δv", `${fmt(rocket.dvIdeal)} m/s`], ["Fuel on board", `${fmt((rocket.s1.propKg + rocket.s2.propKg + (rocket.s3?.propKg ?? 0)) / 1000)} t`]].map(([k, val]) => (
+                <div key={k} className="rounded-md bg-white/5 p-2"><dt className="text-muted">{k}</dt><dd className="font-display text-base tabular-nums">{val}</dd></div>))}
+            </dl>
+            <p role="status" className={cn("mt-3 rounded-md border px-3 py-2 text-xs", rocket.twr0 < 1.05 ? "border-bad text-bad" : dvVerdict === "ok" ? "border-ok/60 text-ok" : dvVerdict === "tight" ? "border-warn text-warn" : "border-bad text-bad")}>
+              {rocket.twr0 < 1.05 ? "Thrust-to-weight is too low: with this throttle limit and load the rocket cannot lift off. Raise the throttle limit or reduce payload or fuel."
+                : dvVerdict === "ok" ? (mission === "moon" ? "Enough delta-v for the lunar mission." : "Autopilot test flight: this setup reaches orbit. Flying it yourself may be easier or harder.")
+                  : dvVerdict === "tight" ? "Tight: very little margin. Fly cleanly or add fuel." : mission === "moon" ? "Not enough delta-v for the lunar mission. Add fuel or reduce payload." : `Autopilot test flight: this setup does not reach orbit${sim.reach?.reason ? `: ${sim.reach.reason.replace(/\s*Cut the engine sooner\.|\s*Throttle the upper stage down as it gets lighter\./, "").replace(/\.$/, "")}` : ""}. Add fuel or reduce payload.`}
+            </p>
           </Panel>
         </div>
         <aside className="lg:sticky lg:top-4 lg:self-start">
@@ -280,7 +310,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
       else if (k === "p") togglePause();
       else if (k === "h" || k === "?") setHelp((v) => !v);
       else if (k === "m") setVoice((v) => !v);
-      else if (["1", "2", "3", "4", "5"].includes(k)) setWarp([1, 2, 5, 10, 50][Number(k) - 1]);
+      else if (["1", "2", "3", "4", "5"].includes(k)) setWarp([1, 3, 5, 10, 50][Number(k) - 1]);
     };
     const up = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (k === "arrowup") session.hold("up", false); if (k === "arrowdown") session.hold("down", false); if (k === " " && !(e.target as HTMLElement | null)?.closest("input:not([type=range]),select,textarea")) e.preventDefault(); /* a focused button must not also "click" on Space */ };
     const release = () => { session.hold("up", false); session.hold("down", false); }; // keys held while the window loses focus would otherwise stay pressed
@@ -367,7 +397,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
             <B label="Lower nose (↓)" disabled={!manualPitch} {...held("down")}><ArrowDown className="size-4" /></B>
           </div>
           <label data-tour="throttle" className="flex items-center gap-2 text-xs text-ink2"><span className="hud-label">Throttle</span>
-            <input type="range" min={0} max={100} value={Math.round((manualThrottle ? session.input.throttle : s.throttle) * 100)} disabled={!manualThrottle} aria-label="Throttle" className="w-28"
+            <input type="range" min={0} max={Math.round((f.rocket.throttleCap ?? 1) * 100)} value={Math.round((manualThrottle ? Math.min(session.input.throttle, f.rocket.throttleCap ?? 1) : s.throttle) * 100)} disabled={!manualThrottle} aria-label="Throttle" className="w-28"
               onChange={(e) => { session.setThrottle(Number(e.target.value) / 100); setS(snap(session)); }} /><kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">W/S</kbd></label>
           <B data-tour="stage" label="Stage separation / ignite (Space)" disabled={!stageReady} onClick={() => session.stage()}><Layers className="size-4" />{rules.autoStaging ? "Staging auto" : "Stage"}<kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">Space</kbd></B>
           <B data-tour="cut" label="Engine cutoff (X)" disabled={!canCut} onClick={() => session.cut()}><Octagon className="size-4" />Cut<kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">X</kbd></B>
@@ -376,7 +406,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
           <div data-tour="warp" role="radiogroup" aria-label="Time warp" className="ml-auto flex items-center gap-2">
             <span className="hud-label !text-sm">Warp</span>
             <div className="flex overflow-hidden rounded-md border border-[var(--border)]">
-              {[1, 2, 5, 10, 50].map((w, i) => (
+              {[1, 3, 5, 10, 50].map((w, i) => (
                 <button key={w} type="button" role="radio" aria-checked={s.warp === w} aria-label={`Time warp ${w}x (key ${i + 1})`} title={`${w}× (key ${i + 1})`} onClick={() => setWarp(w)}
                   className={cn("h-10 min-w-12 px-3 font-display text-base font-semibold tabular-nums transition", s.warp === w ? "bg-orange text-[#1a0b00]" : "bg-panel text-ink2 hover:text-ink", i > 0 && "border-l border-[var(--border)]")}>{w}×</button>))}
             </div>
@@ -426,10 +456,12 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
 
 /* ============================== screen ============================== */
 export function LaunchControl() {
-  const { difficulty, siteId, vehicleId, mission } = useLaunchSetup();
+  const { difficulty, siteId, vehicleId, mission, payloadPct, fuelPct, throttleCap } = useLaunchSetup();
   const [session, setSession] = useState<LaunchSession | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const launch = useCallback((n: number) => { setSession(new LaunchSession(difficulty, siteId, vehicleId, 1000 + n * 7919, undefined, mission)); setAttempt(n); }, [difficulty, siteId, vehicleId, mission]);
+  const launch = useCallback((n: number) => { const v = vehicleById(vehicleId) ?? DATASET.vehicles[0];
+    setSession(new LaunchSession(difficulty, siteId, vehicleId, 1000 + n * 7919, Math.round(payloadFor(v, RULES[difficulty].payloadFrac, mission) * payloadPct), mission, { fuelPct, throttleCap })); setAttempt(n);
+  }, [difficulty, siteId, vehicleId, mission, payloadPct, fuelPct, throttleCap]);
   if (!session) return <Briefing onStart={() => launch(attempt)} />;
   return <AscentFlight key={`${attempt}`} session={session} onExit={() => setSession(null)} onAgain={() => launch(attempt + 1)} />;
 }
