@@ -4,7 +4,7 @@ import type { RocketSprite } from "./partThumbs";
 
 /** Camera + scene state for the launch canvas (a class so async loaders can attach textures without mutating React state). */
 export class SceneView {
-  cx = 0; cy = R_E(); logE = Math.log(190); shake = 0; boom: { x: number; y: number; age: number } | null = null; flicker = 0;
+  cx = 0; cy = R_E(); logE = Math.log(190); /** player zoom on the orbit view: 0 = automatic framing, 1 = close in on the rocket */ zoom = 0; shake = 0; boom: { x: number; y: number; age: number } | null = null; flicker = 0;
   smoke: Puff[] = []; earth: HTMLCanvasElement | null = null; sprite: RocketSprite | null = null; biome: Biome;
   stars: [number, number, number][] = Array.from({ length: 190 }, (_, i) => { const a = Math.sin(i * 91.7) * 43758.5453; const b = Math.sin(i * 12.9) * 24634.6345; return [a - Math.floor(a), b - Math.floor(b), 0.35 + ((i * 37) % 10) / 12] as [number, number, number]; });
   constructor(siteId: string) { this.biome = biomeFor(siteId); }
@@ -34,6 +34,10 @@ export function updateView(v: SceneView, f: Flight, dtReal: number, reduced: boo
       const rApo = el.apo + R, a = Math.atan2(el.ey, el.ex) + Math.PI;
       tLogE = Math.log(rApo * 0.62); cx = Math.cos(a) * rApo * 0.5; cy = Math.sin(a) * rApo * 0.5;
     }
+  }
+  if (v.zoom > 0) { // the player closes in on the rocket (only once the view has left the pad; fades in with the orbit view)
+    const zz = v.zoom * smooth(s * 2.5);
+    if (zz > 0) { tLogE = lerp(tLogE, Math.log(Math.max(350_000, alt * 2.2)), zz); cx = lerp(cx, f.x, zz); cy = lerp(cy, f.y, zz); }
   }
   const k = 1 - Math.exp(-dtReal * (onPad ? 3 : 2.8));
   v.cx += (cx - v.cx) * k; v.cy += (cy - v.cy) * k; v.logE += (tLogE - v.logE) * k;

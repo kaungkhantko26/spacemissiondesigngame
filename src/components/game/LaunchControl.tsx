@@ -1,14 +1,14 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, Pause, Play, Rocket, RotateCcw, Power, Layers, Bot, Octagon, Volume2, VolumeX, Keyboard } from "lucide-react";
+import { ArrowDown, ArrowUp, Pause, Play, Rocket, RotateCcw, Power, Layers, Bot, Octagon, Volume2, VolumeX, Keyboard, ZoomIn, ZoomOut } from "lucide-react";
 import { ControlsHelp, MANUAL_TOUR } from "./FlightHelp";
 import { explainFailure } from "@/game/launch/coach";
 import { BackButton, GameButton, GlassPanel, ScreenContainer } from "@/components/ui";
 import { useUIStore } from "@/stores";
 import { cn } from "@/lib/mission";
 import { DATASET, vehicleById } from "@/game/data";
-import { LAUNCH, RULES, autopilotReaches, buildRocket, configureRocket, guidancePitch, scoreFlight, type Difficulty, type Flight } from "@/game/launch/core";
+import { LAUNCH, RULES, TLI, autopilotReaches, buildRocket, configureRocket, guidancePitch, scoreFlight, type Difficulty, type Flight } from "@/game/launch/core";
 import { MoonLeg } from "./MoonLeg";
 import { playVoice, primeVoice, stopVoice, audioContext, type VoiceId } from "@/lib/voice";
 import { RocketSound, playSfx } from "@/lib/sfx";
@@ -204,6 +204,15 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     try { if (!window.localStorage.getItem("smd-manual-school")) setSchool(true); } catch { /* storage unavailable */ } // eslint-disable-line react-hooks/set-state-in-effect
   }, [session]);
 
+  const [zoom, setZoomState] = useState(0);
+  const setZoom = useCallback((z: number) => { const c = Math.min(1, Math.max(0, z)); view.zoom = c; setZoomState(c); }, [view]);
+  useEffect(() => {
+    const box = wrap.current; if (!box) return;
+    const wheel = (e: WheelEvent) => { e.preventDefault(); setZoom(view.zoom - Math.sign(e.deltaY) * 0.1); };
+    box.addEventListener("wheel", wheel, { passive: false });
+    return () => box.removeEventListener("wheel", wheel);
+  }, [view, setZoom]);
+
   useEffect(() => {
     const el = canvas.current, box = wrap.current; if (!el || !box) return;
     const ctx = el.getContext("2d"); if (!ctx) return;
@@ -310,13 +319,16 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
       else if (k === "p") togglePause();
       else if (k === "h" || k === "?") setHelp((v) => !v);
       else if (k === "m") setVoice((v) => !v);
+      else if (k === "+" || k === "=") setZoom(view.zoom + 0.15);
+      else if (k === "-" || k === "_") setZoom(view.zoom - 0.15);
+      else if (k === "0") setZoom(0);
       else if (["1", "2", "3", "4", "5"].includes(k)) setWarp([1, 3, 5, 10, 50][Number(k) - 1]);
     };
     const up = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (k === "arrowup") session.hold("up", false); if (k === "arrowdown") session.hold("down", false); if (k === " " && !(e.target as HTMLElement | null)?.closest("input:not([type=range]),select,textarea")) e.preventDefault(); /* a focused button must not also "click" on Space */ };
     const release = () => { session.hold("up", false); session.hold("down", false); }; // keys held while the window loses focus would otherwise stay pressed
     window.addEventListener("keydown", down); window.addEventListener("keyup", up); window.addEventListener("blur", release); document.addEventListener("visibilitychange", release);
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); window.removeEventListener("blur", release); document.removeEventListener("visibilitychange", release); };
-  }, [session, toggleAuto, togglePause, setWarp]);
+  }, [session, toggleAuto, togglePause, setWarp, setZoom, view]);
 
   const qLim = LAUNCH.qDesignPa * rules.qLimitFactor, qFrac = tel.q / qLim;
   const upper = f.rocket.s3 ? 3 : 2, upperFuel = f.rocket.s3 ? s.prop3 : s.prop2;
@@ -324,7 +336,10 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   const middle = s.stage === 2 && !!f.rocket.s3; // the 3-stage rocket's middle stage may also be cut and relit
   const canCut = (s.stage === upper || middle) && s.engineOn && !apActive && (s.phase === "stage2" || s.phase === "tli");
   const autoTli = rules.autopilot === "full" && s.autopilot;
-  const canRestart = (s.stage === upper && !s.engineOn && upperFuel > 0 && s.cutoffs > 0 && s.cutoffs < 4 && s.phase === "stage2") || (middle && !s.engineOn && s.prop2 > 0 && s.cuts2 > 0 && s.cuts2 < 4 && s.phase === "stage2") || (s.phase === "parking" && !autoTli);
+  const relightable = (s.stage === upper || middle) && (s.phase === "stage2");
+  const cutsUsed = middle ? s.cuts2 : s.cutoffs;
+  const relightsLeft = Math.max(0, TLI.maxRestarts - 1 - Math.max(0, cutsUsed - 1)); // each cut after the first was preceded by a relight; the last allowed cut cannot be relit
+  const canRestart = (s.stage === upper && !s.engineOn && upperFuel > 0 && s.cutoffs > 0 && s.cutoffs < TLI.maxRestarts && s.phase === "stage2") || (middle && !s.engineOn && s.prop2 > 0 && s.cuts2 > 0 && s.cuts2 < TLI.maxRestarts && s.phase === "stage2") || (s.phase === "parking" && !autoTli);
   const pitchErr = s.cue - s.pitch;
   const result = showResult ? scoreFlight(f) : null;
   const held = (key: "up" | "down") => ({ onPointerDown: () => session.hold(key, true), onPointerUp: () => session.hold(key, false), onPointerLeave: () => session.hold(key, false), onPointerCancel: () => session.hold(key, false) });
@@ -353,6 +368,10 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
           <div><dt className="hud-label">Pitch</dt><dd className="tabular-nums">{s.pitch.toFixed(0)}°</dd></div>
           <div><dt className="hud-label">Orbit (low × high)</dt><dd className="tabular-nums text-xs">{tel.periKm > -1000 && tel.apoKm > 0.5 ? fmt(tel.periKm) : "—"} × {Number.isFinite(tel.apoKm) ? (tel.apoKm > 0.5 ? fmt(tel.apoKm) : "—") : "∞"} km</dd></div>
         </div>
+        {relightable && !(rules.autopilot === "full" && s.autopilot) && (
+          <div className="border-t border-[var(--border)] pt-1.5"><dt className="hud-label">Engine relights left</dt>
+            <dd className={cn("tabular-nums", relightsLeft === 0 ? "text-bad" : relightsLeft === 1 ? "text-warn" : "")}>{relightsLeft} <span className="text-xs text-muted">· {s.engineOn ? "burning" : "engine off"} · {f.rocket.stageNames[s.stage - 1]}</span></dd></div>
+        )}
         {s.phase === "parking" && tel.tliRemainS !== null && (
           <p className="text-[11px] text-ink2" aria-live="polite">TLI window in <b className="text-orange tabular-nums">{tel.tliRemainS > 1 ? clock(tel.tliRemainS).replace("T+", "") : "NOW"}</b>{autoTli ? " · autopilot ignites it" : tel.tliRemainS < 40 ? " · press Ignite TLI" : " · warp ahead (5)"}</p>
         )}
@@ -403,6 +422,10 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
           <B data-tour="stage" label="Stage separation / ignite (Space)" disabled={!stageReady} onClick={() => session.stage()}><Layers className="size-4" />{rules.autoStaging ? "Staging auto" : "Stage"}<kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">Space</kbd></B>
           <B data-tour="cut" label="Engine cutoff (X)" disabled={!canCut} onClick={() => session.cut()}><Octagon className="size-4" />Cut<kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">X</kbd></B>
           <B label="Restart engine (R)" disabled={!canRestart} onClick={() => session.restart()}><Power className="size-4" />{s.phase === "parking" ? "Ignite TLI" : "Restart"}<kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">R</kbd></B>
+          <div role="group" aria-label="Orbit view zoom" className="flex items-center gap-1" data-tour="zoom">
+            <B label="Zoom out (−, or mouse wheel)" disabled={zoom <= 0} onClick={() => setZoom(zoom - 0.2)}><ZoomOut className="size-4" /></B>
+            <B label="Zoom in on the rocket (+, or mouse wheel)" disabled={zoom >= 1} onClick={() => setZoom(zoom + 0.2)}><ZoomIn className="size-4" /></B>
+          </div>
           <B label="Keyboard controls (H)" onClick={() => setHelp(true)}><Keyboard className="size-4" /><kbd className="ml-0.5 rounded border border-white/25 bg-white/5 px-1 font-mono text-[10px] normal-case tracking-normal">H</kbd></B>
           <div data-tour="warp" role="radiogroup" aria-label="Time warp" className="ml-auto flex items-center gap-2">
             <span className="hud-label !text-sm">Warp</span>

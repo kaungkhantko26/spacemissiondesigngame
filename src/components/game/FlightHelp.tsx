@@ -7,6 +7,7 @@ import type { TourStep } from "./Tour";
 export const KEY_GROUPS: { title: string; keys: [string, string][] }[] = [
   { title: "Steer", keys: [["↑", "Raise the nose"], ["↓", "Lower the nose (pitch over toward the horizon)"]] },
   { title: "Engine", keys: [["W", "More throttle (+5%)"], ["S", "Less throttle (−5%)"], ["Shift+W", "Full throttle"], ["Shift+S", "Throttle off"], ["X", "Cut the engine (2nd stage onward)"], ["R", "Relight the engine / ignite TLI"]] },
+  { title: "View", keys: [["+ / −", "Zoom the orbit view in / out (or mouse wheel)"], ["0", "Back to automatic framing"]] },
   { title: "Stages", keys: [["Space", "Separate the empty stage"]] },
   { title: "Assist & game", keys: [["A", "Autopilot or upper-stage guidance"], ["P", "Pause / resume"], ["1–5", "Time warp 1×, 2×, 5×, 10×, 50×"], ["M", "Mute sound"], ["H", "Show or hide this help"]] },
 ];
