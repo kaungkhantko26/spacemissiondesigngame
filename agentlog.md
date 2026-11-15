@@ -1,4 +1,8 @@
 # Agent Log
+## Session 11 — Enter starts countdown
+- The pad prompt now accepts Enter from the flight view and invokes the same countdown action as its button. Enter on another focused button retains that button's normal behavior; key repeats cannot trigger multiple starts.
+- Added an Enter hint to Start countdown.
+
 ## Session 10 — Disable dragging on Earth
 - Verified the current Pages bundle already had no globe reprojection code; the reported screenshot showed a previously loaded bundle.
 - A pointer drag that begins inside the displayed Earth disc now does nothing. Dragging empty space still pans the camera, with wheel/buttons for zoom.

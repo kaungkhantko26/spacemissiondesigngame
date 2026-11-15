@@ -300,7 +300,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     const names = useProgress.getState().recordFlight({ ok: sc.ok, mission: session.flight.mission, difficulty: session.difficulty, grade: sc.grade }, usePlayerStore.getState().profile.progression.level);
     if (names.length) useUIStore.getState().toast(`Cosmetic unlocked: ${names.join(", ")}`, "success");
   }, [s.phase, session]);
-  const start = () => { primeVoice(); session.start(); setS(snap(session)); };
+  const start = useCallback(() => { primeVoice(); session.start(); setS(snap(session)); }, [session]);
   const togglePause = useCallback(() => { if (session.flight.t > -LAUNCH.countdownS + 0.01 || session.running) session.toggleRun(); setS(snap(session)); }, [session]);
   const setWarp = useCallback((w: number) => { session.setWarp(w); setS(snap(session)); }, [session]);
 
@@ -309,6 +309,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
       // typing fields keep their keys, but a focused slider or button must not steal the flight controls (arrows pitch, Space stages)
       if ((e.target as HTMLElement | null)?.closest("input:not([type=range]),select,textarea")) return;
       const k = e.key.toLowerCase();
+      if (k === "enter" && !e.repeat && !session.running && session.flight.phase === "countdown" && session.flight.t <= -LAUNCH.countdownS + 0.01 && !(e.target as HTMLElement | null)?.closest("button,a,[role=button]")) { e.preventDefault(); start(); return; }
       if (k === "arrowup") { session.hold("up", true); e.preventDefault(); }
       else if (k === "arrowdown") { session.hold("down", true); e.preventDefault(); }
       else if (k === "w") session.setThrottle(e.shiftKey ? 1 : session.input.throttle + 0.05);
@@ -329,7 +330,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     const release = () => { session.hold("up", false); session.hold("down", false); }; // keys held while the window loses focus would otherwise stay pressed
     window.addEventListener("keydown", down); window.addEventListener("keyup", up); window.addEventListener("blur", release); document.addEventListener("visibilitychange", release);
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); window.removeEventListener("blur", release); document.removeEventListener("visibilitychange", release); };
-  }, [session, toggleAuto, togglePause, setWarp, setZoom, view]);
+  }, [session, start, toggleAuto, togglePause, setWarp, setZoom, view]);
 
   const qLim = LAUNCH.qDesignPa * rules.qLimitFactor, qFrac = tel.q / qLim;
   const upper = f.rocket.s3 ? 3 : 2, upperFuel = f.rocket.s3 ? s.prop3 : s.prop2;
@@ -420,7 +421,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
           <p className="hud-label !text-orange">{f.rocket.name} on the pad · {f.site.location.split(",")[0]}</p>
           <h2 className="mt-1 text-3xl font-bold">All systems go?</h2>
           <p className="mt-2 text-sm text-ink2">{rules.name}: {rules.tagline}. {f.mission === "moon" ? `Mission: parking orbit above ${rules.minPerigeeKm} km, then translunar injection to the Moon.` : `Orbit: lowest point above ${rules.minPerigeeKm} km.`}</p>
-          <div className="mt-4 flex justify-center gap-2"><GameButton variant="primary" icon={<Rocket className="size-5" />} onClick={start}>Start countdown</GameButton><GameButton variant="ghost" onClick={onExit}>Back to briefing</GameButton></div>
+          <div className="mt-4 flex justify-center gap-2"><GameButton variant="primary" icon={<Rocket className="size-5" />} onClick={start}>Start countdown <kbd className="ml-1 rounded border border-black/30 px-1 text-xs">Enter</kbd></GameButton><GameButton variant="ghost" onClick={onExit}>Back to briefing</GameButton></div>
         </div>
       )}
       {s.phase === "countdown" && s.running && s.t < 0 && <p className="pointer-events-none absolute inset-x-0 top-[22%] z-10 text-center font-display text-[clamp(3rem,16vh,6rem)] font-bold text-orange tabular-nums drop-shadow-lg" aria-live="assertive">{Math.ceil(-s.t) > 0 ? Math.ceil(-s.t) : ""}</p>}
