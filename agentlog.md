@@ -1,4 +1,8 @@
 # Agent Log
+## Session 10 — Disable dragging on Earth
+- Verified the current Pages bundle already had no globe reprojection code; the reported screenshot showed a previously loaded bundle.
+- A pointer drag that begins inside the displayed Earth disc now does nothing. Dragging empty space still pans the camera, with wheel/buttons for zoom.
+
 ## Session 9 — Remove globe drag rotation
 - Removed interactive Earth reprojection and its background rendering/cache updates. The Earth texture now stays at the site-oriented projection while dragging anywhere on the flight canvas pans the camera.
 - Retained orbit zoom controls and Reset view.

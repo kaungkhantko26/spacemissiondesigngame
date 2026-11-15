@@ -8,7 +8,7 @@ import { BackButton, GameButton, GlassPanel, ScreenContainer } from "@/component
 import { useUIStore } from "@/stores";
 import { cn } from "@/lib/mission";
 import { DATASET, vehicleById } from "@/game/data";
-import { LAUNCH, RULES, TLI, autopilotReaches, buildRocket, configureRocket, guidancePitch, scoreFlight, type Difficulty, type Flight } from "@/game/launch/core";
+import { LAUNCH, RULES, R_E, TLI, autopilotReaches, buildRocket, configureRocket, guidancePitch, scoreFlight, type Difficulty, type Flight } from "@/game/launch/core";
 import { MoonLeg } from "./MoonLeg";
 import { playVoice, primeVoice, stopVoice, audioContext, type VoiceId } from "@/lib/voice";
 import { RocketSound, playSfx } from "@/lib/sfx";
@@ -348,6 +348,9 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   const point = (e: React.PointerEvent<HTMLCanvasElement>) => { const rect = e.currentTarget.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top, width: rect.width, height: rect.height }; };
   const pointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const p = point(e);
+    const scale = cameraScale(p.width, p.height);
+    const earthX = p.width / 2 - view.current.cx * scale, earthY = p.height / 2 + view.current.cy * scale;
+    if (Math.exp(view.current.logE) > R_E() * 0.15 && Math.hypot(p.x - earthX, p.y - earthY) <= R_E() * scale) return;
     drag.current = { id: e.pointerId, x: p.x, y: p.y };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -365,9 +368,9 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
       {school && <Tour steps={MANUAL_TOUR.filter((st) => st.target !== "[data-tour=cue]" || rules.guideCue)} doneLabel="Start flying" onDone={() => { setSchool(false); try { window.localStorage.setItem("smd-manual-school", "1"); } catch { /* ignore */ } }} onSkip={() => { setSchool(false); try { window.localStorage.setItem("smd-manual-school", "1"); } catch { /* ignore */ } }} />}
       {help && <ControlsHelp onClose={() => setHelp(false)} />}
       {tour && <Tour steps={FLIGHT_TOUR} doneLabel="Let's fly" onDone={() => { setTour(false); setPendingTour(null); }} onSkip={() => { setTour(false); setPendingTour(null); }} />}
-      <div ref={wrap} className="absolute inset-0"><canvas ref={canvas} className="h-full w-full cursor-grab touch-none active:cursor-grabbing" aria-label="Rocket flight view. Drag to move the camera and scroll to zoom." role="img" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} /></div>
+      <div ref={wrap} className="absolute inset-0"><canvas ref={canvas} className="h-full w-full touch-none" aria-label="Rocket flight view. Drag empty space to move the camera and scroll to zoom. Earth cannot be dragged." role="img" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} /></div>
       <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 rounded-md border border-[var(--border)] bg-bg/80 px-2 py-1 text-[11px] text-ink2 max-sm:top-auto max-sm:bottom-36">
-        <span className="max-md:hidden">Drag to move the view · scroll to zoom</span><span className="md:hidden">Drag to move</span>
+        <span className="max-md:hidden">Drag empty space to move the view · scroll to zoom</span><span className="md:hidden">Drag space to move</span>
         <button type="button" onClick={() => { view.current.resetCamera(); setZoom(0); }} className="rounded border border-[var(--border)] px-2 py-0.5 text-ink hover:text-orange">Reset view</button>
       </div>
 
