@@ -118,10 +118,12 @@ export function drawFlight(ctx: CanvasRenderingContext2D, W: number, H: number, 
   }
 
   // ---- reference rings + predicted orbit (orbit view)
-  if (E > R * 0.15) {
+  if (E > R * 0.15 || (v.zoom > 0.01 && Math.hypot(f.x, f.y) - R > 60_000)) { // also when the player has zoomed in, so the guide rings stay visible
+    const half = Math.hypot(W, H) / 2 / k, ac = Math.atan2(v.cy, v.cx); // draw only the stretch that is on screen, in fine steps
+    const ring = (rad: number) => { const span = Math.min(Math.PI, (half / rad) * 1.3 + 0.02); if (span >= Math.PI) arc(rad, 0, Math.PI * 2, 180); else arc(rad, ac - span, ac + span, 160); };
     ctx.setLineDash([6, 6]); ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.beginPath(); arc(R + LAUNCH.karmanM, 0, Math.PI * 2, 180); ctx.stroke();
-    ctx.strokeStyle = "rgba(95,207,154,.6)"; ctx.beginPath(); arc(R + LAUNCH.targetOrbitKm * 1000, 0, Math.PI * 2, 180); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.beginPath(); ring(R + LAUNCH.karmanM); ctx.stroke();
+    ctx.strokeStyle = "rgba(95,207,154,.6)"; ctx.beginPath(); ring(R + LAUNCH.targetOrbitKm * 1000); ctx.stroke(); ctx.setLineDash([]);
   }
   const el = orbitElements(f.x, f.y, f.vx, f.vy);
   if (el.bound && f.liftedOff && (f.stage === 2 || f.phase === "coast") && E > 4_000) {

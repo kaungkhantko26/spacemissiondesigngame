@@ -238,3 +238,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Earth drag-rotate lag: the globe texture is now rendered at 160px while dragging (skipping frames while one is still computing) and at 512px once released, instead of 512px every 80 ms.
 - Launch camera: at partial zoom the rocket is now always kept within 45% of the view radius from the screen centre (it used to drift to the edge while the camera still framed the Earth).
 - Launch Control: the relights-left count is also shown on the Restart button ("N left"), since the telemetry panel row sat below the fold of its scroll area.
+- Launch camera: the dashed Karman-line and target-orbit guide rings now stay visible when the player zooms in (they were hidden below a 950 km view) and are drawn only along the on-screen stretch with fine steps so they stay smooth up close.
