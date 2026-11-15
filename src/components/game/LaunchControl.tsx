@@ -8,7 +8,7 @@ import { BackButton, GameButton, GlassPanel, ScreenContainer } from "@/component
 import { useUIStore } from "@/stores";
 import { cn } from "@/lib/mission";
 import { DATASET, vehicleById } from "@/game/data";
-import { LAUNCH, RULES, R_E, TLI, autopilotReaches, buildRocket, configureRocket, guidancePitch, scoreFlight, type Difficulty, type Flight } from "@/game/launch/core";
+import { LAUNCH, RULES, TLI, autopilotReaches, buildRocket, configureRocket, guidancePitch, scoreFlight, type Difficulty, type Flight } from "@/game/launch/core";
 import { MoonLeg } from "./MoonLeg";
 import { playVoice, primeVoice, stopVoice, audioContext, type VoiceId } from "@/lib/voice";
 import { RocketSound, playSfx } from "@/lib/sfx";
@@ -192,16 +192,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   const rules = session.flight.rules;
   const canvas = useRef<HTMLCanvasElement>(null), wrap = useRef<HTMLDivElement>(null);
   const view = useRef(newView(session.flight.site.id));
-  const drag = useRef<{ id: number; mode: "globe" | "pan"; x: number; y: number } | null>(null);
-  const globeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const globeRequest = useRef(0);
-  const globeBusy = useRef(false);
-  const refreshGlobe = useCallback((size = 512) => { // small and cheap while dragging, sharp when released
-    if (globeBusy.current && size < 512) return;
-    const request = ++globeRequest.current, scene = view.current, site = session.flight.site;
-    globeBusy.current = true;
-    void buildEarthDisc(site.lat, scene.globeLon, size, scene.globeLat).then((disc) => { globeBusy.current = false; if (request === globeRequest.current && disc) scene.setEarth(disc); });
-  }, [session]);
+  const drag = useRef<{ id: number; x: number; y: number } | null>(null);
   const [s, setS] = useState<Snap>(() => snap(session));
   const [showResult, setShowResult] = useState(false);
   const [leg, setLeg] = useState(false); // Moon mission: coast to the Moon after TLI
@@ -231,8 +222,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     resize(); const ro = new ResizeObserver(resize); ro.observe(box);
     // real Earth texture for the orbit view + the 3-D rocket model as the flight sprite (both load async; the scene works without them)
     const fl = session.flight;
-    view.current.setGlobeOrigin(fl.site.lat, fl.site.lon);
-    refreshGlobe();
+    void buildEarthDisc(fl.site.lat, fl.site.lon).then((disc) => { if (!dead) view.current.setEarth(disc); });
     void loadRocketSprite(fl.rocket.vehicle.id).then((sp) => { if (!dead) view.current.setSprite(sp); });
     const frame = (now: number) => {
       if (dead) return;
@@ -241,8 +231,8 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
-    return () => { dead = true; if (globeTimer.current) clearTimeout(globeTimer.current); cancelAnimationFrame(raf); ro.disconnect(); };
-  }, [session, view, reduced, refreshGlobe]);
+    return () => { dead = true; cancelAnimationFrame(raf); ro.disconnect(); };
+  }, [session, view, reduced]);
 
   useEffect(() => { // HUD at 10 Hz
     let doneAt = 0;
@@ -354,41 +344,31 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   const pitchErr = s.cue - s.pitch;
   const result = showResult ? scoreFlight(f) : null;
   const held = (key: "up" | "down") => ({ onPointerDown: () => session.hold(key, true), onPointerUp: () => session.hold(key, false), onPointerLeave: () => session.hold(key, false), onPointerCancel: () => session.hold(key, false) });
-  const globeAt = (width: number, height: number) => {
-    const scale = Math.min(width, height) * 0.45 / Math.exp(view.current.logE);
-    return { x: width / 2 - view.current.cx * scale, y: height / 2 + view.current.cy * scale, radius: R_E() * scale, scale };
-  };
+  const cameraScale = (width: number, height: number) => Math.min(width, height) * 0.45 / Math.exp(view.current.logE);
   const point = (e: React.PointerEvent<HTMLCanvasElement>) => { const rect = e.currentTarget.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top, width: rect.width, height: rect.height }; };
   const pointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const p = point(e), globe = globeAt(p.width, p.height);
-    const onGlobe = !e.shiftKey && globe.radius > 20 && Math.hypot(p.x - globe.x, p.y - globe.y) < globe.radius;
-    drag.current = { id: e.pointerId, mode: onGlobe ? "globe" : "pan", x: p.x, y: p.y };
+    const p = point(e);
+    drag.current = { id: e.pointerId, x: p.x, y: p.y };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const pointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const d = drag.current; if (!d || d.id !== e.pointerId) return;
-    const p = point(e), globe = globeAt(p.width, p.height);
-    if (d.mode === "globe") {
-      view.current.globeLon = ((view.current.globeLon - (p.x - d.x) * 0.45 + 540) % 360) - 180;
-      view.current.globeLat = Math.max(-85, Math.min(85, view.current.globeLat + (p.y - d.y) * 0.28));
-      if (!globeTimer.current) globeTimer.current = setTimeout(() => { globeTimer.current = null; refreshGlobe(160); }, 30);
-    } else {
-      const dx = (p.x - d.x) / globe.scale, dy = (p.y - d.y) / globe.scale;
-      view.current.panX -= dx; view.current.cx -= dx; view.current.panY += dy; view.current.cy += dy;
-    }
+    const p = point(e), scale = cameraScale(p.width, p.height);
+    const dx = (p.x - d.x) / scale, dy = (p.y - d.y) / scale;
+    view.current.panX -= dx; view.current.cx -= dx; view.current.panY += dy; view.current.cy += dy;
     d.x = p.x; d.y = p.y;
   };
-  const pointerEnd = (e: React.PointerEvent<HTMLCanvasElement>) => { if (drag.current?.id === e.pointerId) { if (drag.current.mode === "globe") { if (globeTimer.current) clearTimeout(globeTimer.current); globeTimer.current = null; refreshGlobe(); } drag.current = null; } };
+  const pointerEnd = (e: React.PointerEvent<HTMLCanvasElement>) => { if (drag.current?.id === e.pointerId) drag.current = null; };
   if (leg) return <MoonLeg flight={f} onAgain={onAgain} onExit={onExit} onResult={onLunarResult} />;
   return (
     <main className="relative flex h-[calc(100dvh-81px)] min-h-0 shrink-0 flex-col overflow-hidden">
       {school && <Tour steps={MANUAL_TOUR.filter((st) => st.target !== "[data-tour=cue]" || rules.guideCue)} doneLabel="Start flying" onDone={() => { setSchool(false); try { window.localStorage.setItem("smd-manual-school", "1"); } catch { /* ignore */ } }} onSkip={() => { setSchool(false); try { window.localStorage.setItem("smd-manual-school", "1"); } catch { /* ignore */ } }} />}
       {help && <ControlsHelp onClose={() => setHelp(false)} />}
       {tour && <Tour steps={FLIGHT_TOUR} doneLabel="Let's fly" onDone={() => { setTour(false); setPendingTour(null); }} onSkip={() => { setTour(false); setPendingTour(null); }} />}
-      <div ref={wrap} className="absolute inset-0"><canvas ref={canvas} className="h-full w-full cursor-grab touch-none active:cursor-grabbing" aria-label="Rocket flight view. Drag Earth to rotate it, drag space to move the camera, scroll to zoom." role="img" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} /></div>
+      <div ref={wrap} className="absolute inset-0"><canvas ref={canvas} className="h-full w-full cursor-grab touch-none active:cursor-grabbing" aria-label="Rocket flight view. Drag to move the camera and scroll to zoom." role="img" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} /></div>
       <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 rounded-md border border-[var(--border)] bg-bg/80 px-2 py-1 text-[11px] text-ink2 max-sm:top-auto max-sm:bottom-36">
-        <span className="max-md:hidden">Drag Earth to rotate · drag space or Shift-drag to pan · scroll to zoom</span><span className="md:hidden">Drag to explore</span>
-        <button type="button" onClick={() => { view.current.resetCamera(); setZoom(0); if (globeTimer.current) clearTimeout(globeTimer.current); refreshGlobe(); }} className="rounded border border-[var(--border)] px-2 py-0.5 text-ink hover:text-orange">Reset view</button>
+        <span className="max-md:hidden">Drag to move the view · scroll to zoom</span><span className="md:hidden">Drag to move</span>
+        <button type="button" onClick={() => { view.current.resetCamera(); setZoom(0); }} className="rounded border border-[var(--border)] px-2 py-0.5 text-ink hover:text-orange">Reset view</button>
       </div>
 
       {/* telemetry */}

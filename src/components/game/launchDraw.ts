@@ -5,14 +5,13 @@ import type { RocketSprite } from "./partThumbs";
 /** Camera + scene state for the launch canvas (a class so async loaders can attach textures without mutating React state). */
 export class SceneView {
   cx = 0; cy = R_E(); logE = Math.log(190); zoom = 0; shake = 0; boom: { x: number; y: number; age: number } | null = null; flicker = 0;
-  panX = 0; panY = 0; globeLat = 0; globeLon = 0; baseGlobeLat = 0; baseGlobeLon = 0;
+  panX = 0; panY = 0;
   smoke: Puff[] = []; earth: HTMLCanvasElement | null = null; sprite: RocketSprite | null = null; biome: Biome;
   stars: [number, number, number][] = Array.from({ length: 190 }, (_, i) => { const a = Math.sin(i * 91.7) * 43758.5453; const b = Math.sin(i * 12.9) * 24634.6345; return [a - Math.floor(a), b - Math.floor(b), 0.35 + ((i * 37) % 10) / 12] as [number, number, number]; });
   constructor(siteId: string) { this.biome = biomeFor(siteId); }
   setEarth(c: HTMLCanvasElement | null) { this.earth = c; }
   setSprite(s: RocketSprite | null) { this.sprite = s; }
-  setGlobeOrigin(lat: number, lon: number) { this.baseGlobeLat = (Math.abs(lat) - 90) * Math.sign(lat || 1); this.baseGlobeLon = lon; this.globeLat = this.baseGlobeLat; this.globeLon = lon; }
-  resetCamera() { this.panX = 0; this.panY = 0; this.zoom = 0; this.globeLat = this.baseGlobeLat; this.globeLon = this.baseGlobeLon; }
+  resetCamera() { this.panX = 0; this.panY = 0; this.zoom = 0; }
 }
 export const newView = (siteId: string) => new SceneView(siteId);
 

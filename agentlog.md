@@ -1,4 +1,8 @@
 # Agent Log
+## Session 9 — Remove globe drag rotation
+- Removed interactive Earth reprojection and its background rendering/cache updates. The Earth texture now stays at the site-oriented projection while dragging anywhere on the flight canvas pans the camera.
+- Retained orbit zoom controls and Reset view.
+
 ## Session 6 — Cut and relight from the second stage
 - Engine cutoff/restart used to work only on the last stage (the S-IVB on the Saturn V). It now also works on the middle stage of a 3-stage rocket (S-II), which is already above the atmosphere when it burns. Two-stage rockets are unchanged (their second stage is the last stage).
 - `core.ts`: new `Flight.cuts2` counter (kept apart from `cutoffs`, so S-II cut/relight cycles do not use up the S-IVB's restarts for TLI); cut/restart block covers `isUpper || middle`; after a manual S-II cut the stage can be separated with fuel left; the "re-entered the atmosphere after cutting" failure also covers the middle stage.
