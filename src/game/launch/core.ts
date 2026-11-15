@@ -43,7 +43,7 @@ export const RULES: Record<Difficulty, Rules> = {
   hard: {
     id: "hard", name: "Commander", tagline: "Fully manual — no autopilot, real consequences", autopilot: "none", autoStaging: false, payloadFrac: 0.9,
     minPerigeeKm: 180, maxApogeeKm: 600, qLimitFactor: 1.25, aoaProtect: false, windMs: 30, minorAnomalyChance: 0.5, majorAnomalyChance: 0.3, scoreMult: 2.5, guideCue: false,
-    bullets: ["No autopilot: you control pitch, throttle, staging and engine cutoff/restart", "You must trigger stage separation and ignite stage 2 yourself", "Strong jet-stream winds, 50 % minor + 30 % major engine anomalies", "Payload is 90 % of capacity — almost no Δv to waste", "Orbit counts only when the lowest point is above 180 km (apogee below 600 km)", "Tight structural limits: max-Q or angle-of-attack mistakes destroy the rocket", "No guidance cue. Score ×2.5"],
+    bullets: ["No autopilot: you control pitch, throttle, staging and engine cutoff/restart (cut and relight from the 2nd stage onward)", "You must trigger stage separation and ignite stage 2 yourself", "Strong jet-stream winds, 50 % minor + 30 % major engine anomalies", "Payload is 90 % of capacity — almost no Δv to waste", "Orbit counts only when the lowest point is above 180 km (apogee below 600 km)", "Tight structural limits: max-Q or angle-of-attack mistakes destroy the rocket", "No guidance cue. Score ×2.5"],
   },
 };
 
@@ -155,7 +155,7 @@ export interface Flight {
   omega: number; maxQ: number; maxQt: number; maxG: number; maxQAlpha: number;
   anomalies: { at: number; kind: "minor" | "major" | "none"; done: boolean };
   milestones: Record<string, number>; log: LogLine[]; tel: Telemetry; failure: string | null; trail: number[]; debris: { x: number; y: number; vx: number; vy: number; /** sprite rows (fraction from the top) of the spent part */ top: number; bot: number }[];
-  cutoffs: number; kickDone: boolean; manualOverride: boolean; gOver: number;
+  cutoffs: number; /** manual cut/restart cycles on the middle stage of a 3-stage rocket (kept apart from the upper stage's restart budget) */ cuts2: number; kickDone: boolean; manualOverride: boolean; gOver: number;
   /** orbit reached (insertion): numbers frozen for scoring; TLI apogee accuracy */
   park: { periKm: number; apoKm: number; fuel: number } | null; tliRatio: number | null;
 }
@@ -174,7 +174,7 @@ export function createFlight(rocket: Rocket, rules: Rules, site: LaunchSite, see
     x: 0, y: earthRadius, vx: site.rotation_boost_m_s, vy: 0, theta0: 0, m: rocket.m0, prop1: rocket.s1.propKg, prop2: rocket.s2.propKg, prop3: rocket.s3?.propKg ?? 0,
     pitch: 90, throttle: rocket.throttleCap ?? 1, engineOn: false, ignited: false, liftedOff: false, coastLeft: 0, fairing: true, thrustMult: 1, thrustMultUntil: 0, guidanceDownUntil: 0,
     omega: site.rotation_boost_m_s / earthRadius, maxQ: 0, maxQt: 0, maxG: 0, maxQAlpha: 0, anomalies: { at: 0, kind: "none", done: false },
-    milestones: {}, log: [], tel: undefined as unknown as Telemetry, failure: null, trail: [], debris: [], cutoffs: 0, kickDone: false, manualOverride: false, gOver: 0, park: null, tliRatio: null,
+    milestones: {}, log: [], tel: undefined as unknown as Telemetry, failure: null, trail: [], debris: [], cutoffs: 0, cuts2: 0, kickDone: false, manualOverride: false, gOver: 0, park: null, tliRatio: null,
   };
   const rnd = () => mulberry(f);
   const major = rnd() < rules.majorAnomalyChance, minor = rnd() < rules.minorAnomalyChance;
@@ -344,7 +344,7 @@ export function stepFlight(f: Flight, input: Input, dt = LAUNCH.dt): void {
     if (rules.autoStaging) stageSeparation(f); else log(f, `${f.rocket.stageNames[1]} is spent — press STAGE to separate.`, "warn");
   }
   if (f.stage === 1 && f.prop1 <= 0 && !rules.autoStaging && input.stage && f.phase === "stage1") stageSeparation(f);
-  if (f.stage === 2 && f.rocket.s3 && f.prop2 <= 0 && !rules.autoStaging && input.stage && f.phase === "stage2" && !f.engineOn) stageSeparation(f);
+  if (f.stage === 2 && f.rocket.s3 && (f.prop2 <= 0 || f.cuts2 > 0) && !rules.autoStaging && input.stage && f.phase === "stage2" && !f.engineOn) stageSeparation(f); // after a manual cut the unburnt propellant is simply left behind
   if (f.phase === "coast") {
     f.coastLeft -= dt;
     const ready = f.coastLeft <= 0;
@@ -353,10 +353,18 @@ export function stepFlight(f: Flight, input: Input, dt = LAUNCH.dt): void {
       mark(f, f.stage === 2 ? "ignition2" : "ignition3", `${f.rocket.stageNames[f.stage - 1]} ignition.`);
     }
   }
-  // restart / cutoff
-  if (isUpper(f) && (f.phase === "stage2" || f.phase === "tli")) {
-    if (input.cut && f.engineOn) { f.engineOn = false; f.cutoffs++; mark(f, f.phase === "tli" ? "tliCut" : "seco" + f.cutoffs, f.phase === "tli" ? "TLI engine cutoff." : "Second engine cutoff (SECO)."); }
-    else if (f.phase === "stage2" && !f.engineOn && propOf(f) > 0 && input.restart && f.cutoffs > 0 && f.cutoffs < TLI.maxRestarts) { f.engineOn = true; f.throttle = Math.min(f.rocket.throttleCap ?? 1, Math.max(0.35, input.throttle)); log(f, "Engine restart.", "info"); }
+  // restart / cutoff: allowed on the upper stage, and on the middle stage of a 3-stage rocket (it is already above the atmosphere when it burns)
+  const middle = f.stage === 2 && !!f.rocket.s3;
+  if ((isUpper(f) || middle) && (f.phase === "stage2" || f.phase === "tli")) {
+    const used = middle ? f.cuts2 : f.cutoffs;
+    if (input.cut && f.engineOn) {
+      f.engineOn = false;
+      if (middle) { f.cuts2++; mark(f, "cut2_" + f.cuts2, `${f.rocket.stageNames[1]} engine cutoff.`); }
+      else { f.cutoffs++; mark(f, f.phase === "tli" ? "tliCut" : "seco" + f.cutoffs, f.phase === "tli" ? "TLI engine cutoff." : "Second engine cutoff (SECO)."); }
+    }
+    else if (f.phase === "stage2" && !f.engineOn && propOf(f) > 0 && input.restart && used > 0 && used < TLI.maxRestarts) {
+      f.engineOn = true; f.throttle = Math.min(f.rocket.throttleCap ?? 1, Math.max(0.35, input.throttle)); log(f, "Engine restart.", "info");
+    }
   }
 
   // ---- forces
@@ -458,7 +466,7 @@ function evaluateOutcome(f: Flight) {
   if (isUpper(f) && f.phase === "stage2" && propOf(f) <= 0 && !f.engineOn && periKm < f.rules.minPerigeeKm) {
     return fail(f, `Out of propellant in a ${periKm.toFixed(0)} × ${apoKm.toFixed(0)} km path — perigee must clear ${f.rules.minPerigeeKm} km. Fly the gravity turn more efficiently.`);
   }
-  if (isUpper(f) && f.phase === "stage2" && !f.engineOn && propOf(f) > 0 && f.milestones.karman !== undefined && radialSpeed(f) < 0 && alt < 70_000 && periKm < 0) {
+  if ((isUpper(f) || (f.stage === 2 && !!f.rocket.s3)) && f.phase === "stage2" && !f.engineOn && propOf(f) > 0 && f.milestones.karman !== undefined && radialSpeed(f) < 0 && alt < 70_000 && periKm < 0) {
     return fail(f, "The stage re-entered the atmosphere — you cut the engine before reaching a safe orbit.");
   }
   if (f.phase === "coast" && alt < 20_000 && radialSpeed(f) < -100) fail(f, "Stage separation too early — the upper stage fell back to Earth.");

@@ -173,3 +173,35 @@ describe("Saturn V and the mission to the Moon", () => {
     expect(moon.ok && orbit.ok).toBe(true); expect(moon.score).toBeGreaterThan(orbit.score); expect(moon.max).toBe(1300);
   });
 });
+
+describe("cut and relight from the second stage onward", () => {
+  /** Fly the Saturn V (autopilot) until the middle stage has been burning for `sec` seconds, then return the input to drive it by hand. */
+  const toMiddleBurn = (sec = 25) => {
+    const f = moonFlight(SATURN, "easy", 1), i = defaultInput(f.rules);
+    let t0: number | null = null;
+    while (f.phase !== "failed" && f.t < 2000) {
+      if (f.stage === 2 && f.phase === "stage2" && f.engineOn) { t0 ??= f.t; if (f.t - t0 >= sec) break; }
+      stepFlight(f, i); i.stage = false; i.cut = false; i.restart = false;
+    }
+    return { f, i };
+  };
+  it("the middle stage of the Saturn V can be cut and relit; fuel is only used while it burns", () => {
+    const { f, i } = toMiddleBurn();
+    expect(f.stage).toBe(2); expect(f.engineOn).toBe(true); expect(f.cuts2).toBe(0);
+    i.cut = true; stepFlight(f, i); i.cut = false;
+    expect(f.engineOn).toBe(false); expect(f.cuts2).toBe(1); expect(f.cutoffs).toBe(0); // the upper stage keeps its own restart budget
+    const left = f.prop2; for (let k = 0; k < 200; k++) stepFlight(f, i);
+    expect(f.prop2).toBeCloseTo(left, 3); expect(f.phase).not.toBe("failed");
+    i.restart = true; stepFlight(f, i); i.restart = false;
+    expect(f.engineOn).toBe(true); for (let k = 0; k < 100; k++) stepFlight(f, i);
+    expect(f.prop2).toBeLessThan(left);
+  });
+  it("a restart needs a previous cut, and after a manual cut the stage can be separated with fuel left", () => {
+    const { f, i } = toMiddleBurn();
+    i.restart = true; stepFlight(f, i); i.restart = false; expect(f.cuts2).toBe(0); // already burning: nothing to relight
+    i.cut = true; stepFlight(f, i); i.cut = false;
+    const manual = { ...i, autopilot: false }; f.rules = { ...f.rules, autoStaging: false } as typeof f.rules;
+    manual.stage = true; stepFlight(f, manual);
+    expect(f.stage).toBe(3);
+  });
+});

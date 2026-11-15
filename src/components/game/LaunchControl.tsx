@@ -158,8 +158,8 @@ function Briefing({ onStart }: { onStart: () => void }) {
 }
 
 /* ============================== flight ============================== */
-interface Snap { t: number; phase: Flight["phase"]; stage: 1 | 2 | 3; engineOn: boolean; tel: Flight["tel"]; pitch: number; throttle: number; cue: number; ms: Record<string, number>; log: Flight["log"]; failure: string | null; cutoffs: number; coastLeft: number; prop1: number; prop2: number; prop3: number; maxQ: number; maxG: number; warp: number; running: boolean; autopilot: boolean; upper: boolean; fairing: boolean }
-const snap = (s: LaunchSession): Snap => { const f = s.flight; return { t: f.t, phase: f.phase, stage: f.stage, engineOn: f.engineOn, tel: f.tel, pitch: f.pitch, throttle: f.throttle, cue: guidancePitch(f), ms: f.milestones, log: f.log, failure: f.failure, cutoffs: f.cutoffs, coastLeft: f.coastLeft, prop1: f.prop1, prop2: f.prop2, prop3: f.prop3, maxQ: f.maxQ, maxG: f.maxG, warp: s.warp, running: s.running, autopilot: s.input.autopilot, upper: s.input.upperGuidance, fairing: f.fairing }; };
+interface Snap { t: number; phase: Flight["phase"]; stage: 1 | 2 | 3; engineOn: boolean; tel: Flight["tel"]; pitch: number; throttle: number; cue: number; ms: Record<string, number>; log: Flight["log"]; failure: string | null; cutoffs: number; cuts2: number; coastLeft: number; prop1: number; prop2: number; prop3: number; maxQ: number; maxG: number; warp: number; running: boolean; autopilot: boolean; upper: boolean; fairing: boolean }
+const snap = (s: LaunchSession): Snap => { const f = s.flight; return { t: f.t, phase: f.phase, stage: f.stage, engineOn: f.engineOn, tel: f.tel, pitch: f.pitch, throttle: f.throttle, cue: guidancePitch(f), ms: f.milestones, log: f.log, failure: f.failure, cutoffs: f.cutoffs, cuts2: f.cuts2, coastLeft: f.coastLeft, prop1: f.prop1, prop2: f.prop2, prop3: f.prop3, maxQ: f.maxQ, maxG: f.maxG, warp: s.warp, running: s.running, autopilot: s.input.autopilot, upper: s.input.upperGuidance, fairing: f.fairing }; };
 const milestonesFor = (f: Flight): [string, string][] => {
   const n = f.rocket.stageNames, three = !!f.rocket.s3, moon = f.mission === "moon";
   return [
@@ -320,10 +320,11 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
 
   const qLim = LAUNCH.qDesignPa * rules.qLimitFactor, qFrac = tel.q / qLim;
   const upper = f.rocket.s3 ? 3 : 2, upperFuel = f.rocket.s3 ? s.prop3 : s.prop2;
-  const stageReady = !rules.autoStaging && ((s.stage === 1 && s.prop1 <= 0 && s.phase === "stage1") || (s.stage === 2 && !!f.rocket.s3 && s.prop2 <= 0 && s.phase === "stage2" && !s.engineOn) || s.phase === "coast");
-  const canCut = s.stage === upper && s.engineOn && !apActive && (s.phase === "stage2" || s.phase === "tli");
+  const stageReady = !rules.autoStaging && ((s.stage === 1 && s.prop1 <= 0 && s.phase === "stage1") || (s.stage === 2 && !!f.rocket.s3 && (s.prop2 <= 0 || s.cuts2 > 0) && s.phase === "stage2" && !s.engineOn) || s.phase === "coast");
+  const middle = s.stage === 2 && !!f.rocket.s3; // the 3-stage rocket's middle stage may also be cut and relit
+  const canCut = (s.stage === upper || middle) && s.engineOn && !apActive && (s.phase === "stage2" || s.phase === "tli");
   const autoTli = rules.autopilot === "full" && s.autopilot;
-  const canRestart = (s.stage === upper && !s.engineOn && upperFuel > 0 && s.cutoffs > 0 && s.cutoffs < 4 && s.phase === "stage2") || (s.phase === "parking" && !autoTli);
+  const canRestart = (s.stage === upper && !s.engineOn && upperFuel > 0 && s.cutoffs > 0 && s.cutoffs < 4 && s.phase === "stage2") || (middle && !s.engineOn && s.prop2 > 0 && s.cuts2 > 0 && s.cuts2 < 4 && s.phase === "stage2") || (s.phase === "parking" && !autoTli);
   const pitchErr = s.cue - s.pitch;
   const result = showResult ? scoreFlight(f) : null;
   const held = (key: "up" | "down") => ({ onPointerDown: () => session.hold(key, true), onPointerUp: () => session.hold(key, false), onPointerLeave: () => session.hold(key, false), onPointerCancel: () => session.hold(key, false) });
