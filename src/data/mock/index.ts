@@ -103,6 +103,7 @@ export const cosmetics: CosmeticItem[] = [
   { id: "pack-solar", name: "Solar Wings", category: "backpack", rarity: "epic", collection: "Orbit", color: "#4FC3F7", accent: "#FFC857", unlocked: false, unlockCondition: "Reach orbit 3 times", hardModeExclusive: false },
   { id: "patch-mission", name: "Mission Patch", category: "patch", rarity: "common", collection: "Starter", color: "#0B3D91", accent: "#FF8C42", unlocked: true, unlockCondition: "Default", hardModeExclusive: false },
   { id: "patch-nasa", name: "NASA Meatball", category: "patch", rarity: "rare", collection: "Space Agency", color: "#0B3D91", accent: "#FC3D21", unlocked: true, unlockCondition: "Starter", hardModeExclusive: false },
+  { id: "patch-msa", name: "MSA Logo", category: "patch", rarity: "rare", collection: "Flags", color: "#FFFFFF", accent: "#1B2B8F", unlocked: true, unlockCondition: "Starter", hardModeExclusive: false },
   { id: "patch-myanmar", name: "Myanmar Patch", category: "patch", rarity: "rare", collection: "Flags", color: "#34B232", accent: "#FECB00", unlocked: true, unlockCondition: "Starter", hardModeExclusive: false },
   { id: "patch-earth", name: "Earth Patch", category: "patch", rarity: "rare", collection: "Earth", color: "#168BFF", accent: "#36D399", unlocked: false, unlockCondition: "Complete Earth Observation", hardModeExclusive: false },
   { id: "pattern-stripes", name: "Racing Stripes", category: "pattern", rarity: "rare", collection: "Launch Day", color: "#FF8C42", accent: "#FF8C42", unlocked: true, unlockCondition: "Complete 2 missions", hardModeExclusive: false },
@@ -119,6 +120,7 @@ export const cosmetics: CosmeticItem[] = [
   { id: "boots-moon", name: "Moon Boots", category: "boots", rarity: "common", collection: "Moonwalk", color: "#E8EEF7", accent: "#FFC857", unlocked: true, unlockCondition: "Complete Lunar Landing", hardModeExclusive: false },
   { id: "boots-thruster", name: "Thruster Boots", category: "boots", rarity: "rare", collection: "Launch Day", color: "#4FC3F7", accent: "#FF8C42", unlocked: true, unlockCondition: "Reach level 10", hardModeExclusive: false },
   { id: "emote-wave", name: "Wave", category: "emote", rarity: "common", collection: "Starter", color: "#4FC3F7", accent: "#FFF", unlocked: true, unlockCondition: "Default", hardModeExclusive: false },
+  { id: "emote-float", name: "Float", category: "emote", rarity: "common", collection: "Orbit", color: "#7C3AED", accent: "#4FC3F7", unlocked: true, unlockCondition: "Complete 1 flight", hardModeExclusive: false },
   { id: "emote-cheer", name: "Cheer", category: "emote", rarity: "rare", collection: "Celebration", color: "#FFC857", accent: "#FF8C42", unlocked: false, unlockCondition: "Win 5 missions", hardModeExclusive: false },
 ];
 

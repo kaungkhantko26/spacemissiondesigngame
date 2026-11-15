@@ -20,14 +20,14 @@ export const UNLOCK_RULES: Record<Id, Rule> = {
   "suit-stealth": R("Reach orbit on Pilot or Commander", (p) => p.pilotWins >= 1), "suit-gold": R("Win a Commander flight", (p) => p.hardWins >= 1),
   "helmet-classic": R("Starter item", () => true), "helmet-lunar": R("Fly the Moon mission", (p) => p.moons >= 1), "helmet-neon": R("Win a Commander flight", (p) => p.hardWins >= 1),
   "pack-std": R("Starter item", () => true), "pack-telescope": R("Finish a Team Up mission", (p) => p.teamRuns >= 1),
-  "patch-mission": R("Starter item", () => true), "patch-nasa": R("Starter item", () => true), "patch-myanmar": R("Starter item", () => true),
+  "patch-mission": R("Starter item", () => true), "patch-nasa": R("Starter item", () => true), "patch-msa": R("Starter item", () => true), "patch-myanmar": R("Starter item", () => true),
   "pack-jet": R("Complete 5 flights", (p) => p.flights >= 5), "pack-solar": R("Reach orbit 3 times", (p) => p.orbits >= 3), "patch-earth": R("Reach orbit once", (p) => p.orbits >= 1),
   "pattern-stripes": R("Complete 2 flights", (p) => p.flights >= 2), "pattern-stars": R("Complete 3 flights", (p) => p.flights >= 3), "pattern-circuit": R("Reach level 20", (_, l) => l >= 20),
   "pattern-camo": R("Fly the Moon mission on Pilot or Commander", (p) => p.moonsPilot >= 1),
   "head-antenna": R("Starter item", () => true), "head-lamp": R("Fly the Moon mission", (p) => p.moons >= 1), "head-halo": R("Win 3 flights", (p) => p.wins >= 3), "head-crown": R("Win 2 Commander flights", (p) => p.hardWins >= 2),
   "shoulder-flag": R("Starter item", () => true), "shoulder-pads": R("Reach level 15", (_, l) => l >= 15), "shoulder-beacon": R("Earn an S grade", (p) => p.sGrades >= 1),
   "boots-moon": R("Fly the Moon mission", (p) => p.moons >= 1), "boots-thruster": R("Reach level 10", (_, l) => l >= 10),
-  "emote-wave": R("Starter item", () => true), "emote-cheer": R("Win 5 flights", (p) => p.wins >= 5),
+  "emote-wave": R("Starter item", () => true), "emote-float": R("Complete 1 flight", (p) => p.flights >= 1), "emote-cheer": R("Win 5 flights", (p) => p.wins >= 5),
 };
 export const isUnlocked = (id: Id, p: Progress, level: number) => (UNLOCK_RULES[id]?.test(p, level) ?? false);
 /** Items with their unlocked flag and unlock text taken from the rules above. */
