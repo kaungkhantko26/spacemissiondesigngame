@@ -299,14 +299,14 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   const held = (key: "up" | "down") => ({ onPointerDown: () => session.hold(key, true), onPointerUp: () => session.hold(key, false), onPointerLeave: () => session.hold(key, false), onPointerCancel: () => session.hold(key, false) });
   if (leg) return <MoonLeg flight={f} onAgain={onAgain} onExit={onExit} onResult={onLunarResult} />;
   return (
-    <main className="relative flex min-h-[calc(100vh-70px)] flex-1 flex-col">
+    <main className="relative flex h-[calc(100dvh-81px)] min-h-0 shrink-0 flex-col overflow-hidden">
       {school && <Tour steps={MANUAL_TOUR.filter((st) => st.target !== "[data-tour=cue]" || rules.guideCue)} doneLabel="Start flying" onDone={() => { setSchool(false); try { window.localStorage.setItem("smd-manual-school", "1"); } catch { /* ignore */ } }} onSkip={() => { setSchool(false); try { window.localStorage.setItem("smd-manual-school", "1"); } catch { /* ignore */ } }} />}
       {help && <ControlsHelp onClose={() => setHelp(false)} />}
       {tour && <Tour steps={FLIGHT_TOUR} doneLabel="Let's fly" onDone={() => { setTour(false); setPendingTour(null); }} onSkip={() => { setTour(false); setPendingTour(null); }} />}
       <div ref={wrap} className="absolute inset-0"><canvas ref={canvas} className="h-full w-full" aria-label="Rocket flight view" role="img" /></div>
 
       {/* telemetry */}
-      <dl className="relative z-10 m-2 max-h-[46vh] w-52 space-y-1.5 overflow-y-auto max-sm:w-[46vw] max-sm:text-xs sm:m-3 rounded-md border border-[var(--border)] bg-bg/80 p-3 font-display text-sm tracking-wider" aria-label="Flight telemetry" data-tour="telemetry">
+      <dl className="relative z-10 m-2 max-h-[40%] w-52 shrink-0 space-y-1.5 overflow-y-auto max-sm:w-[46vw] max-sm:text-xs sm:m-3 rounded-md border border-[var(--border)] bg-bg/80 p-3 font-display text-sm tracking-wider" aria-label="Flight telemetry" data-tour="telemetry">
         <div><dt className="hud-label">Mission clock</dt><dd className="text-xl tabular-nums text-orange">{clock(s.t)}</dd></div>
         <div className="grid grid-cols-2 gap-x-2">
           <div><dt className="hud-label">Altitude</dt><dd className="tabular-nums">{tel.alt >= 100_000 ? fmt(tel.alt / 1000, 1) + " km" : tel.alt >= 1000 ? fmt(tel.alt / 1000, 2) + " km" : fmt(tel.alt) + " m"}</dd></div>
@@ -332,7 +332,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
       </dl>
 
       {/* milestones */}
-      <ol className="absolute right-2 top-2 z-10 max-h-[46vh] w-64 space-y-1 overflow-y-auto max-sm:w-[44vw] max-sm:text-xs sm:right-3 sm:top-3 rounded-md border border-[var(--border)] bg-bg/80 p-3 text-sm" data-tour="milestones" aria-label="Mission milestones">
+      <ol className="absolute right-2 top-2 z-10 max-h-[40%] w-64 space-y-1 overflow-y-auto max-sm:w-[44vw] max-sm:text-xs sm:right-3 sm:top-3 rounded-md border border-[var(--border)] bg-bg/80 p-3 text-sm" data-tour="milestones" aria-label="Mission milestones">
         {milestonesFor(f).map(([key, label]) => (
           <li key={key} className={cn("flex items-center gap-2", s.ms[key] !== undefined ? "text-ok" : "text-muted")}>
             <span aria-hidden className="grid size-4 place-items-center rounded-sm border text-[10px]">{s.ms[key] !== undefined ? "✓" : ""}</span>{label}
@@ -343,17 +343,17 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
 
       {/* pad overlay */}
       {!s.running && s.t <= -LAUNCH.countdownS + 0.01 && s.phase === "countdown" && (
-        <div data-tour="pad" className="relative z-10 mx-auto mt-24 max-h-[50vh] max-w-md overflow-y-auto rounded-lg max-sm:mt-4 border border-[var(--border-strong)] bg-bg/85 p-5 text-center">
+        <div data-tour="pad" className="absolute left-1/2 top-[16%] z-20 max-h-[66%] w-[min(28rem,calc(100%-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-lg border border-[var(--border-strong)] bg-bg/90 p-4 text-center sm:p-5">
           <p className="hud-label !text-orange">{f.rocket.name} on the pad · {f.site.location.split(",")[0]}</p>
           <h2 className="mt-1 text-3xl font-bold">All systems go?</h2>
           <p className="mt-2 text-sm text-ink2">{rules.name}: {rules.tagline}. {f.mission === "moon" ? `Mission: parking orbit above ${rules.minPerigeeKm} km, then translunar injection to the Moon.` : `Orbit: lowest point above ${rules.minPerigeeKm} km.`}</p>
           <div className="mt-4 flex justify-center gap-2"><GameButton variant="primary" icon={<Rocket className="size-5" />} onClick={start}>Start countdown</GameButton><GameButton variant="ghost" onClick={onExit}>Back to briefing</GameButton></div>
         </div>
       )}
-      {s.phase === "countdown" && s.running && s.t < 0 && <p className="pointer-events-none relative z-10 mt-20 text-center font-display text-8xl font-bold text-orange tabular-nums drop-shadow-lg" aria-live="assertive">{Math.ceil(-s.t) > 0 ? Math.ceil(-s.t) : ""}</p>}
+      {s.phase === "countdown" && s.running && s.t < 0 && <p className="pointer-events-none absolute inset-x-0 top-[22%] z-10 text-center font-display text-[clamp(3rem,16vh,6rem)] font-bold text-orange tabular-nums drop-shadow-lg" aria-live="assertive">{Math.ceil(-s.t) > 0 ? Math.ceil(-s.t) : ""}</p>}
 
       {/* log + controls */}
-      <div className="relative z-10 mt-auto flex flex-col gap-2 p-3">
+      <div className="relative z-10 mt-auto flex max-h-[62%] shrink-0 flex-col gap-2 overflow-y-auto p-3">
         <ul className="pointer-events-none max-w-xl space-y-0.5 text-sm" aria-live="polite">
           {s.log.slice(-3).map((l, i) => <li key={`${l.t}-${i}`} className={cn("rounded-sm bg-bg/70 px-2 py-0.5", l.tone === "good" ? "text-ok" : l.tone === "bad" ? "text-bad" : l.tone === "warn" ? "text-warn" : "text-ink2")}><span className="mr-2 text-muted tabular-nums">{clock(l.t)}</span>{l.text}</li>)}
         </ul>
