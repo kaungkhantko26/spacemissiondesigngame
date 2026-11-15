@@ -193,3 +193,4 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 - Captions for voice lines (Settings switch), About and glossary page, validation tests + docs/validation.md.
 - Removed the "Your mission" card from the menu (user request); menu back to two columns.
 - Customisation: MSA logo (user-supplied) as a flag and chest patch; patch cards show the real emblem (PatchView/drawPatch), 3-D patch larger and moved off the chest box; emotes now play real clips (src/game/emotes.ts: wave, cheer = moon walk, new Float) on the cosmetics preview, profile preview and menu.
+- Patch fix: the chest patch and back-pack add-ons now follow the bone rotation (relative to the first frame) so they no longer sink into the suit during animations; patch radius 0.1.

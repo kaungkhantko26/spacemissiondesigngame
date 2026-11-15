@@ -3,7 +3,7 @@ import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Stars, useAnimations, useGLTF, useTexture } from "@react-three/drei";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { AdditiveBlending, CanvasTexture, SRGBColorSpace, Vector3, type Group, type Mesh, type MeshStandardMaterial, type Object3D } from "three";
+import { AdditiveBlending, CanvasTexture, Quaternion, SRGBColorSpace, Vector3, type Group, type Mesh, type MeshStandardMaterial, type Object3D } from "three";
 import { BackpackGear, BootGear, Headgear, PatchGear, ShoulderGear, patternTexture } from "./Gear";
 import { useUIStore } from "@/stores";
 import { asset } from "@/lib/asset";
@@ -129,12 +129,19 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
   }, [model]);
   const headG = useRef<Group>(null), lShG = useRef<Group>(null), rShG = useRef<Group>(null), lFootG = useRef<Group>(null), rFootG = useRef<Group>(null), packG = useRef<Group>(null), chestG = useRef<Group>(null);
   const tmp = useMemo(() => new Vector3(), []);
+  // Chest patch and back-pack add-ons also follow the bone's ROTATION (relative to the first frame), so a leaning or turning torso carries them along instead of swallowing them.
+  const tracks = useMemo(() => ({ q0: new Map<string, Quaternion>(), q: new Quaternion(), rq: new Quaternion() }), []);
   useFrame(() => {
     const r = root.current; if (!r) return;
     const pairs: [string, Group | null][] = [["head", headG.current], ["lSh", lShG.current], ["rSh", rShG.current], ["lFoot", lFootG.current], ["rFoot", rFootG.current], ["pack", packG.current], ["chest", chestG.current]];
     for (const [key, g] of pairs) {
       const b = bones[key]; if (!b || !g) continue;
       b.getWorldPosition(tmp); r.worldToLocal(tmp); g.position.copy(tmp);
+      if (key === "chest" || key === "pack") {
+        b.getWorldQuaternion(tracks.q); r.getWorldQuaternion(tracks.rq).invert(); tracks.q.premultiply(tracks.rq);
+        const q0 = tracks.q0.get(key) ?? tracks.q0.set(key, tracks.q.clone()).get(key)!;
+        g.quaternion.copy(tracks.q).multiply(q0.clone().invert());
+      }
     }
   });
 
@@ -152,7 +159,7 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
       {headgear && <group ref={headG}><Headgear kind={headgear} color={headgearColor ?? "#ffc857"} /></group>}
       {shoulder && <><group ref={lShG}><ShoulderGear kind={shoulder} color={shoulderColor ?? "#9fb3c8"} side={1} /></group><group ref={rShG}><ShoulderGear kind={shoulder} color={shoulderColor ?? "#9fb3c8"} side={-1} /></group></>}
       {packKind && packKind !== "pack-std" && <group ref={packG}><BackpackGear kind={packKind} color={pack ?? "#9fb3c8"} accent={packAccent ?? "#ffc857"} /></group>}
-      {patchKind && <group ref={chestG}><group position={[0.2, 0.1, 0.205]} rotation={[0, 0.25, 0]}><PatchGear kind={patchKind} color={patchColor ?? "#0b3d91"} accent={patchAccent ?? "#ff8c42"} /></group></group>}
+      {patchKind && <group ref={chestG}><group position={[0.18, 0.06, 0.21]} rotation={[0, 0.2, 0]}><PatchGear kind={patchKind} color={patchColor ?? "#0b3d91"} accent={patchAccent ?? "#ff8c42"} /></group></group>}
       {boots && <><group ref={lFootG}><BootGear kind={boots} color={bootsColor ?? "#4fc3f7"} /></group><group ref={rFootG}><BootGear kind={boots} color={bootsColor ?? "#4fc3f7"} /></group></>}
     </group>
   );

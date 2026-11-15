@@ -65,7 +65,7 @@ export function PatchGear({ kind, color, accent }: { kind: string; color: string
   const custom = useFlag((s) => s.custom);
   const [cloth] = useState(() => new Cloth(256, 256));
   cloth.patch(kind, color, accent, custom);
-  return <mesh position={[0, 0, 0]}><circleGeometry args={[0.15, 48]} /><meshStandardMaterial map={cloth.tex} roughness={0.7} emissive="#ffffff" emissiveMap={cloth.tex} emissiveIntensity={0.3} /></mesh>;
+  return <mesh position={[0, 0, 0]}><circleGeometry args={[0.1, 48]} /><meshStandardMaterial map={cloth.tex} roughness={0.7} emissive="#ffffff" emissiveMap={cloth.tex} emissiveIntensity={0.3} /></mesh>;
 }
 /** Back-mounted add-on modules (the suit's own life-support pack is part of the model). Origin = the pack bone, +z toward the viewer. */
 export function BackpackGear({ kind, color, accent }: { kind: string; color: string; accent: string }) {
