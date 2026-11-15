@@ -131,16 +131,7 @@ export function drawFlight(ctx: CanvasRenderingContext2D, W: number, H: number, 
 
   // ---- launch complex, tower, smoke
   drawComplex(ctx, scene, pad.angle, padX, padY, b);
-  if (k * 120 > 5) {
-    ctx.save(); ctx.translate(padX, padY); ctx.rotate(pad.angle);
-    const u = k; ctx.fillStyle = "#5b6574"; ctx.fillRect(-60 * u, 0, 120 * u, 5 * u);
-    ctx.fillStyle = "#3a4250"; ctx.fillRect(-14 * u, 0, 28 * u, 3 * u);
-    ctx.fillStyle = "#8c97a8"; ctx.fillRect(-26 * u, -78 * u, 5 * u, 78 * u); ctx.fillRect(-26 * u, -78 * u, 12 * u, 1.6 * u);
-    ctx.strokeStyle = "#8c97a8"; ctx.lineWidth = Math.max(1, 1.2 * u);
-    for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(-26 * u, -i * 13 * u); ctx.lineTo(-18 * u, -(i + 1) * 13 * u); ctx.stroke(); }
-    ctx.fillStyle = "#c8553d"; ctx.fillRect(-32 * u, -78 * u, 16 * u, 3 * u);
-    ctx.restore();
-  } else if (alt < 30_000) { ctx.fillStyle = "#ffd27a"; ctx.beginPath(); ctx.arc(padX, padY, 3, 0, 7); ctx.fill(); }
+  if (k * 120 <= 5 && alt < 30_000) { ctx.fillStyle = "#ffd27a"; ctx.beginPath(); ctx.arc(padX, padY, 3, 0, 7); ctx.fill(); }
   drawSmoke(ctx, scene, v.smoke, pad.angle, padX, padY);
   if (f.engineOn && alt < 350 && f.tel.thrust > 0 || (f.phase === "countdown" && f.engineOn)) { // ground glare under the engines
     const gl = ctx.createRadialGradient(padX, padY - 4 * k, 0, padX, padY - 4 * k, 90 * k * (1 - Math.min(1, alt / 450) * 0.7));

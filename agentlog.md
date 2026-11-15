@@ -1,4 +1,10 @@
 # Agent Log
+## Session 6 — Real site references for launch scenery
+- Replaced the shared generic launch campus with five pad-specific silhouettes and a cleared hardstand: LC-39A raised pad/crawler ramp, Vandenberg transporter erector, ELA-2 rail/mobile service tower, Sriharikota rail/mobile service tower, and Baikonur support arms/rail.
+- Corrected immediate terrain cues (flat Kennedy marsh, distant Kourou coast, sparse Baikonur steppe) and removed the duplicate tower from `launchDraw.ts`.
+- Sources and schematic limitations recorded in `docs/spaceport-reference.md`.
+- Verified: TypeScript typecheck and targeted ESLint pass. `npm ci` is blocked by a pre-existing lockfile mismatch; installed dependencies without rewriting the lockfile for these checks.
+
 ## Session 5 — Spaceport environment design refresh
 - Reworked the pad-local launch complex in `launchScenery.ts` into a more detailed mission campus: integration hall with windows/ribs, braced service tower and crew arms, banded cryogenic tanks and pipes, support buildings, beacons, safety perimeter, apron and branching access roads.
 - Kept the existing site-specific terrain, coastlines, vegetation, cloud layers and canvas rendering path; additions fade with the existing zoom/alpha behavior and remain within the same canvas.
