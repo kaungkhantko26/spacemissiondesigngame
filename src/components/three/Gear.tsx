@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { CanvasTexture, SRGBColorSpace } from "three";
-import { drawFlag, useFlag, type CustomFlag } from "@/game/flags";
+import { drawFlag, drawPatch, useFlag, type CustomFlag } from "@/game/flags";
 
 /** Cosmetic gear: procedural accessories + suit-pattern textures (no extra model files). All positions are bone-relative. */
 
@@ -49,17 +49,7 @@ class Cloth {
   }
   patch(kind: string, color: string, accent: string, custom: CustomFlag) {
     const c = this.canvas, ctx = c?.getContext("2d"); if (!c || !ctx || !this.tex) return;
-    const R = c.width / 2;
-    const draw = () => {
-      ctx.clearRect(0, 0, c.width, c.height); ctx.save(); ctx.beginPath(); ctx.arc(R, R, R - 4, 0, 7); ctx.clip();
-      if (kind === "patch-nasa") drawFlag(ctx, c.width, c.height, "nasa", custom, draw);
-      else if (kind === "patch-myanmar") drawFlag(ctx, c.width, c.height, "myanmar", custom, draw);
-      else { ctx.fillStyle = color; ctx.fillRect(0, 0, c.width, c.height); ctx.fillStyle = accent; ctx.beginPath();
-        if (kind === "patch-earth") { ctx.arc(R, R, R * 0.5, 0, 7); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = R * 0.07; ctx.beginPath(); ctx.ellipse(R, R, R * 0.5, R * 0.2, 0, 0, 7); ctx.stroke(); }
-        else for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? R * 0.22 : R * 0.55; ctx[i ? "lineTo" : "moveTo"](R + rr * Math.cos(a), R + rr * Math.sin(a)); } ctx.fill(); }
-      ctx.restore(); ctx.lineWidth = R * 0.1; ctx.strokeStyle = accent; ctx.beginPath(); ctx.arc(R, R, R - 6, 0, 7); ctx.stroke();
-      if (this.tex) this.tex.needsUpdate = true;
-    };
+    const draw = () => { drawPatch(ctx, c.width, kind, color, accent, custom, draw); if (this.tex) this.tex.needsUpdate = true; };
     draw();
   }
 }
@@ -75,7 +65,7 @@ export function PatchGear({ kind, color, accent }: { kind: string; color: string
   const custom = useFlag((s) => s.custom);
   const [cloth] = useState(() => new Cloth(256, 256));
   cloth.patch(kind, color, accent, custom);
-  return <mesh position={[0, 0, 0]}><circleGeometry args={[0.115, 40]} /><meshStandardMaterial map={cloth.tex} roughness={0.7} emissive="#ffffff" emissiveMap={cloth.tex} emissiveIntensity={0.3} /></mesh>;
+  return <mesh position={[0, 0, 0]}><circleGeometry args={[0.15, 48]} /><meshStandardMaterial map={cloth.tex} roughness={0.7} emissive="#ffffff" emissiveMap={cloth.tex} emissiveIntensity={0.3} /></mesh>;
 }
 /** Back-mounted add-on modules (the suit's own life-support pack is part of the model). Origin = the pack bone, +z toward the viewer. */
 export function BackpackGear({ kind, color, accent }: { kind: string; color: string; accent: string }) {

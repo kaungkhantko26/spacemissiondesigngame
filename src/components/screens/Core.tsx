@@ -10,6 +10,9 @@ import {
 } from "@/components/ui";
 import { Astronaut, Scene3D, PlanetModel } from "@/components/three/lazy";
 import { IdBadge } from "./IdBadge";
+import { EMOTES, emotePose } from "@/game/emotes";
+import { PatchView } from "@/components/ui/PatchView";
+import { FlagView } from "@/components/ui/FlagView";
 import { useCaptions } from "@/lib/captions";
 import { AvatarEditor } from "./AvatarEditor";
 import { FlagEditor } from "./FlagEditor";
@@ -147,8 +150,7 @@ export function MenuScreen() {
   const profile = usePlayerStore((s) => s.profile);
   const router = useRouter();
   const look = useLook();
-  const items = useItems(), emote = usePlayerStore((s) => s.profile.equipped.emote);
-  const home: Pose = emote === "emote-cheer" && items.find((c) => c.id === emote)?.unlocked ? "celebrate" : "wave"; // the equipped emote is the astronaut's resting pose
+  const home: Pose = look.pose ?? "wave"; // the equipped emote is the astronaut's resting pose
   const [hover, setPose] = useState<Pose | null>(null);
   const pose: Pose = hover ?? home;
   const [more, setMore] = useState(false);
@@ -212,9 +214,11 @@ export function useLook() {
     const eq = { ...profile.equipped };
     const p = byId(previewId);
     if (p) eq[p.category] = p.id;
+    const em = byId(eq.emote), emoteOk = em && (em.unlocked || p?.id === em.id);
     const suit = byId(eq.suit), helmet = byId(eq.helmet), pack = byId(eq.backpack), patch = byId(eq.patch);
     const pat = byId(eq.pattern), head = byId(eq.headgear), sh = byId(eq.shoulder), bt = byId(eq.boots);
     return {
+      pose: (emoteOk ? emotePose(em!.id) : null) ?? undefined,
       suit: suit?.color ?? "#e8eef7", accent: suit?.accent ?? "#168bff", helmet: helmet?.color ?? "#4fc3f7", pack: pack?.color ?? "#9fb3c8", packKind: pack?.id, packAccent: pack?.accent, patchKind: patch?.id, patchColor: patch?.color, patchAccent: patch?.accent,
       pattern: pat?.id, patternColor: pat?.color, headgear: head?.id, headgearColor: head?.color,
       shoulder: sh?.id, shoulderColor: sh?.color, boots: bt?.id, bootsColor: bt?.color,
@@ -317,8 +321,7 @@ export function CosmeticsScreen() {
   const list = items.filter((c) => c.category === category);
   const sel: CosmeticItem | undefined = items.find((c) => c.id === previewId);
   const equipped = sel && profile.equipped[sel.category] === sel.id;
-  const emoteId = sel?.category === "emote" ? sel.id : profile.equipped.emote;
-  const showPose: "idle" | "celebrate" = emoteId === "emote-cheer" && items.find((c) => c.id === emoteId)?.unlocked ? "celebrate" : "idle";
+  const showPose = look.pose ?? "idle";
   const have = items.filter((c) => c.unlocked).length;
   return (
     <ScreenContainer title="Cosmetics" subtitle={`Visual only — cosmetics never change gameplay. Unlock them by flying: ${have} of ${items.length} earned.`} actions={<BackButton href="/menu" label="Main menu" />}>
@@ -341,8 +344,9 @@ export function CosmeticsScreen() {
                 <li key={c.id} className="enter lift" style={{ animationDelay: `${i * 50}ms` }}>
                   <button onClick={() => preview(c.id)} aria-pressed={previewId === c.id}
                     className={cn("w-full rounded-lg border bg-panel p-3 text-left transition", previewId === c.id ? "border-orange" : "border-white/10 hover:border-cyan/50")}>
-                    <div className="mb-2 grid h-20 place-items-center rounded-lg" style={{ background: `linear-gradient(135deg, ${c.color}, ${c.accent})` }}>
-                      {!c.unlocked && <Lock className="size-6 text-white/90" aria-label="Locked" />}
+                    <div className="relative mb-2 grid h-20 place-items-center rounded-lg" style={{ background: c.category === "patch" || c.category === "emote" ? "rgba(255,255,255,.06)" : `linear-gradient(135deg, ${c.color}, ${c.accent})` }}>
+                      {c.category === "patch" ? <PatchView kind={c.id} color={c.color} accent={c.accent} size={68} label={c.name} /> : c.category === "emote" ? <span aria-hidden className="text-4xl">{EMOTES[c.id]?.icon ?? "🙂"}</span> : null}
+                      {!c.unlocked && <span className="absolute inset-0 grid place-items-center rounded-lg bg-black/45"><Lock className="size-6 text-white/90" aria-label="Locked" /></span>}
                     </div>
                     <p className="font-semibold">{c.name}</p>
                     <p className="text-xs text-muted capitalize">{c.category} · {c.collection}</p>

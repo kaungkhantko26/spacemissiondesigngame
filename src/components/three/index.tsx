@@ -152,7 +152,7 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
       {headgear && <group ref={headG}><Headgear kind={headgear} color={headgearColor ?? "#ffc857"} /></group>}
       {shoulder && <><group ref={lShG}><ShoulderGear kind={shoulder} color={shoulderColor ?? "#9fb3c8"} side={1} /></group><group ref={rShG}><ShoulderGear kind={shoulder} color={shoulderColor ?? "#9fb3c8"} side={-1} /></group></>}
       {packKind && packKind !== "pack-std" && <group ref={packG}><BackpackGear kind={packKind} color={pack ?? "#9fb3c8"} accent={packAccent ?? "#ffc857"} /></group>}
-      {patchKind && <group ref={chestG}><group position={[0.13, 0.03, 0.19]}><PatchGear kind={patchKind} color={patchColor ?? "#0b3d91"} accent={patchAccent ?? "#ff8c42"} /></group></group>}
+      {patchKind && <group ref={chestG}><group position={[0.2, 0.1, 0.205]} rotation={[0, 0.25, 0]}><PatchGear kind={patchKind} color={patchColor ?? "#0b3d91"} accent={patchAccent ?? "#ff8c42"} /></group></group>}
       {boots && <><group ref={lFootG}><BootGear kind={boots} color={bootsColor ?? "#4fc3f7"} /></group><group ref={rFootG}><BootGear kind={boots} color={bootsColor ?? "#4fc3f7"} /></group></>}
     </group>
   );
