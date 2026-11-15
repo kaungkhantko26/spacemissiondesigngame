@@ -38,12 +38,16 @@ export function updateView(v: SceneView, f: Flight, dtReal: number, reduced: boo
       tLogE = Math.log(rApo * 0.62); cx = Math.cos(a) * rApo * 0.5; cy = Math.sin(a) * rApo * 0.5;
     }
   }
+  let lock = 0; // how tightly the camera is glued to the rocket (1 = no lag), so a close-up never drifts away at orbital speed
   if (v.zoom > 0) { // the player closes in on the rocket (only once the view has left the pad; fades in with the orbit view)
-    const zz = v.zoom * smooth(s * 2.5);
+    const zz = v.zoom * smooth(s * 2.5); lock = zz;
     if (zz > 0) { tLogE = lerp(tLogE, Math.log(Math.max(350_000, alt * 2.2)), zz); cx = lerp(cx, f.x, zz); cy = lerp(cy, f.y, zz); }
   }
   const k = 1 - Math.exp(-dtReal * (onPad ? 3 : 2.8));
-  v.cx += (cx + v.panX - v.cx) * k; v.cy += (cy + v.panY - v.cy) * k; v.logE += (tLogE - v.logE) * k;
+  const lim = Math.exp(v.logE) * 1.1, pm = Math.hypot(v.panX, v.panY); // pan limit: the view can be nudged about one screen away, never off into empty space
+  if (pm > lim) { v.panX *= lim / pm; v.panY *= lim / pm; }
+  const kc = k + (1 - k) * lock;
+  v.cx += (cx + v.panX - v.cx) * kc; v.cy += (cy + v.panY - v.cy) * kc; v.logE += (tLogE - v.logE) * k;
   const thrusting = f.engineOn && f.tel.thrust > 0;
   v.shake = reduced ? 0 : thrusting && alt < 8000 ? Math.min(1, (f.tel.thrust / (f.rocket.s1.thrustSlN || 1)) * (1 - alt / 8000)) * 2.2 : 0;
   v.flicker = reduced ? 0.5 : Math.random();
