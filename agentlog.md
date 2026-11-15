@@ -1,4 +1,9 @@
 # Agent Log
+## Session 7 — Ground shading and published launch environments
+- Added deterministic multiscale terrain textures, depth shading and a textured paved compound to every spaceport scene. These sit under the existing site-specific terrain colors, coast, vegetation and pad structures.
+- The textures are generated once per biome in the browser, then reused each frame; no new remote imagery requests or extra WebGL canvases.
+- Verified: TypeScript typecheck and targeted ESLint pass.
+
 ## Session 6 — Real site references for launch scenery
 - Replaced the shared generic launch campus with five pad-specific silhouettes and a cleared hardstand: LC-39A raised pad/crawler ramp, Vandenberg transporter erector, ELA-2 rail/mobile service tower, Sriharikota rail/mobile service tower, and Baikonur support arms/rail.
 - Corrected immediate terrain cues (flat Kennedy marsh, distant Kourou coast, sparse Baikonur steppe) and removed the duplicate tower from `launchDraw.ts`.

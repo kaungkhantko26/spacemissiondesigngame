@@ -26,6 +26,32 @@ const smooth = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t 
 export const hash = (n: number) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const noise = (x: number, seed: number) => (Math.sin(x + seed) * 0.5 + Math.sin(x * 2.37 + seed * 1.7) * 0.3 + Math.sin(x * 5.11 + seed * 0.6) * 0.2 + 1) / 2;
 const SPACE: RGB = [3, 6, 16];
+const terrainTiles = new Map<string, HTMLCanvasElement>();
+function terrainTile(b: Biome): HTMLCanvasElement {
+  const cached = terrainTiles.get(b.id);
+  if (cached) return cached;
+  const tile = document.createElement("canvas"); tile.width = tile.height = 256;
+  const context = tile.getContext("2d");
+  if (!context) return tile;
+  const image = context.createImageData(256, 256);
+  const seed = b.id.length * 19;
+  const field = (x: number, y: number, scale: number) => {
+    const fx = x / scale, fy = y / scale, ix = Math.floor(fx), iy = Math.floor(fy);
+    const tx = smooth(fx - ix), ty = smooth(fy - iy);
+    const at = (dx: number, dy: number) => hash((ix + dx) * 17.13 + (iy + dy) * 91.71 + seed);
+    return (at(0, 0) * (1 - tx) + at(1, 0) * tx) * (1 - ty) + (at(0, 1) * (1 - tx) + at(1, 1) * tx) * ty;
+  };
+  for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
+    const n = field(x, y, 70) * 0.55 + field(x, y, 22) * 0.3 + field(x, y, 5) * 0.15;
+    const dry = b.id === "baikonur" || b.id === "vandenberg" || b.id === "sriharikota";
+    const base = mix(b.land[1], b.land[0], Math.max(0, Math.min(1, n * 1.7 - 0.35)));
+    const grain = (hash(x * 8.21 + y * 33.7 + seed) - 0.5) * (dry ? 27 : 17);
+    const i = (y * 256 + x) * 4;
+    for (let ch = 0; ch < 3; ch++) image.data[i + ch] = Math.max(0, Math.min(255, base[ch] + grain));
+    image.data[i + 3] = 255;
+  }
+  context.putImageData(image, 0, 0); terrainTiles.set(b.id, tile); return tile;
+}
 
 /** Sky colour at height h (m) above the local ground: pale horizon → deep zenith → black above ~100 km. */
 export function skyAt(h: number, b: Biome): RGB {
@@ -78,6 +104,28 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, s: Scene, b: Biome, a
   const land = ctx.createLinearGradient(0, gy, 0, H);
   land.addColorStop(0, rgb(mix(b.land[0], b.horizon, b.haze * 0.7), s.alpha)); land.addColorStop(0.25, rgb(b.land[0], s.alpha)); land.addColorStop(1, rgb(b.land[1], s.alpha));
   ctx.fillStyle = land; ctx.fillRect(0, gy, W, below);
+  // Site-coloured multiscale ground texture breaks up the solid gradient while remaining stable during flight.
+  const pattern = ctx.createPattern(terrainTile(b), "repeat");
+  if (pattern) { ctx.save(); ctx.globalAlpha = s.alpha * 0.72; ctx.fillStyle = pattern; ctx.fillRect(0, gy, W, below); ctx.restore(); }
+  const shade = ctx.createLinearGradient(0, gy, 0, H);
+  shade.addColorStop(0, "rgba(255,247,215,.10)"); shade.addColorStop(0.52, "rgba(0,0,0,.04)"); shade.addColorStop(1, "rgba(12,19,20,.28)");
+  ctx.fillStyle = shade; ctx.fillRect(0, gy, W, below);
+  // Broad landforms visible around each complex, with depth-scaled shadows instead of uniform grass.
+  const features: Record<string, { light: string; dark: string; count: number }> = {
+    kennedy: { light: "#b5ad83", dark: "#456961", count: 75 },
+    vandenberg: { light: "#c3a77a", dark: "#5d5746", count: 100 },
+    kourou: { light: "#8a9e66", dark: "#244d37", count: 125 },
+    sriharikota: { light: "#dac493", dark: "#728e78", count: 85 },
+    baikonur: { light: "#c9b47f", dark: "#776e53", count: 95 },
+  };
+  const feature = features[b.id];
+  if (feature) for (let i = 0; i < feature.count; i++) {
+    const y = gy + below * Math.pow(hash(i * 12.7 + 4), 1.4);
+    const depth = (y - gy) / below, x = hash(i * 35.9 + 8) * W;
+    const radius = (9 + hash(i * 17.3 + 10) * 55) * (0.25 + depth * 1.8);
+    ctx.fillStyle = rgb(c(i % 3 === 0 ? feature.light : feature.dark), s.alpha * (0.05 + depth * 0.09));
+    ctx.beginPath(); ctx.ellipse(x, y, radius * (1.3 + hash(i + 5)), Math.max(1, radius * 0.19), -0.1, 0, 7); ctx.fill();
+  }
   // sea
   if (b.sea) {
     const side = b.sea.side, shoreX = s.anchorX + side * b.sea.shoreM * k;
@@ -105,6 +153,11 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, s: Scene, b: Biome, a
   ctx.fillStyle = apron; ctx.beginPath();
   ctx.moveTo(s.anchorX - 235 * k, gy); ctx.lineTo(s.anchorX + 235 * k, gy);
   ctx.lineTo(s.anchorX + 390 * k, H); ctx.lineTo(s.anchorX - 390 * k, H); ctx.closePath(); ctx.fill();
+  ctx.save(); ctx.clip();
+  if (pattern) { ctx.globalAlpha = s.alpha * 0.26; ctx.fillStyle = pattern; ctx.fillRect(0, gy, W, below); ctx.globalAlpha = 1; }
+  ctx.strokeStyle = `rgba(45,50,48,${0.11 * s.alpha})`; ctx.lineWidth = 1;
+  for (let t = 0.12; t < 1; t += 0.18) { const y = gy + below * t; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  ctx.restore();
   ctx.strokeStyle = `rgba(230,225,205,${0.22 * s.alpha})`; ctx.lineWidth = Math.max(1, k);
   for (const side of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s.anchorX + side * 235 * k, gy); ctx.lineTo(s.anchorX + side * 390 * k, H); ctx.stroke(); }
   // vegetation / dunes on the land side, drawn in perspective rows (nearer rows are bigger and slide faster)
