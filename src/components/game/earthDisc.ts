@@ -13,14 +13,14 @@ let texPromise: Promise<{ earth: ImageData; cloud: ImageData }> | null = null;
 const textures = () => (texPromise ??= Promise.all([load(asset("/textures/earth.jpg")), load(asset("/textures/earth_clouds.png"))]).then(([e, c]) => ({ earth: pixels(e), cloud: pixels(c) })));
 
 const cache = new Map<string, HTMLCanvasElement>();
-export async function buildEarthDisc(latDeg: number, lonDeg: number, size = 640): Promise<HTMLCanvasElement | null> {
-  const key = `${latDeg.toFixed(1)},${lonDeg.toFixed(1)},${size}`;
+export async function buildEarthDisc(latDeg: number, lonDeg: number, size = 640, centerLatDeg?: number): Promise<HTMLCanvasElement | null> {
+  const key = `${(centerLatDeg ?? latDeg).toFixed(1)},${lonDeg.toFixed(1)},${size}`;
   if (cache.has(key)) return cache.get(key)!;
   try {
     const { earth, cloud } = await textures();
     const out = document.createElement("canvas"); out.width = out.height = size;
     const ctx = out.getContext("2d")!, img = ctx.createImageData(size, size);
-    const phi0 = ((Math.abs(latDeg) - 90) * Math.PI) / 180 * Math.sign(latDeg || 1), lam0 = (lonDeg * Math.PI) / 180;
+    const phi0 = centerLatDeg === undefined ? ((Math.abs(latDeg) - 90) * Math.PI) / 180 * Math.sign(latDeg || 1) : centerLatDeg * Math.PI / 180, lam0 = lonDeg * Math.PI / 180;
     const sp0 = Math.sin(phi0), cp0 = Math.cos(phi0), R = size / 2;
     for (let py = 0; py < size; py++) {
       for (let px = 0; px < size; px++) {
@@ -39,6 +39,7 @@ export async function buildEarthDisc(latDeg: number, lonDeg: number, size = 640)
       }
     }
     ctx.putImageData(img, 0, 0);
+    if (cache.size >= 8) cache.delete(cache.keys().next().value!);
     cache.set(key, out);
     return out;
   } catch { return null; }
