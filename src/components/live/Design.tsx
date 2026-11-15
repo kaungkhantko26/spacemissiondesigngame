@@ -7,6 +7,7 @@ import { GameButton, GlassPanel, StatusPill } from "@/components/ui";
 import { GameChip, Pick, Section, Slider } from "@/components/game/DesignStudio";
 import { GAME, destinationById, launchReliability } from "@/game/data";
 import { planTransfer } from "@/game/physics";
+import { suitability } from "@/game/instruments";
 import { cn } from "@/lib/mission";
 import { mmss, secondsLeft } from "@/live/format";
 import type { CheckStatus, DesignPatch, RoleId } from "@/live/types";
@@ -147,7 +148,7 @@ export function Design() {
                 <li key={i.id}><Pick on={d.instrumentIds.includes(i.id)} onClick={() => toggleInst(i.id)} className="w-full">
                   <div className="flex justify-between gap-2"><span className="text-sm font-semibold">{i.name}</span>{wanted && <span className="hud-label !text-ok">wanted ×{GAME.wantedBonus}</span>}</div>
                   <p className="text-xs text-ink2">{i.mission} · {i.mass_kg} kg · {i.power_w ?? GAME.defaultInstrumentPowerW} W{i.power_w === null && <GameChip />}</p>
-                  <p className="text-xs capitalize text-muted">{i.tag}</p>
+                  {(() => { const su = suitability(i, dest); return <p className={cn("text-xs", su.kind === "suited" ? "text-ok" : su.kind === "unsuitable" ? "text-bad" : "text-muted")}>{su.kind === "neutral" ? <span className="capitalize">{i.tag}</span> : su.label}</p>; })()}
                 </Pick></li>); })}
             </ul>}
           </Owned>

@@ -223,3 +223,8 @@ Splash = pre-launch checklist + T-minus countdown (still gated on fonts/3D chunk
 
 ## 2026-11-14 — Crew comms in design phase
 - Added `CrewChat` panel to the live Mission Architect sidebar (uses existing server `chat` message). Design screen otherwise already uses his Section/Pick/Slider/GameChip + review panel.
+
+## 2026-11-15 — Merged origin/main (Mission Control, Launch Control, curated instruments) into live-on-main
+- Resolved conflicts in DesignStudio.tsx (kept PartImg thumbnails, exported GameChip/Pick for live Design), Core.tsx (his new menu), data.ts (DesignDataset interface + DATASET), agentlog.md.
+- Live Design science list now shows his `suitability()` hint per instrument (required measurement / surface-only / supporting).
+- Server engine re-synced with his new evaluate(): required measurements (Moon needs magnetic-vector + electron-spectrum), shared instrument packages counted once, surface-only (contact) instruments blocked, Moon ops-readiness checks (sustained power, eclipse battery, sustained observing), power-limited ion throttle. Parity-tested against compiled engine.ts: 0 mismatches / 3000 random designs.
