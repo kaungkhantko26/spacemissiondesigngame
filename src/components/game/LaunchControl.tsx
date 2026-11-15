@@ -195,9 +195,12 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
   const drag = useRef<{ id: number; mode: "globe" | "pan"; x: number; y: number } | null>(null);
   const globeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const globeRequest = useRef(0);
-  const refreshGlobe = useCallback(() => {
+  const globeBusy = useRef(false);
+  const refreshGlobe = useCallback((size = 512) => { // small and cheap while dragging, sharp when released
+    if (globeBusy.current && size < 512) return;
     const request = ++globeRequest.current, scene = view.current, site = session.flight.site;
-    void buildEarthDisc(site.lat, scene.globeLon, 512, scene.globeLat).then((disc) => { if (request === globeRequest.current) scene.setEarth(disc); });
+    globeBusy.current = true;
+    void buildEarthDisc(site.lat, scene.globeLon, size, scene.globeLat).then((disc) => { globeBusy.current = false; if (request === globeRequest.current && disc) scene.setEarth(disc); });
   }, [session]);
   const [s, setS] = useState<Snap>(() => snap(session));
   const [showResult, setShowResult] = useState(false);
@@ -368,7 +371,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
     if (d.mode === "globe") {
       view.current.globeLon = ((view.current.globeLon - (p.x - d.x) * 0.45 + 540) % 360) - 180;
       view.current.globeLat = Math.max(-85, Math.min(85, view.current.globeLat + (p.y - d.y) * 0.28));
-      if (!globeTimer.current) globeTimer.current = setTimeout(() => { globeTimer.current = null; refreshGlobe(); }, 80);
+      if (!globeTimer.current) globeTimer.current = setTimeout(() => { globeTimer.current = null; refreshGlobe(160); }, 30);
     } else {
       const dx = (p.x - d.x) / globe.scale, dy = (p.y - d.y) / globe.scale;
       view.current.panX -= dx; view.current.cx -= dx; view.current.panY += dy; view.current.cy += dy;
