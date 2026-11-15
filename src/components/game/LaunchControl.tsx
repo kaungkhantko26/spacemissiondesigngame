@@ -368,7 +368,7 @@ export function AscentFlight({ session, onExit, onAgain, onContinue, continueLab
           <div><dt className="hud-label">Pitch</dt><dd className="tabular-nums">{s.pitch.toFixed(0)}°</dd></div>
           <div><dt className="hud-label">Orbit (low × high)</dt><dd className="tabular-nums text-xs">{tel.periKm > -1000 && tel.apoKm > 0.5 ? fmt(tel.periKm) : "—"} × {Number.isFinite(tel.apoKm) ? (tel.apoKm > 0.5 ? fmt(tel.apoKm) : "—") : "∞"} km</dd></div>
         </div>
-        {relightable && !(rules.autopilot === "full" && s.autopilot) && (
+        {relightable && (
           <div className="border-t border-[var(--border)] pt-1.5"><dt className="hud-label">Engine relights left</dt>
             <dd className={cn("tabular-nums", relightsLeft === 0 ? "text-bad" : relightsLeft === 1 ? "text-warn" : "")}>{relightsLeft} <span className="text-xs text-muted">· {s.engineOn ? "burning" : "engine off"} · {f.rocket.stageNames[s.stage - 1]}</span></dd></div>
         )}
