@@ -2,19 +2,49 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, Volume2, VolumeX, Accessibility, X } from "lucide-react";
+import { AlertTriangle, Bell, CheckCircle2, Info, Volume2, VolumeX, Accessibility, X } from "lucide-react";
 import { useUIStore, usePlayerStore } from "@/stores";
 import { GlassPanel, GameButton, IconButton, LevelBadge, PlayerAvatar, XPProgressBar } from "@/components/ui";
 import Link from "next/link";
 import { cn } from "@/lib/mission";
+import { GlobalSound } from "./GlobalSound";
+import { useProgress } from "@/game/progress";
+import { useAvatar } from "@/game/avatar";
+import { useFlag } from "@/game/flags";
+import { useIdentity } from "@/game/identity";
+import { useMission } from "@/game/mission";
+import { useTargets } from "@/game/lunarField";
+import { useCaptions } from "@/lib/captions";
 
 const BARE = ["/", "/splash", "/menu", "/mission/gameplay", "/mission/loading"];
 
+function CaptionBar() {
+  const text = useCaptions((c) => c.text);
+  return text ? <p role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-24 z-[80] mx-auto w-fit max-w-[min(42rem,92vw)] rounded-lg bg-black/80 px-4 py-2 text-center text-sm text-white shadow-lg sm:bottom-28">{text}</p> : null;
+}
 export function GameShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const { toasts, dismissToast, confirm, closeConfirm, reducedMotion, highContrast, muted, set } = useUIStore();
   const profile = usePlayerStore((s) => s.profile);
 
+  useEffect(() => { // a page from before a new deploy may ask for a script that no longer exists: reload once to pick up the new version
+    const reloadOnce = () => {
+      try { const last = Number(window.sessionStorage.getItem("smd-reload") ?? 0); if (Date.now() - last < 30_000) return; window.sessionStorage.setItem("smd-reload", String(Date.now())); } catch { /* storage unavailable */ }
+      window.location.reload();
+    };
+    const onError = (e: Event) => { const t = e.target; if (t instanceof HTMLScriptElement && t.src.includes("/_next/static/")) reloadOnce(); };
+    const onRejection = (e: PromiseRejectionEvent) => { const m = String((e.reason as { name?: string; message?: string } | undefined)?.name ?? "") + String((e.reason as { message?: string } | undefined)?.message ?? ""); if (/ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module/i.test(m)) reloadOnce(); };
+    window.addEventListener("error", onError, true); window.addEventListener("unhandledrejection", onRejection);
+    return () => { window.removeEventListener("error", onError, true); window.removeEventListener("unhandledrejection", onRejection); };
+  }, []);
+  useEffect(() => { // restore saved cosmetics, progress and profile picture from this browser
+    void useAvatar.persist.rehydrate(); void useFlag.persist.rehydrate(); void useMission.persist.rehydrate(); void useTargets.persist.rehydrate(); void useCaptions.persist.rehydrate();
+    void Promise.resolve(useIdentity.persist.rehydrate()).then(() => { const n = useIdentity.getState().name; if (n) usePlayerStore.setState((st) => ({ profile: { ...st.profile, username: n } })); });
+    void Promise.resolve(useProgress.persist.rehydrate()).then(() => {
+      const saved = useProgress.getState().equipped;
+      usePlayerStore.setState((st) => ({ profile: { ...st.profile, equipped: { ...st.profile.equipped, ...saved } } }));
+    });
+  }, []);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) set({ reducedMotion: true });
   }, [set]);
@@ -23,12 +53,14 @@ export function GameShell({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.toggle("high-contrast", highContrast);
   }, [reducedMotion, highContrast]);
 
-  const bare = BARE.includes(path);
+  // GitHub Pages serves routes with a trailing slash ("/menu/"), so normalise before comparing.
+  const bare = BARE.includes(path.length > 1 ? path.replace(/\/+$/, "") : path);
   const showHeader = !bare;
 
   return (
     <div className="starfield relative flex min-h-screen flex-col">
       <div className="stars" aria-hidden />
+      <GlobalSound />
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-gold focus:p-2 focus:text-black">Skip to content</a>
 
       {showHeader && (
@@ -54,21 +86,37 @@ export function GameShell({ children }: { children: React.ReactNode }) {
       <div id="main" className="relative z-10 flex flex-1 flex-col">
         <AnimatePresence mode="wait">
           <motion.div key={path} className="flex flex-1 flex-col"
-            initial={{ opacity: 0, y: reducedMotion ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            transition={{ duration: reducedMotion ? 0 : 0.3 }}>
+            initial={{ opacity: 0, y: reducedMotion ? 0 : 14, filter: reducedMotion ? "none" : "blur(6px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: reducedMotion ? 0 : -6, filter: reducedMotion ? "none" : "blur(4px)", transition: { duration: reducedMotion ? 0 : 0.16 } }}
+            transition={{ duration: reducedMotion ? 0 : 0.42, ease: [0.22, 1, 0.36, 1] }}>
             {children}
           </motion.div>
         </AnimatePresence>
       </div>
 
-      {/* Toasts */}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2" role="status" aria-live="polite">
-        {toasts.map((t) => (
-          <GlassPanel key={t.id} className={cn("pointer-events-auto flex items-center gap-3 px-4 py-3 text-sm", t.tone === "success" && "border-ok", t.tone === "error" && "border-bad")}>
-            <span>{t.tone === "success" ? "✓" : t.tone === "error" ? "!" : "i"}</span>{t.message}
-            <button aria-label="Dismiss" onClick={() => dismissToast(t.id)}><X className="size-4" /></button>
-          </GlassPanel>
-        ))}
+      <CaptionBar />
+      {/* Toasts: top-centre, above every overlay (flight HUD, tour, dialogs) */}
+      <div className="pointer-events-none fixed inset-x-0 top-3 z-[90] flex flex-col items-center gap-2 px-3" role="status" aria-live="polite">
+        <AnimatePresence initial={false}>
+          {toasts.map((t) => {
+            const tone = t.tone === "success" ? { c: "#5fcf9a", Icon: CheckCircle2, label: "Done" } : t.tone === "error" ? { c: "#f0707e", Icon: AlertTriangle, label: "Problem" } : { c: "#79c9dc", Icon: Info, label: "Notice" };
+            return (
+              <motion.div key={t.id} layout initial={{ opacity: 0, y: reducedMotion ? 0 : -18, scale: reducedMotion ? 1 : 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: reducedMotion ? 0 : -10, transition: { duration: 0.15 } }}
+                transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-[#0d1424]/95 shadow-[0_14px_40px_rgba(0,0,0,.55)]">
+                <div className="flex items-start gap-3 p-3 pr-2">
+                  <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full" style={{ background: `${tone.c}22`, color: tone.c }}><tone.Icon className="size-[18px]" aria-hidden /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-[.18em]" style={{ color: tone.c }}>{tone.label}</p>
+                    <p className="text-sm leading-snug text-ink">{t.message}</p>
+                  </div>
+                  <button aria-label="Dismiss notification" onClick={() => dismissToast(t.id)} className="rounded-md p-1.5 text-muted hover:bg-white/10 hover:text-ink"><X className="size-4" /></button>
+                </div>
+                <span aria-hidden className="absolute bottom-0 left-0 h-[3px] origin-left" style={{ background: tone.c, width: "100%", animation: reducedMotion ? "none" : "toastbar 3.5s linear forwards" }} />
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
 
       {/* Confirm dialog */}

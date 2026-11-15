@@ -6,6 +6,8 @@ import { LIVE_ENABLED } from "@/live/client";
 
 interface Demo { href: string; title: string; icon: LucideIcon; blurb: string; tag: "Offline" | "Mock data" | "Needs server" }
 const OFFLINE: Demo[] = [
+  { href: "/launch", title: "Launch Control — ground to orbit", icon: Rocket, tag: "Offline",
+    blurb: "Pick a real spaceport and rocket, then fly the ascent from the pad through max-Q and staging into orbit. Three difficulty levels." },
   { href: "/design", title: "Mission Architect + flight sim", icon: Rocket, tag: "Offline",
     blurb: "Design a spacecraft from real launch vehicles, thrusters and instruments, then watch the Earth→Moon/planet flight and results." },
   { href: "/team", title: "Team up → full mission journey", icon: Users, tag: "Mock data",

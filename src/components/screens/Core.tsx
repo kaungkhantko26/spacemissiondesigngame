@@ -1,12 +1,24 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Rocket, Users, User, Shirt, BarChart3, Settings, FlaskConical, Lock, Check } from "lucide-react";
+import { useFrame, useThree } from "@react-three/fiber";
+import type { Group } from "three";
+import { BookOpen, ChevronDown, Rocket, Satellite, Users, User, Shirt, BarChart3, Settings, FlaskConical, Radar, Lock, Check } from "lucide-react";
 import {
   BackButton, GameButton, GlassPanel, LoadingBar, ScreenContainer, StatBar, XPProgressBar, LevelBadge, PlayerAvatar,
 } from "@/components/ui";
 import { Astronaut, Scene3D, PlanetModel } from "@/components/three/lazy";
+import { IdBadge } from "./IdBadge";
+import { EMOTES, emotePose } from "@/game/emotes";
+import { PatchView } from "@/components/ui/PatchView";
+import { FlagView } from "@/components/ui/FlagView";
+import { useCaptions } from "@/lib/captions";
+import { AvatarEditor } from "./AvatarEditor";
+import { FlagEditor } from "./FlagEditor";
+import { MAX_NAME, useIdentity } from "@/game/identity";
+import { useProgress, withUnlocks } from "@/game/progress";
+import { AstronautGuide, TestVoiceButton, TutorialButton } from "./MenuGuide";
 import { ProfileWidget } from "@/components/shell/GameShell";
 import { usePlayerStore, useCosmeticsStore, useUIStore } from "@/stores";
 import { cn } from "@/lib/mission";
@@ -58,19 +70,48 @@ export function SplashScreen() {
   );
 }
 
+/** Sized from the canvas's visible height AND width: as tall as the panel allows (feet near the bottom edge) without clipping the waving arm. */
+/** Drag-to-turn state for the menu astronaut (a class so pointer handlers and the render loop share it without mutating hook values). */
+export class Spin {
+  offset = 0; velocity = 0; dragging = false; idle = 0;
+  private lastX = 0;
+  down(x: number) { this.dragging = true; this.lastX = x; this.velocity = 0; }
+  move(x: number) { if (!this.dragging) return; const d = (x - this.lastX) * 0.012; this.lastX = x; this.offset += d; this.velocity = d * 60; this.idle = 0; }
+  up() { this.dragging = false; }
+  /** Inertia while spinning, then a slow ease back to the waving pose after a few idle seconds. */
+  step(dt: number) {
+    if (this.dragging) return;
+    this.idle += dt;
+    if (Math.abs(this.velocity) > 0.01) { this.offset += this.velocity * dt; this.velocity *= Math.pow(0.04, dt); } else this.velocity = 0;
+    if (this.idle > 2.5) this.offset *= Math.pow(0.35, dt);
+  }
+}
+function MenuAstronaut({ look, pose, spin }: { look: ReturnType<typeof useLook>; pose: "idle" | "wave" | "ready" | "celebrate"; spin: Spin }) {
+  const { width, height } = useThree((st) => st.viewport);
+  const scale = Math.min(0.34 * height, width * 0.42, 3); // leaves headroom: some clips (moon walk) lift the model
+  const y = -height / 2 + 0.25 * scale + 0.03 * height; // the model's feet sit 0.25·scale below its origin
+  const g = useRef<Group>(null);
+  useFrame((_, dt) => { spin.step(Math.min(dt, 0.1)); g.current?.rotation.set(0, spin.offset, 0); });
+  return <group ref={g} position={[Math.min(width * 0.12, 2.4), y, 0]}><Astronaut {...look} pose={pose} position={[0, 0, 0]} scale={scale} rotationY={-Math.PI / 4} /></group>;
+}
+
 /* ---------- Main menu ---------- */
 const LIVE = !!process.env.NEXT_PUBLIC_API_URL; // live backend mode → route to /play/*
 const MENU = [
-  { href: "/design", label: "Design Mission", icon: Rocket, primary: true },
-  { href: "/team", label: "Team Up", icon: Users },
+  { href: "/launch", label: "Launch Control", icon: Rocket, desc: "Practice: fly a rocket to orbit or the Moon" },
+  { href: "/design", label: "Design Mission", icon: Satellite, desc: "Step 1 of your mission: build the spacecraft" },
+  { href: "/mission-control", label: "Mission Control", icon: Radar, desc: "Step 3: run operations in lunar orbit" },
+  { href: LIVE ? "/play" : "/team", label: "Team Up", icon: Users, desc: "Fly a mission together with a crew" },
   { href: LIVE ? "/play/profile" : "/profile", label: "Profile", icon: User },
   { href: LIVE ? "/play/cosmetics" : "/cosmetics", label: "Cosmetics", icon: Shirt },
   { href: LIVE ? "/play/stats" : "/stats", label: "Stats", icon: BarChart3 },
   { href: "/demo", label: "Demo Hub", icon: FlaskConical },
+  { href: "/about", label: "About and glossary", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+const TOUR_KEY: Record<string, string> = { "Launch Control": "menu-launch", "Design Mission": "menu-design", "Team Up": "menu-team", Cosmetics: "menu-cosmetics" };
 type Pose = "idle" | "wave" | "ready" | "celebrate";
-const HOVER_POSE: Record<string, Pose> = { Cosmetics: "celebrate", Stats: "ready", Profile: "idle", Settings: "idle" };
+const HOVER_POSE: Record<string, Pose> = { Cosmetics: "celebrate", Stats: "idle", Profile: "idle", Settings: "idle" };
 
 function MissionClock() {
   const [now, setNow] = useState<Date | null>(null);
@@ -89,11 +130,31 @@ function MissionClock() {
   );
 }
 
+const MAIN_COUNT = 4; // Launch Control, Design Mission, Mission Control and Team Up; the rest sit under "More options"
+type MenuItem = (typeof MENU)[number] & { desc?: string; primary?: boolean };
+function MenuLink({ m, i, setPose, compact }: { m: MenuItem; i: number; setPose: (p: Pose | null) => void; compact?: boolean }) {
+  return (
+    <Link href={m.href} data-tour={TOUR_KEY[m.label]} style={{ animationDelay: `${i * 70}ms` }}
+      onMouseEnter={() => setPose(HOVER_POSE[m.label] ?? "wave")} onFocus={() => setPose(HOVER_POSE[m.label] ?? "wave")}
+      onMouseLeave={() => setPose(null)} onBlur={() => setPose(null)}
+      className={cn("enter group flex items-center gap-3 rounded-lg border font-display tracking-wide transition duration-150 hover:translate-x-1",
+        compact ? "px-3 py-2 text-sm" : "px-5 py-3",
+        m.primary ? "border-orange bg-orange py-4 text-lg font-bold text-[#1a0b00] shadow-[0_4px_0_#b4501a]" : "border-[var(--border)] bg-panel hover:border-[var(--border-strong)]")}>
+      <m.icon className="size-5 shrink-0" aria-hidden />{compact || !m.desc ? m.label.toUpperCase() : <span className="min-w-0"><span className="block">{m.label.toUpperCase()}</span><span className="block font-sans text-xs font-normal normal-case tracking-normal text-muted">{m.desc}</span></span>}
+      {!compact && <kbd aria-label={`Shortcut ${i + 1}`} className={cn("ml-auto rounded-sm border px-1.5 text-xs", m.primary ? "border-black/30" : "border-white/20 text-muted")}>{i + 1}</kbd>}
+    </Link>
+  );
+}
+
 export function MenuScreen() {
   const profile = usePlayerStore((s) => s.profile);
   const router = useRouter();
   const look = useLook();
-  const [pose, setPose] = useState<Pose>("wave");
+  const home: Pose = look.pose ?? "wave"; // the equipped emote is the astronaut's resting pose
+  const [hover, setPose] = useState<Pose | null>(null);
+  const pose: Pose = hover ?? home;
+  const [more, setMore] = useState(false);
+  const [spin] = useState(() => new Spin());
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -112,29 +173,24 @@ export function MenuScreen() {
         </Scene3D>
       </div>
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-bg/60 px-4 py-3 md:px-8">
-        <MissionClock /><ProfileWidget profile={profile} />
+        <MissionClock /><div data-tour="profile"><ProfileWidget profile={profile} /></div>
       </div>
-      <div className="relative z-10 grid flex-1 items-center gap-6 px-6 pb-10 md:grid-cols-2 md:px-16">
+      <div className="relative z-10 mx-auto grid w-full max-w-[1320px] flex-1 items-center gap-6 px-6 pb-8 md:grid-cols-2 md:px-10">
         <div>
           <p className="hud-label !text-orange !tracking-[.3em]">NASA SPACE APPS CHALLENGE 2026</p>
           <h1 className="mt-2 text-5xl font-bold leading-tight md:text-7xl"><span className="text-orange">Space Mission</span><br />Design Game</h1>
           <nav aria-label="Main menu" className="mt-8 flex max-w-sm flex-col gap-3">
-            {MENU.map((m, i) => (
-              <Link key={m.href} href={m.href} style={{ animationDelay: `${i * 70}ms` }}
-                onMouseEnter={() => setPose(HOVER_POSE[m.label] ?? "wave")} onFocus={() => setPose(HOVER_POSE[m.label] ?? "wave")}
-                onMouseLeave={() => setPose("wave")} onBlur={() => setPose("wave")}
-                className={cn("enter group flex items-center gap-3 rounded-lg border px-5 py-3 font-display tracking-wide transition duration-150 hover:translate-x-1",
-                  m.primary ? "border-orange bg-orange shadow-[0_4px_0_#b4501a] py-4 text-lg font-bold text-[#1a0b00]"
-                    : "border-[var(--border)] bg-panel hover:border-[var(--border-strong)]")}>
-                <m.icon className="size-5" aria-hidden />{m.label.toUpperCase()}
-                <kbd aria-label={`Shortcut ${i + 1}`} className={cn("ml-auto rounded-sm border px-1.5 text-xs", m.primary ? "border-black/30" : "border-white/20 text-muted")}>{i + 1}</kbd>
-              </Link>
-            ))}
+            {MENU.slice(0, MAIN_COUNT).map((m, i) => <MenuLink key={m.href} m={m} i={i} setPose={setPose} />)}
+            <button type="button" data-tour="menu-more" aria-expanded={more} onClick={() => setMore((v) => !v)}
+              className="flex items-center justify-between rounded-lg border border-dashed border-[var(--border)] px-5 py-2.5 text-sm text-ink2 transition hover:border-[var(--border-strong)] hover:text-ink">
+              <span>{more ? "Fewer options" : "More options"}</span><ChevronDown aria-hidden className={cn("size-4 transition", more && "rotate-180")} />
+            </button>
+            {more && <div className="grid grid-cols-2 gap-2">{MENU.slice(MAIN_COUNT).map((m, i) => <MenuLink key={m.href} m={m} i={i + MAIN_COUNT} setPose={setPose} compact />)}</div>}
           </nav>
-          <p className="hud-label mt-4">Press 1–{MENU.length} to jump</p>
+          <div className="mt-4 flex items-center gap-4"><TutorialButton /><p className="hud-label">Keys 1–{Math.min(9, MENU.length)} jump to a screen</p></div>
         </div>
-        <div className="h-[380px] md:h-[560px]">
-          <Scene3D camera={[0, 0.6, 7]} label="Your astronaut"><Astronaut {...look} pose={pose} position={[1.9, -2.1, 0]} scale={1.6} rotationY={-Math.PI / 4} /></Scene3D>
+        <div className="h-[460px] md:h-[min(80vh,860px)]">
+          <AstronautGuide spin={spin}><Scene3D camera={[0, 0, 7]} label="Your astronaut"><MenuAstronaut look={look} pose={pose} spin={spin} /></Scene3D></AstronautGuide>
         </div>
       </div>
     </main>
@@ -142,19 +198,28 @@ export function MenuScreen() {
 }
 
 /* ---------- helpers ---------- */
+/** Cosmetics with their unlocked state taken from what the player has actually achieved. */
+export function useItems() {
+  const level = usePlayerStore((s) => s.profile.progression.level);
+  const flights = useProgress((s) => s.flights), wins = useProgress((s) => s.wins), orbits = useProgress((s) => s.orbits), moons = useProgress((s) => s.moons), hardWins = useProgress((s) => s.hardWins);
+  const pilotWins = useProgress((s) => s.pilotWins), moonsPilot = useProgress((s) => s.moonsPilot), sGrades = useProgress((s) => s.sGrades), teamRuns = useProgress((s) => s.teamRuns);
+  return useMemo(() => withUnlocks({ flights, wins, orbits, moons, hardWins, pilotWins, moonsPilot, sGrades, teamRuns, equipped: {} }, level), [level, flights, wins, orbits, moons, hardWins, pilotWins, moonsPilot, sGrades, teamRuns]);
+}
 export function useLook() {
   const profile = usePlayerStore((s) => s.profile);
-  const items = useCosmeticsStore((s) => s.items);
+  const items = useItems();
   const previewId = useCosmeticsStore((s) => s.previewId);
   return useMemo(() => {
     const byId = (id: string | null) => items.find((c) => c.id === id);
     const eq = { ...profile.equipped };
     const p = byId(previewId);
     if (p) eq[p.category] = p.id;
-    const suit = byId(eq.suit), helmet = byId(eq.helmet), pack = byId(eq.backpack);
+    const em = byId(eq.emote), emoteOk = em && (em.unlocked || p?.id === em.id);
+    const suit = byId(eq.suit), helmet = byId(eq.helmet), pack = byId(eq.backpack), patch = byId(eq.patch);
     const pat = byId(eq.pattern), head = byId(eq.headgear), sh = byId(eq.shoulder), bt = byId(eq.boots);
     return {
-      suit: suit?.color ?? "#e8eef7", accent: suit?.accent ?? "#168bff", helmet: helmet?.color ?? "#4fc3f7", pack: pack?.color ?? "#9fb3c8",
+      pose: (emoteOk ? emotePose(em!.id) : null) ?? undefined,
+      suit: suit?.color ?? "#e8eef7", accent: suit?.accent ?? "#168bff", helmet: helmet?.color ?? "#4fc3f7", pack: pack?.color ?? "#9fb3c8", packKind: pack?.id, packAccent: pack?.accent, patchKind: patch?.id, patchColor: patch?.color, patchAccent: patch?.accent,
       pattern: pat?.id, patternColor: pat?.color, headgear: head?.id, headgearColor: head?.color,
       shoulder: sh?.id, shoulderColor: sh?.color, boots: bt?.id, bootsColor: bt?.color,
     };
@@ -165,43 +230,74 @@ export function useLook() {
 export function ProfileScreen() {
   const profile = usePlayerStore((s) => s.profile);
   const look = useLook();
+  const items = useItems();
+  const patchItem = items.find((c) => c.id === profile.equipped.patch && c.unlocked);
+  const [tab, setTab] = useState<"overview" | "picture" | "flag">("overview");
+  const [editing, setEditing] = useState(false), [draft, setDraft] = useState("");
+  const saveName = () => {
+    useIdentity.getState().setName(draft);
+    const n = useIdentity.getState().name;
+    if (n) usePlayerStore.setState((st) => ({ profile: { ...st.profile, username: n } }));
+    setEditing(false);
+  };
   const h = profile.history;
   return (
     <ScreenContainer title="Profile" actions={<BackButton href="/menu" label="Main menu" />}>
-      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <div className="grid gap-4">
+      <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
+        <div className="grid content-start gap-4">
           <GlassPanel className="flex flex-wrap items-center gap-4 p-5">
             <PlayerAvatar player={profile} size={72} />
             <div className="flex-1">
-              <h2 className="text-2xl font-bold">{profile.username} <LevelBadge level={profile.progression.level} /></h2>
+              <h2 className="flex flex-wrap items-center gap-2 text-2xl font-bold">
+                {editing ? (
+                  <form onSubmit={(e) => { e.preventDefault(); saveName(); }} className="flex items-center gap-2">
+                    <input autoFocus aria-label="Display name" value={draft} maxLength={MAX_NAME} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setEditing(false); }}
+                      className="w-52 rounded-md border border-orange bg-bg px-2 py-0.5 text-xl outline-none" />
+                    <GameButton type="submit" variant="primary">Save</GameButton>
+                    <GameButton type="button" variant="outline" onClick={() => setEditing(false)}>Cancel</GameButton>
+                  </form>
+                ) : (<>{profile.username} <LevelBadge level={profile.progression.level} />
+                  <button type="button" onClick={() => { setDraft(profile.username); setEditing(true); }} className="rounded-md border border-white/15 px-2 py-0.5 text-xs font-normal text-ink2 hover:text-ink">Edit name</button></>)}
+              </h2>
               <p className="text-sm text-muted">Player ID {profile.playerCode} · Mock identity (no real auth)</p>
               <XPProgressBar className="mt-3 max-w-md" xp={profile.progression.xp} max={profile.progression.xpForNextLevel} />
             </div>
           </GlassPanel>
-          <GlassPanel className="p-5">
-            <h2 className="mb-3 text-xl font-bold">Mission history</h2>
-            <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {[["Attempted", h.attempted], ["Completed", h.completed], ["Best", h.bestPerformance], ["Highest difficulty", h.highestDifficulty ?? "—"]].map(([k, v]) => (
-                <div key={String(k)} className="rounded-lg bg-white/5 p-3"><dt className="text-xs text-muted">{k}</dt><dd className="font-semibold capitalize">{v}</dd></div>
-              ))}
-            </dl>
-          </GlassPanel>
-          <GlassPanel className="p-5">
-            <h2 className="mb-3 text-xl font-bold">Achievements</h2>
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {profile.achievements.map((a) => (
-                <li key={a.id} className={cn("flex items-start gap-3 rounded-lg border p-3", a.unlockedAt ? "border-gold/40" : "border-white/10 opacity-70")}>
-                  {a.unlockedAt ? <Check className="size-5 text-gold" aria-label="Unlocked" /> : <Lock className="size-5 text-muted" aria-label="Locked" />}
-                  <div><p className="font-semibold">{a.name}</p><p className="text-xs text-ink2">{a.description}</p><p className="text-xs text-muted">{a.unlockedAt ? `Unlocked ${a.unlockedAt}` : "Locked"}</p></div>
-                </li>
-              ))}
-            </ul>
-          </GlassPanel>
+          <div role="tablist" aria-label="Profile sections" className="flex gap-2">
+            {([["overview", "Overview"], ["picture", "Profile picture"], ["flag", "Flag"]] as const).map(([id, label]) => (
+              <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={cn("rounded-md border px-4 py-1.5 text-sm", tab === id ? "border-orange bg-orange/10 text-orange" : "border-white/15 text-ink2 hover:text-ink")}>{label}</button>))}
+          </div>
+          {tab === "picture" && <AvatarEditor name={profile.username} />}
+          {tab === "flag" && <FlagEditor />}
+          {tab === "overview" && <div className="grid items-start gap-4 md:grid-cols-[300px_1fr]">
+            <IdBadge profile={profile} patch={patchItem ? { name: patchItem.name, color: patchItem.color, accent: patchItem.accent } : null} suit={look.suit} />
+            <div className="grid content-start gap-4">
+              <GlassPanel className="p-5">
+                <h2 className="mb-3 text-xl font-bold">Mission history</h2>
+                <dl className="grid grid-cols-2 gap-3">
+                  {[["Attempted", h.attempted], ["Completed", h.completed], ["Best", h.bestPerformance], ["Highest difficulty", h.highestDifficulty ?? "—"]].map(([k, v]) => (
+                    <div key={String(k)} className="rounded-lg bg-white/5 p-3"><dt className="text-xs text-muted">{k}</dt><dd className="font-semibold capitalize">{v}</dd></div>
+                  ))}
+                </dl>
+              </GlassPanel>
+              <GlassPanel className="p-5">
+                <h2 className="mb-3 text-xl font-bold">Achievements</h2>
+                <ul className="grid gap-3">
+                  {profile.achievements.map((a) => (
+                    <li key={a.id} className={cn("flex items-start gap-3 rounded-lg border p-3", a.unlockedAt ? "border-gold/40" : "border-white/10 opacity-70")}>
+                      {a.unlockedAt ? <Check className="size-5 text-gold" aria-label="Unlocked" /> : <Lock className="size-5 text-muted" aria-label="Locked" />}
+                      <div><p className="font-semibold">{a.name}</p><p className="text-xs text-ink2">{a.description}</p><p className="text-xs text-muted">{a.unlockedAt ? `Unlocked ${a.unlockedAt}` : "Locked"}</p></div>
+                    </li>
+                  ))}
+                </ul>
+              </GlassPanel>
+            </div>
+          </div>}
         </div>
-        <GlassPanel className="flex min-h-[420px] flex-col p-3">
+        <GlassPanel className="flex h-[min(620px,calc(100vh-200px))] min-h-[420px] flex-col p-3 lg:sticky lg:top-4">
           <h2 className="px-2 pt-2 text-xl font-bold">Character preview</h2>
           <p className="px-2 text-xs text-muted">Drag to rotate · scroll to zoom</p>
-          <div className="min-h-0 flex-1"><Scene3D controls camera={[0, 1, 5]} label="Interactive astronaut preview"><Astronaut {...look} position={[0, -1, 0]} /></Scene3D></div>
+          <div className="min-h-0 flex-1"><Scene3D controls camera={[0, 1, 6.2]} label="Interactive astronaut preview"><Astronaut {...look} position={[0, -1, 0]} /></Scene3D></div>
         </GlassPanel>
       </div>
     </ScreenContainer>
@@ -217,18 +313,21 @@ const CATS: { id: CosmeticCategory; label: string }[] = [
 const rarityColor = { common: "text-ink2", rare: "text-cyan", epic: "text-[#c084fc]", legendary: "text-gold" } as const;
 
 export function CosmeticsScreen() {
-  const { items, category, previewId, setCategory, preview } = useCosmeticsStore();
+  const { category, previewId, setCategory, preview } = useCosmeticsStore();
+  const items = useItems();
   const { profile, equip } = usePlayerStore();
   const toast = useUIStore((s) => s.toast);
   const look = useLook();
   const list = items.filter((c) => c.category === category);
   const sel: CosmeticItem | undefined = items.find((c) => c.id === previewId);
   const equipped = sel && profile.equipped[sel.category] === sel.id;
+  const showPose = look.pose ?? "idle";
+  const have = items.filter((c) => c.unlocked).length;
   return (
-    <ScreenContainer title="Cosmetics" subtitle="Visual only — cosmetics never change gameplay." actions={<BackButton href="/menu" label="Main menu" />}>
+    <ScreenContainer title="Cosmetics" subtitle={`Visual only — cosmetics never change gameplay. Unlock them by flying: ${have} of ${items.length} earned.`} actions={<BackButton href="/menu" label="Main menu" />}>
       <div className="grid gap-4 lg:grid-cols-[minmax(300px,1fr)_1.4fr]">
         <GlassPanel className="flex min-h-[420px] flex-col p-3">
-          <div className="min-h-0 flex-1"><Scene3D controls camera={[0, 1, 5]} label="Cosmetic preview"><Astronaut {...look} position={[0, -1, 0]} /></Scene3D></div>
+          <div className="min-h-0 flex-1"><Scene3D controls camera={[0, 1, 5]} label="Cosmetic preview"><Astronaut {...look} pose={showPose} position={[0, -1, 0]} /></Scene3D></div>
           <p className="px-2 pb-2 text-sm text-ink2">{profile.username} · {sel ? `Previewing ${sel.name}` : "Equipped look"}</p>
         </GlassPanel>
         <div className="flex flex-col gap-3">
@@ -245,13 +344,14 @@ export function CosmeticsScreen() {
                 <li key={c.id} className="enter lift" style={{ animationDelay: `${i * 50}ms` }}>
                   <button onClick={() => preview(c.id)} aria-pressed={previewId === c.id}
                     className={cn("w-full rounded-lg border bg-panel p-3 text-left transition", previewId === c.id ? "border-orange" : "border-white/10 hover:border-cyan/50")}>
-                    <div className="mb-2 grid h-20 place-items-center rounded-lg" style={{ background: `linear-gradient(135deg, ${c.color}, ${c.accent})` }}>
-                      {!c.unlocked && <Lock className="size-6 text-white/90" aria-label="Locked" />}
+                    <div className="relative mb-2 grid h-20 place-items-center rounded-lg" style={{ background: c.category === "patch" || c.category === "emote" ? "rgba(255,255,255,.06)" : `linear-gradient(135deg, ${c.color}, ${c.accent})` }}>
+                      {c.category === "patch" ? <PatchView kind={c.id} color={c.color} accent={c.accent} size={68} label={c.name} /> : c.category === "emote" ? <span aria-hidden className="text-4xl">{EMOTES[c.id]?.icon ?? "🙂"}</span> : null}
+                      {!c.unlocked && <span className="absolute inset-0 grid place-items-center rounded-lg bg-black/45"><Lock className="size-6 text-white/90" aria-label="Locked" /></span>}
                     </div>
                     <p className="font-semibold">{c.name}</p>
                     <p className="text-xs text-muted capitalize">{c.category} · {c.collection}</p>
                     <p className={cn("text-xs capitalize", rarityColor[c.rarity])}>{c.rarity}{c.hardModeExclusive && <span className="ml-1 rounded bg-orange/20 px-1 text-orange">HARD ONLY</span>}</p>
-                    <p className="text-xs">{isEq ? "✓ Equipped" : c.unlocked ? "Unlocked" : "Locked"}</p>
+                    <p className="text-xs">{isEq ? "✓ Equipped" : c.unlocked ? "Unlocked" : c.unlockCondition}</p>
                   </button>
                 </li>
               );
@@ -261,7 +361,7 @@ export function CosmeticsScreen() {
             <GlassPanel className="flex flex-wrap items-center justify-between gap-3 p-4">
               <div>
                 <p className="font-display text-lg font-bold">{sel.name}</p>
-                <p className="text-sm text-ink2">{sel.unlocked ? "Unlocked (mock ownership)" : `Unlock: ${sel.unlockCondition}`}</p>
+                <p className="text-sm text-ink2">{sel.unlocked ? `Unlocked · ${sel.unlockCondition}` : `How to earn it: ${sel.unlockCondition}`}</p>
               </div>
               {sel.unlocked
                 ? <GameButton variant={equipped ? "outline" : "primary"} onClick={async () => { await equip(sel.category, equipped ? null : sel.id); toast(equipped ? `${sel.name} unequipped` : `${sel.name} equipped`, "success"); }}>{equipped ? "Unequip" : "Equip"}</GameButton>
@@ -320,16 +420,19 @@ export function StatsScreen() {
 /* ---------- Settings ---------- */
 const Row = ({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) => (
   <button role="switch" aria-checked={on} onClick={onClick} className="flex w-full items-center justify-between rounded-lg bg-white/5 p-3 text-left">
-    {label}<span className={cn("rounded-sm px-3 py-0.5 font-display text-xs uppercase tracking-wider", on ? "bg-ok/20 text-ok" : "bg-white/10 text-muted")}>{on ? "On" : "Off"}</span>
+    <span className="text-ink">{label}</span><span className={cn("inline-flex min-w-16 items-center justify-center gap-1.5 rounded-full border px-3 py-1 font-display text-sm font-semibold uppercase tracking-wider", on ? "border-ok bg-ok/20 text-ok" : "border-white/40 bg-white/10 text-ink")}><span aria-hidden className={cn("size-2 rounded-full", on ? "bg-ok" : "bg-white/50")} />{on ? "On" : "Off"}</span>
   </button>
 );
 
 export function SettingsScreen() {
   const ui = useUIStore();
+  const captions = useCaptions();
   return (
     <ScreenContainer title="Settings" actions={<BackButton href="/menu" label="Main menu" />}>
       <GlassPanel className="grid max-w-xl gap-3 p-5">
-        <Row label="Mute audio (no audio assets yet)" on={ui.muted} onClick={() => ui.set({ muted: !ui.muted })} />
+        <Row label="Mute audio" on={ui.muted} onClick={() => ui.set({ muted: !ui.muted })} />
+        <div className="flex items-center justify-between rounded-lg bg-white/5 p-3">Sound check<TestVoiceButton /></div>
+        <Row label="Captions for voice lines" on={captions.on} onClick={() => captions.setOn(!captions.on)} />
         <Row label="Reduce motion" on={ui.reducedMotion} onClick={() => ui.set({ reducedMotion: !ui.reducedMotion })} />
         <Row label="High contrast" on={ui.highContrast} onClick={() => ui.set({ highContrast: !ui.highContrast })} />
         <div role="radiogroup" aria-label="3D quality" className="flex items-center justify-between rounded-lg bg-white/5 p-3">

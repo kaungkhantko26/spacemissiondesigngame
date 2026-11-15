@@ -1,10 +1,12 @@
 "use client";
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   AttributeKey, CosmeticCategory, CosmeticItem, CrewAssignment, DifficultyId,
   Id, Lobby, PlayerProfile, RoleId,
 } from "@/types";
 import { cosmetics as cosmeticSeed, profile as profileSeed } from "@/data/mock";
+import { useProgress } from "@/game/progress";
 import { lobbyService, playerService, progressionService } from "@/services/mocks";
 
 /* ---------- UI (transient) ---------- */
@@ -53,6 +55,7 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   equip: async (category, id) => {
     await playerService.equipCosmetic(id, category);
     set((s) => ({ profile: { ...s.profile, equipped: { ...s.profile.equipped, [category]: id } } }));
+    useProgress.getState().setEquipped(category, id);
   },
 }));
 
@@ -89,6 +92,10 @@ export const useLobbyStore = create<LobbyState>((set) => ({
 }));
 
 /* ---------- Mission setup ---------- */
+/** Session-only persistence so refreshing a Team Up step does not bounce the player back to mission select. Hydrated manually after mount. */
+const sessionStore = createJSONStorage(() => {
+  try { return window.sessionStorage; } catch { return { getItem: () => null, setItem: () => undefined, removeItem: () => undefined }; }
+});
 interface MissionSetupState {
   difficultyId: DifficultyId;
   missionId: Id | null;
@@ -96,12 +103,12 @@ interface MissionSetupState {
   setMission: (id: Id | null) => void;
   reset: () => void;
 }
-export const useMissionSetupStore = create<MissionSetupState>((set) => ({
+export const useMissionSetupStore = create<MissionSetupState>()(persist((set) => ({
   difficultyId: "easy", missionId: null,
   setDifficulty: (difficultyId) => set({ difficultyId, missionId: null }),
   setMission: (missionId) => set({ missionId }),
   reset: () => set({ difficultyId: "easy", missionId: null }),
-}));
+}), { name: "smd-mission-setup", storage: sessionStore, skipHydration: true }));
 
 /* ---------- Crew selection ---------- */
 interface CrewState {
@@ -115,7 +122,7 @@ interface CrewState {
   reset: () => void;
 }
 const blank = (playerId: Id): CrewAssignment => ({ playerId, roleId: null, characterId: null, confirmedRole: false, confirmedCharacter: false });
-export const useCrewSelectionStore = create<CrewState>((set) => ({
+export const useCrewSelectionStore = create<CrewState>()(persist((set) => ({
   assignments: {},
   ensure: (ids) => set((s) => {
     const next = { ...s.assignments };
@@ -142,4 +149,7 @@ export const useCrewSelectionStore = create<CrewState>((set) => ({
     return { assignments: next };
   }),
   reset: () => set({ assignments: {} }),
-}));
+}), { name: "smd-crew-selection", storage: sessionStore, skipHydration: true }));
+
+/** Restore the Team Up setup from this tab's session (refresh-safe). */
+export const hydrateTeamSetup = () => Promise.all([useMissionSetupStore.persist.rehydrate(), useCrewSelectionStore.persist.rehydrate()]).then(() => undefined);

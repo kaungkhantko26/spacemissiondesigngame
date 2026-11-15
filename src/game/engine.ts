@@ -1,5 +1,9 @@
+import { OPS } from "./ops/core";
+import { OPS_DUTY } from "./ops/model";
+import { curationOf, hardware, measuresOf, requiredMeasures } from "./instruments";
 import { ANTENNAS, DATASET, GAME, destinationById, instrumentById, launchReliability, vehicleById, type Antenna, type Destination, type Instrument, type Vehicle, type ElectricThruster } from "./data";
 import { deltaV, linkRate, planTransfer, type TransferPlan } from "./physics";
+import { opsPower, requiredObserveFrac, sustainableObserveFrac, type OpsPower } from "./ops/model";
 
 export type PropulsionId = "chem" | string; // "chem" or an electric thruster id from the dataset
 export interface Design {
@@ -13,7 +17,7 @@ export interface Evaluation {
   design: Design; destination: Destination; vehicle: Vehicle; plan: TransferPlan; antenna: Antenna; instruments: Instrument[];
   electric: ElectricThruster | null; isp: number;
   dryKg: number; wetKg: number; dvRequired: number; dvAvailable: number; propellantNeededKg: number;
-  powerGenW: number; powerLoadW: number; linkBps: number; requiredBps: number; dataFraction: number;
+  powerGenW: number; solarGenW: number; rtgGenW: number; powerLoadW: number; ops: OpsPower; observeFrac: number; electricThrottle: number; linkBps: number; requiredBps: number; dataFraction: number;
   cruiseDays: number; costUsd: number; costBreakdown: Record<string, number>; science: number;
   probabilities: { launch: number; cruise: number; insertion: number; ops: number; mission: number };
   checks: Check[]; goNoGo: boolean;
@@ -49,7 +53,8 @@ export function evaluate(d: Design): Evaluation {
   const prop = Math.max(0, d.propellantKg);
 
   // ---- Mass ----
-  const instrumentKg = instruments.reduce((s, i) => s + i.mass_kg, 0);
+  const hw = hardware(instruments); // shared packages (e.g. Lunar Prospector MAG + ER) count once
+  const instrumentKg = hw.massKg;
   const powerKg = d.solarAreaM2 * GAME.solar.kgPerM2 + d.rtgUnits * GAME.rtg.kg;
   const propulsionKg = electric
     ? n * (GAME.electric.thrusterKg + (GAME.electric.ppuKgPerKw * electric.power_w) / 1000)
@@ -69,20 +74,24 @@ export function evaluate(d: Design): Evaluation {
 
   // ---- Power ----
   const commsDrawW = (antenna.txW / GAME.comms.amplifierEff) * GAME.comms.duty;
-  const powerLoadW = GAME.busPowerW + instruments.reduce((s, i) => s + instrumentPower(i), 0) + commsDrawW;
+  const powerLoadW = GAME.busPowerW + hw.powerW + commsDrawW;
   const solarEff = GAME.solar.efficiency * GAME.solar.degradation;
-  const powerGenW = plan.irradiance * d.solarAreaM2 * solarEff + d.rtgUnits * GAME.rtg.watts;
+  const solarGenW = plan.irradiance * d.solarAreaM2 * solarEff, rtgGenW = d.rtgUnits * GAME.rtg.watts;
+  const powerGenW = solarGenW + rtgGenW;
   const solarAt1AuW = 1361 * d.solarAreaM2 * solarEff;
   const thrusterPowerW = electric ? n * electric.power_w : 0;
 
   // ---- Time ----
-  const thrust = electric ? n * electric.thrust_n : GAME.chemical.thrust_n;
+  // Ion thrusters are power-limited: average the solar power over the transfer (1 AU at departure → destination at arrival).
+  const arrivalSolarW = plan.irradiance * d.solarAreaM2 * solarEff;
+  const electricThrottle = electric ? Math.max(0.05, Math.min(1, ((solarAt1AuW + arrivalSolarW) / 2) / Math.max(1, thrusterPowerW + GAME.busPowerW))) : 1;
+  const thrust = electric ? n * electric.thrust_n * electricThrottle : GAME.chemical.thrust_n;
   const burnDays = electric ? (dvRequired * ((wetKg + dryKg) / 2)) / thrust / 86400 : 0;
   const cruiseDays = plan.transferDays + burnDays * 0.5 + (electric ? 0 : 0);
 
   // ---- Link & science ----
   const linkBps = linkRate(antenna.dishM, antenna.txW, plan.linkDistanceM, antenna.maxBps);
-  const requiredBps = instruments.reduce((s, i) => s + instrumentKbps(i) * 1000, 0);
+  const requiredBps = hw.kbps * 1000;
   const dataFraction = requiredBps === 0 ? 0 : Math.min(1, linkBps / requiredBps);
   const seen = new Map<string, number>();
   let rawScience = 0;
@@ -93,6 +102,12 @@ export function evaluate(d: Design): Evaluation {
     rawScience += GAME.tagValue[i.tag] * wanted * Math.pow(GAME.duplicateTagFactor, k);
   }
   const science = rawScience * dataFraction;
+
+  // ---- Operations readiness (same model Mission Control uses)
+  const instKbps = hw.kbps;
+  const opsModel = opsPower({ solarW: solarGenW, rtgW: rtgGenW, instW: hw.powerW * OPS.loadScale, txW: antenna.txW });
+  const observeFrac = sustainableObserveFrac(instKbps, linkBps);
+  const hasFieldsInst = instruments.some((i) => measuresOf(i).includes("magnetic-vector")); // the survey needs an actual magnetometer, not any "fields" tag
 
   // ---- Cost (launch price = dataset; the rest = game values) ----
   const dryNoTanks = dryKg - tankKg;
@@ -126,12 +141,35 @@ export function evaluate(d: Design): Evaluation {
   add("power", "Power", `${fmt(powerGenW)} W`, `≥ ${fmt(powerLoadW * 1.1)} W`, powerGenW < powerLoadW ? "bad" : powerGenW < powerLoadW * 1.1 ? "warn" : "ok",
     powerGenW < powerLoadW ? `Blackout at ${destination.name} (${fmt(plan.irradiance)} W/m² sunlight) — more array area or RTGs.` : "Generation covers the load at the destination.");
   if (electric) add("thruster-power", "Thruster power (at 1 AU)", `${fmt(solarAt1AuW)} W`, `≥ ${fmt(thrusterPowerW + GAME.busPowerW)} W`, solarAt1AuW < thrusterPowerW + GAME.busPowerW ? "bad" : "ok",
-    solarAt1AuW < thrusterPowerW + GAME.busPowerW ? "Ion thrusters need solar arrays; RTGs are too weak." : "Arrays can drive the thrusters.");
+    solarAt1AuW < thrusterPowerW + GAME.busPowerW ? "Ion thrusters need solar arrays; RTGs are too weak." : electricThrottle < 0.999 ? `Thrust is power-limited along the transfer (average ${fmt(electricThrottle * 100)} % of rated; arrival sunlight ${fmt(plan.irradiance)} W/m²) — cruise time already accounts for it.` : "Arrays can drive the thrusters the whole way.");
   add("time", "Cruise time", `${fmt(cruiseDays)} d`, `≤ ${fmt(destination.deadlineDays)} d`, cruiseDays > destination.deadlineDays ? "bad" : cruiseDays > destination.deadlineDays * 0.85 ? "warn" : "ok",
     cruiseDays > destination.deadlineDays ? "Misses the mission deadline — add thrusters or use chemical propulsion." : "Arrives inside the mission window.");
   add("budget", "Budget", usd(costUsd), `≤ ${usd(destination.budgetUsd)}`, costUsd > destination.budgetUsd ? "bad" : costUsd > destination.budgetUsd * 0.95 ? "warn" : "ok",
     costUsd > destination.budgetUsd ? "Over budget — launch price is real data; other prices are game values." : "Funded.");
   add("payload", "Instruments", `${instruments.length}`, "≥ 1", instruments.length === 0 ? "bad" : "ok", instruments.length === 0 ? "A mission with no science is just expensive space junk." : `${instruments.length} real NASA instrument(s) aboard.`);
+  const needM = requiredMeasures(destination);
+  if (needM.length) { // measurement capabilities, not broad tags: an electric-field detector is not a magnetometer
+    const have = new Set(instruments.flatMap((i) => measuresOf(i)));
+    const missing = needM.filter((m) => !have.has(m));
+    add("contract", "Required measurements", missing.length ? `missing ${missing.map((m) => m.replace("-", " ")).join(", ")}` : needM.map((m) => m.replace("-", " ")).join(" + "), needM.map((m) => m.replace("-", " ")).join(" + "), missing.length ? "bad" : "ok",
+      missing.length ? `The ${destination.name} survey needs a magnetic-field measurement and an electron measurement. Missing: ${missing.map((m) => m.replace("-", " ")).join(", ")}. A generic "fields" or "particles" instrument does not count.` : "The instruments can make the measurements the contract asks for.");
+  } else if (destination.requires) {
+    const has = instruments.some((i) => i.tag === destination.requires);
+    add("contract", "Required payload", has ? `${destination.requires} instrument` : "missing", `${destination.requires} instrument`, has ? "ok" : "bad",
+      has ? "Contract payload aboard." : `The ${destination.name} contract requires a ${destination.requires} instrument; without one the survey cannot be completed.`);
+  }
+  const contact = instruments.filter((i) => curationOf(i).deployment === "contact");
+  if (contact.length) add("payload", "Orbiter-compatible instruments", `${contact.length} surface-only`, "0", "bad", `${contact.map((i) => i.name).join(", ")} works on a rover's arm, not from orbit. Remove it, or this mission cannot use it.`);
+  if (instruments.length > 0 && destination.kind === "moon") { // the operations model (Mission Control) exists for the Moon
+    const ratio = opsModel.avgLoad > 0 ? opsModel.avgGen / opsModel.avgLoad : 9;
+    add("ops-power", "Sustained power (orbit avg)", `${fmt(opsModel.avgGen)} W in`, `≥ ${fmt(opsModel.avgLoad)} W out`, ratio < 1 ? "bad" : ratio < 1.15 ? "warn" : "ok",
+      `Operating mix ${Math.round(OPS_DUTY.observe * 100)} % observing / ${Math.round(OPS_DUTY.downlink * 100)} % downlink, solar derated ${Math.round(OPS.arrayDerate * 100)} % for pointing, off in eclipse, RTG constant. Observing: ${fmt(opsModel.science.gen)} W in / ${fmt(opsModel.science.load)} W out · downlink: ${fmt(opsModel.downlink.gen)} W in / ${fmt(opsModel.downlink.load)} W out.${ratio < 1 ? " Add array area or RTGs." : ""}`);
+    add("ops-battery", "Eclipse battery", `${fmt(opsModel.eclipseWh)} Wh`, `≤ ${fmt(opsModel.batteryUsableWh)} Wh`, opsModel.eclipseWh > opsModel.batteryUsableWh ? "bad" : opsModel.eclipseWh > opsModel.batteryUsableWh * 0.8 ? "warn" : "ok",
+      opsModel.eclipseWh > opsModel.batteryUsableWh ? "The battery cannot carry the observing load through an eclipse — cut instrument power or add RTGs." : "Battery carries the load through the lunar eclipse.");
+    const need = requiredObserveFrac(hasFieldsInst);
+    add("ops-data", "Sustained observing (data)", `${fmt(observeFrac * 100)} %`, `≥ ${fmt(need * 100)} %`, observeFrac < need ? "bad" : observeFrac < need * 1.15 ? "warn" : "ok",
+      observeFrac < need ? "The link cannot return the data the instruments record, so the survey cannot finish — bigger antenna or fewer/lower-rate instruments." : "Downlink keeps up with the survey data rate (counting ground-station windows).");
+  }
   add("link", "Science data link", `${fmt(linkBps / 1000, 1)} kbps`, `${fmt(requiredBps / 1000, 1)} kbps wanted`, requiredBps > 0 && dataFraction < 0.5 ? "warn" : "ok",
     dataFraction < 1 && requiredBps > 0 ? `Only ${fmt(dataFraction * 100)} % of instrument data reaches Earth — bigger antenna or fewer instruments.` : "All instrument data can be downlinked.");
   if (prop <= 0) add("prop", "Propellant", "0 kg", "> 0", "bad", "No propellant loaded.");
@@ -139,7 +177,7 @@ export function evaluate(d: Design): Evaluation {
 
   return {
     design: d, destination, vehicle, plan, antenna, instruments, electric, isp, dryKg, wetKg, dvRequired, dvAvailable, propellantNeededKg,
-    powerGenW, powerLoadW, linkBps, requiredBps, dataFraction, cruiseDays, costUsd, costBreakdown, science, probabilities, checks, goNoGo,
+    powerGenW, solarGenW, rtgGenW, powerLoadW, ops: opsModel, observeFrac, electricThrottle, linkBps, requiredBps, dataFraction, cruiseDays, costUsd, costBreakdown, science, probabilities, checks, goNoGo,
   };
 }
 

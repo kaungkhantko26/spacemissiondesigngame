@@ -13,7 +13,8 @@ export interface Telemetry { metS: number; phase: string; altKm: number | null; 
 export interface Sample { craft: V3; earth: V3; target: V3; telemetry: Telemetry; lost: boolean }
 export interface Trajectory {
   mode: "moon" | "sun"; unitKm: number; earthR: number; targetR: number; targetName: string; uEnd: number;
-  reveal: number[]; markers: { seg1: number; seg2: number }; sample: (u: number) => Sample; path: Float32Array; orbitRadii: number[];
+  reveal: number[]; markers: { seg1: number; seg2: number }; sample: (u: number) => Sample; path: Float32Array;
+  /** craft position relative to the target (for drawing the capture orbit as a clean ring) and the path index where capture begins */ pathRel: Float32Array; seg3Index: number; captureRadius: number; orbitRadii: number[];
   centre: V3; viewRadius: number; durationS: number; transferDays: number;
 }
 
@@ -67,6 +68,13 @@ export function buildTrajectory(dest: Destination, failIndex: FailIndex): Trajec
     const nu = trueAnomaly(E, e);
     return { r, th: startAngle + (nu - nu0), v: Math.sqrt(mu * (2 / r - 1 / a)) };
   };
+  // Lunar approach: a real hyperbolic flyby (periapsis = the 100 km capture radius) that the insertion burn turns into a circular orbit.
+  const vInf = moon ? Math.sqrt(earth.mu / r2) * (1 - Math.sqrt((2 * r1) / (r1 + r2))) : 0;
+  const eH = 1 + (rcM * vInf * vInf) / target.mu, pH = rcM * (1 + eH), r0H = 9e6;
+  const nuS = Math.acos(Math.min(1, Math.max(-1, (pH / r0H - 1) / eH))); // |ν| where the approach is picked up (≈ 9,000 km out)
+  const th0 = targetAngle(tArr) + Math.PI - 0.35;                        // coming in from the Earth-facing side
+  const phiP = th0 - nuS;                                               // periapsis direction (clockwise flight: θ = φp − ν)
+  const startOff = (): V3 => polar(U(r0H), th0);
   const offsetDir = (): V3 => { const p = targetPos(tArr); const l = Math.hypot(p[0], p[2]) || 1; return [-p[0] / l, 0, -p[2] / l]; }; // toward the central body
   const scale = (v: V3, k: number): V3 => [v[0] * k, 0, v[2] * k];
 
@@ -105,7 +113,7 @@ export function buildTrajectory(dest: Destination, failIndex: FailIndex): Trajec
       const el = ellipse(t2);
       craft = polar(U(el.r), el.th);
       const lateral = smooth((w - 0.9) / 0.1);
-      craft = add(craft, scale(offsetDir(), U(approachM) * lateral));
+      craft = moon && failIndex !== 2 ? add(craft, scale(startOff(), lateral)) : add(craft, scale(offsetDir(), U(approachM) * lateral));
       speed = el.v / 1000; phase = moon ? "Translunar coast" : "Interplanetary cruise";
       altKm = moon ? (el.r - earth.radius_m) / 1000 : null;
     } else if (failIndex === 2) { // ---- missed the target: ballistic continuation
@@ -114,7 +122,21 @@ export function buildTrajectory(dest: Destination, failIndex: FailIndex): Trajec
       const el = ellipse(t2);
       craft = add(polar(U(el.r), el.th), scale(offsetDir(), U(approachM)));
       speed = el.v / 1000; phase = "Missed — flyby"; altKm = moon ? (el.r - earth.radius_m) / 1000 : null;
-    } else { // ---- capture & science orbit
+    } else if (moon) { // ---- lunar approach → insertion burn → circular science orbit (all drawn relative to the Moon)
+      const w = (u - s2) / f3, split = 0.4;
+      t = tArr + w * T3;
+      let rr: number, th: number;
+      if (w < split) {
+        const nu = -nuS * Math.pow(1 - w / split, 1.6);
+        rr = pH / (1 + eH * Math.cos(nu)); th = phiP - nu;
+        speed = Math.sqrt(vInf * vInf + (2 * target.mu) / rr) / 1000; phase = "Lunar approach";
+      } else {
+        const wb = (w - split) / (1 - split);
+        rr = rcM; th = phiP - TAU * 2.5 * wb;
+        speed = Math.sqrt(target.mu / rcM) / 1000; phase = wb < 0.12 ? "Orbit insertion burn" : "Science orbit";
+      }
+      craft = add(targetPos(t), polar(U(rr), th)); altKm = null;
+    } else { // ---- capture & science orbit (planets: exaggerated visual orbit)
       const w = (u - s2) / f3;
       t = tArr + w * T3;
       const decay = 1 - smooth(w / 0.25);
@@ -133,12 +155,12 @@ export function buildTrajectory(dest: Destination, failIndex: FailIndex): Trajec
     };
   };
 
-  const N = 720, path = new Float32Array((N + 1) * 3);
-  for (let i = 0; i <= N; i++) { const c = sample((i / N) * uEnd).craft; path[i * 3] = c[0]; path[i * 3 + 1] = c[1]; path[i * 3 + 2] = c[2]; }
+  const N = 720, path = new Float32Array((N + 1) * 3), pathRel = new Float32Array((N + 1) * 3);
+  for (let i = 0; i <= N; i++) { const sm = sample((i / N) * uEnd), c = sm.craft; path[i * 3] = c[0]; path[i * 3 + 1] = c[1]; path[i * 3 + 2] = c[2]; pathRel[i * 3] = c[0] - sm.target[0]; pathRel[i * 3 + 1] = c[1] - sm.target[1]; pathRel[i * 3 + 2] = c[2] - sm.target[2]; }
   const R = U(Math.max(r1, r2));
   return {
     mode: moon ? "moon" : "sun", unitKm: unitM / 1000, earthR: U(earth.radius_m), targetR: U(target.radius_m), targetName: target.name, uEnd,
-    reveal, markers: { seg1: s1, seg2: s2 }, sample, path, orbitRadii: moon ? [U(r2)] : [U(r1), U(r2)],
+    reveal, markers: { seg1: s1, seg2: s2 }, sample, path, pathRel, seg3Index: Math.min(N, Math.ceil((s2 / uEnd) * N)), captureRadius: U(rcM), orbitRadii: moon ? [U(r2)] : [U(r1), U(r2)],
     centre: moon ? [-U(r2) / 2, 0, 0] : [0, 0, 0], viewRadius: R, durationS: moon ? 28 : 34, transferDays: T2 / 86400,
   };
 }

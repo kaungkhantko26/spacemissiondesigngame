@@ -6,13 +6,20 @@ import {
   BackButton, GameButton, GlassPanel, LoadingBar, PlayerAvatar, ScreenContainer, StatBar, StatusPill,
 } from "@/components/ui";
 import { Astronaut, CrewLineup, MissionHangar, OrbitalVisualization, PlanetModel, Scene3D } from "@/components/three/lazy";
-import { useCrewSelectionStore, useLobbyStore, useMissionSetupStore, useUIStore } from "@/stores";
+import { hydrateTeamSetup, useCrewSelectionStore, useLobbyStore, useMissionSetupStore, useUIStore } from "@/stores";
 import { useLobby } from "./Team";
+import { useLook } from "./Core";
 import { cn, missionAvailability, roleCounts } from "@/lib/mission";
 import { characters, difficulties, missions, modifiers, players, traits, telemetrySeed } from "@/data/mock";
 import { lobbyService, missionTelemetryService } from "@/services/mocks";
 import type { Character, DifficultyId, HudState, Mission, MissionModifier, MissionTelemetry, RoleId } from "@/types";
 import { cosmetics } from "@/data/mock";
+import { AscentFlight } from "@/components/game/LaunchControl";
+import { LaunchSession } from "@/game/launch/session";
+import { scoreFlight, type Difficulty as LaunchDifficulty } from "@/game/launch/core";
+import { useTeamResult } from "@/game/launch/teamResult";
+import { useProgress } from "@/game/progress";
+import { usePlayerStore } from "@/stores";
 
 /* ---------- shared hooks ---------- */
 function useSetup() {
@@ -20,8 +27,10 @@ function useSetup() {
   const { missionId, difficultyId } = useMissionSetupStore();
   const mission = missions.find((m) => m.id === missionId) ?? null;
   const difficulty = difficulties.find((d) => d.id === difficultyId)!;
-  useEffect(() => { if (!mission) router.replace("/mission/select"); }, [mission, router]);
-  return { mission, difficulty };
+  const [ready, setReady] = useState(false);
+  useEffect(() => { void hydrateTeamSetup().then(() => setReady(true)); }, []);
+  useEffect(() => { if (ready && !mission) router.replace("/mission/select"); }, [ready, mission, router]);
+  return { mission, difficulty, ready };
 }
 const mods = (m: Mission, d: DifficultyId): MissionModifier[] => m.modifiersByDifficulty[d].map((id) => modifiers.find((x) => x.id === id)!).filter(Boolean);
 const modIcon = { power: Zap, radio: Radio, weight: Weight, alert: AlertTriangle } as const;
@@ -75,6 +84,7 @@ export function MissionSelectScreen() {
                       <div className="flex flex-1 flex-col gap-1 p-3">
                         <p className="font-display font-bold">{m.name} {!a.available && <Lock className="inline size-4" aria-label="Unavailable" />}</p>
                         <p className="text-xs text-ink2">{m.summary}</p>
+                        {m.playable && <p className="mt-1 text-[11px] text-warn">{m.playable}</p>}
                         <p className="text-xs text-muted">{m.category} · {m.minPlayers}–{m.maxPlayers} players · {m.durationMinutes[0]}–{m.durationMinutes[1]} min</p>
                         <p className="text-xs text-muted">Difficulties: {m.supportedDifficulties.join(", ") || "TBD"}</p>
                         {!a.available && <p className="mt-auto text-xs text-warn">⚠ {a.reason}</p>}
@@ -88,7 +98,7 @@ export function MissionSelectScreen() {
           <GlassPanel className="p-4">
             {sel ? (
               <div className="grid gap-3 md:grid-cols-3">
-                <div><h2 className="text-xl font-bold">{sel.name}</h2><p className="text-sm text-ink2">{sel.summary}</p></div>
+                <div><h2 className="text-xl font-bold">{sel.name}</h2><p className="text-sm text-ink2">{sel.summary}</p>{sel.playable && <p className="mt-1 text-xs text-warn">{sel.playable}</p>}</div>
                 <div><p className="text-sm font-semibold">Goals</p><ul className="list-disc pl-5 text-sm text-ink2">{sel.objectives.map((o) => <li key={o}>{o}</li>)}</ul></div>
                 <div className="text-sm text-ink2"><p className="font-semibold text-ink">Crew & rewards</p><p>{sel.roleTemplate.map((r) => `${r.required}× ${r.name}`).join(", ")}</p><p>Rewards: {sel.rewards.map((r) => r.label).join(", ")} ({d.xpMultiplier}× XP)</p></div>
               </div>
@@ -189,7 +199,7 @@ export function RolesScreen() {
 const STAT_LABEL: Record<keyof Character["stats"], string> = { research: "Research", analysis: "Analysis", communication: "Communication", maintenance: "Maintenance", coordination: "Coordination" };
 export function CharactersScreen() {
   const router = useRouter();
-  const { mission, difficulty } = useSetup();
+  const { mission, difficulty, ready } = useSetup();
   const lobby = useLobby();
   const ids = useMemo(() => lobby?.members.map((m) => m.playerId) ?? [ME], [lobby]);
   const { assignments, ensure, chooseCharacter, confirmCharacter } = useCrewSelectionStore();
@@ -199,7 +209,7 @@ export function CharactersScreen() {
   useEffect(() => ensure(ids), [ids, ensure]);
   const mine = assignments[ME];
   const roster = characters.filter((c) => c.role === mine?.roleId);
-  useEffect(() => { if (mine && !mine.roleId) router.replace("/mission/roles"); }, [mine, router]);
+  useEffect(() => { if (ready && mine && !mine.roleId) router.replace("/mission/roles"); }, [ready, mine, router]);
   if (!mission || !mine?.roleId) return null;
   const shown = characters.find((c) => c.id === (view ?? mine.characterId ?? roster[0]?.id))!;
   const other = characters.find((c) => c.id === cmp);
@@ -253,6 +263,7 @@ export function ConfirmScreen() {
   const router = useRouter();
   const { mission, difficulty } = useSetup();
   const lobby = useLobby();
+  const look = useLook(); // your own equipped cosmetics show on your crew member
   const assignments = useCrewSelectionStore((s) => s.assignments);
   if (!mission || !lobby) return null;
   const crew = lobby.members.map((m) => ({ m, p: players.find((x) => x.id === m.playerId)!, a: assignments[m.playerId], c: characters.find((x) => x.id === assignments[m.playerId]?.characterId) }));
@@ -264,7 +275,7 @@ export function ConfirmScreen() {
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <GlassPanel className="h-[380px] overflow-hidden p-0">
           <Scene3D light="hangar" camera={[0, 0.8, 6.5]} label="Crew lineup in hangar"><MissionHangar />
-            <CrewLineup crew={crew.map((x) => x.c ? { suit: x.c.suitColor, skin: x.c.skinTone, accent: x.c.accent, pose: x.m.ready ? "ready" : "idle" } : null)} /></Scene3D>
+            <CrewLineup crew={crew.map((x) => x.c ? { suit: x.p.id === ME ? look.suit : x.c.suitColor, skin: x.c.skinTone, accent: x.p.id === ME ? look.accent : x.c.accent, pose: x.m.ready ? "ready" : "idle" } : null)} /></Scene3D>
         </GlassPanel>
         <GlassPanel className="p-4 text-sm"><h2 className="font-display text-xl font-bold">{mission.name}</h2><p className="capitalize text-ink2">{difficulty.label} · {difficulty.xpMultiplier}× XP</p>
           <p className="mt-2 text-muted">Modifiers: {mods(mission, difficulty.id).map((m) => m.name).join(", ") || "None"}</p>
@@ -316,29 +327,41 @@ function Meter({ label, v, unit }: { label: string; v: { value: number; max: num
       <p className="text-xs text-muted">{Math.round(v.value)} / {v.max} {unit}</p></div>
   );
 }
+const MOON_VEHICLE = "ll2_cfg_93", ORBIT_VEHICLE = "ll2_cfg_164";
 export function GameplayScreen() {
   const router = useRouter();
   const { mission, difficulty } = useSetup();
-  const [t, setT] = useState<MissionTelemetry | null>(null);
-  useEffect(() => { void missionTelemetryService.getInitial().then(setT); return missionTelemetryService.subscribe(setT); }, []);
+  const [attempt, setAttempt] = useState(0);
+  const [started, setStarted] = useState(false);
+  const [lunar, setLunar] = useState<"captured" | "lost" | null>(null);
+  const kind: "orbit" | "moon" = mission?.body === "moon" ? "moon" : "orbit";
+  const [seedBase] = useState(() => Math.floor(Math.random() * 1e9));
+  const seed = seedBase + attempt;
+  const session = useMemo(() => (started ? new LaunchSession(difficulty.id as LaunchDifficulty, "ll2_pad_87", kind === "moon" ? MOON_VEHICLE : ORBIT_VEHICLE, seed, undefined, kind) : null), [started, difficulty.id, kind, seed]);
   if (!mission) return null;
+  const finish = () => {
+    const names = useProgress.getState().recordTeamRun(usePlayerStore.getState().profile.progression.level);
+    if (names.length) useUIStore.getState().toast(`Cosmetic unlocked: ${names.join(", ")}`, "success");
+    if (session) {
+      const sc = scoreFlight(session.flight);
+      const lunarState = kind === "moon" ? (lunar ?? "not-flown") : undefined;
+      useTeamResult.getState().set({ missionId: mission.id, ok: kind === "moon" ? sc.ok && lunar === "captured" : sc.ok, lunar: lunarState, ascentOk: sc.ok, score: sc.score, max: sc.max, grade: sc.grade, rocket: session.flight.rocket.name, maxQ: session.flight.maxQ, maxG: session.flight.maxG, flightS: session.flight.t, kind });
+    }
+    router.push("/mission/results");
+  };
+  if (session) return <AscentFlight key={attempt} session={session} onExit={finish} onAgain={() => { setAttempt((n) => n + 1); setLunar(null); }} onLunarResult={(r) => setLunar(r.captured ? "captured" : "lost")} exitLabel="Finish mission" />;
+  const crew = Object.values(useCrewSelectionStore.getState().assignments);
   return (
-    <main className="grid min-h-screen grid-rows-[auto_1fr] gap-3 p-3 lg:grid-cols-[280px_1fr_280px] lg:grid-rows-1">
-      <div className="grid h-fit gap-3">
-        <GlassPanel className="p-3 text-sm"><p className="text-xs text-warn">MOCK TELEMETRY — not validated science</p><h1 className="text-lg font-bold">{mission.name}</h1><p className="capitalize text-ink2">{difficulty.label}</p>
-          <ul className="mt-2 list-disc pl-4 text-ink2">{mission.objectives.map((o) => <li key={o}>{o}</li>)}</ul></GlassPanel>
-        <GlassPanel className="p-3 text-sm"><p className="mb-1 font-semibold">Crew</p>{useCrewSelectionStore.getState() && Object.values(useCrewSelectionStore.getState().assignments).map((a) => <p key={a.playerId} className="flex justify-between"><span>{players.find((p) => p.id === a.playerId)?.username}</span><span className="capitalize text-ink2">{a.roleId ?? "—"}</span></p>)}</GlassPanel>
+    <ScreenContainer title={mission.name} subtitle={`${difficulty.label} · real launch simulation${kind === "moon" ? " · Saturn V to the Moon" : ""}`}>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <GlassPanel className="p-5 text-sm"><p className="font-semibold">Objectives</p>
+          <ul className="mt-2 list-disc pl-5 text-ink2">{mission.objectives.map((o) => <li key={o}>{o}</li>)}</ul>
+          <p className="mt-3 text-ink2">{kind === "moon" ? "Fly the real Saturn V from Kennedy: ascent, parking orbit, TLI burn in the window, then coast and lunar-orbit insertion." : `Fly a Falcon-class ascent from Kennedy to orbit. ${difficulty.label} rules decide how much the autopilot helps.`}</p></GlassPanel>
+        <GlassPanel className="p-5 text-sm"><p className="font-semibold">Crew</p>
+          {crew.length ? crew.map((a) => <p key={a.playerId} className="flex justify-between"><span>{players.find((p) => p.id === a.playerId)?.username}</span><span className="capitalize text-ink2">{a.roleId ?? "—"}</span></p>) : <p className="text-ink2">Solo flight</p>}
+          <div className="mt-4"><GameButton variant="primary" onClick={() => setStarted(true)}>Go to the pad</GameButton></div></GlassPanel>
       </div>
-      <div className="grid min-h-[60vh] grid-rows-[1fr_auto] gap-3">
-        <GlassPanel className="min-h-0 overflow-hidden"><Scene3D light="orbit" camera={[0, 1.5, 7]} label="Orbital viewport"><OrbitalVisualization /></Scene3D></GlassPanel>
-        <GlassPanel className="p-3"><p className="mb-2 text-xs font-semibold text-muted">TIMELINE</p><ol className="flex flex-wrap gap-3 text-xs">{(t ?? telemetrySeed).timeline.map((x) => <li key={x.id} className={x.done ? "text-ok" : "text-ink2"}>{x.done ? "✓" : "○"} {x.at} {x.label}</li>)}</ol></GlassPanel>
-      </div>
-      <div className="grid h-fit gap-3">
-        <GlassPanel className="grid gap-3 p-3">{t ? <><Meter label="Mass" v={t.massKg} unit="kg" /><Meter label="Power" v={t.powerW} unit="W" /><Meter label="Budget" v={t.budgetM} unit="M$" /><Meter label="Data storage" v={t.storageGb} unit="GB" /><div className="flex justify-between text-xs"><span>Comms</span><StatusPill state={t.comms.state}>{t.comms.label}</StatusPill></div></> : <p role="status" className="text-sm text-cyan">Loading telemetry…</p>}</GlassPanel>
-        <GlassPanel className="p-3"><p className="mb-1 text-xs font-semibold text-muted">EVENTS</p><ul className="grid gap-1 text-xs">{(t?.events ?? []).map((e) => <li key={e.id}><StatusPill state={e.state}>{e.text}</StatusPill></li>)}</ul></GlassPanel>
-        <GameButton variant="primary" onClick={() => router.push("/mission/results")}>End mission (demo)</GameButton>
-      </div>
-    </main>
+    </ScreenContainer>
   );
 }
 
@@ -347,12 +370,13 @@ import { resultSeed } from "@/data/mock";
 export function ResultsScreen() {
   const router = useRouter();
   const r = resultSeed;
+  const real = useTeamResult((x) => x.result);
   const resetAll = () => { useCrewSelectionStore.getState().reset(); useMissionSetupStore.getState().reset(); };
   return (
-    <ScreenContainer title="Mission Results" subtitle="Illustrative mock data — the backend will provide authoritative results.">
+    <ScreenContainer title="Mission Results" subtitle={real ? `${real.rocket} · flown in the launch simulator` : "Illustrative mock data — the backend will provide authoritative results."}>
       <div className="grid gap-4 lg:grid-cols-3">
-        <GlassPanel className="p-5"><p className="text-xs text-muted">STATUS</p><p className="font-display text-3xl font-bold capitalize text-ok">✓ {r.status}</p>
-          <ul className="mt-3 text-sm text-ink2">{r.objectives.map((o) => <li key={o.label}>{o.done ? "✓" : "✗"} {o.label}</li>)}</ul></GlassPanel>
+        <GlassPanel className="p-5"><p className="text-xs text-muted">STATUS</p>{real ? <><p className={cn("font-display text-3xl font-bold", real.ok ? "text-ok" : "text-bad")}>{real.kind === "moon" ? (real.lunar === "captured" ? "✓ Lunar orbit captured" : real.lunar === "lost" ? "✗ Lost on the way to the Moon" : real.ascentOk ? "Translunar injection reached, lunar leg not flown" : "✗ Mission lost") : real.ok ? "✓ Orbit achieved" : "✗ Mission lost"}</p><p className="mt-2 text-sm text-ink2">Score {real.score} / {real.max} · Grade {real.grade}</p><p className="text-sm text-ink2">Max-Q {(real.maxQ / 1000).toFixed(1)} kPa · Peak {real.maxG.toFixed(1)} g · T+{Math.round(real.flightS)} s</p></> : <p className="font-display text-3xl font-bold capitalize text-ok">✓ {r.status}</p>}
+          {!real && <ul className="mt-3 text-sm text-ink2">{r.objectives.map((o) => <li key={o.label}>{o.done ? "✓" : "✗"} {o.label}</li>)}</ul>}</GlassPanel>
         <GlassPanel className="grid gap-3 p-5"><StatBar label="Science" value={r.science} max={100} /><StatBar label="Engineering" value={r.engineering} max={100} /><StatBar label="Resource efficiency" value={r.efficiency} max={100} tone="orange" /></GlassPanel>
         <GlassPanel className="p-5 text-sm"><p className="font-semibold">Crew contribution</p>{r.crewContribution.map((c) => <p key={c.playerId} className="flex justify-between"><span>{players.find((p) => p.id === c.playerId)?.username}</span><span>{c.percent}%</span></p>)}
           <p className="mt-3 text-gold">+{r.xpEarned} XP (mock)</p><p className="text-ink2">Cosmetics: {r.cosmeticRewards.map((id) => cosmetics.find((c) => c.id === id)?.name).join(", ")}</p></GlassPanel>

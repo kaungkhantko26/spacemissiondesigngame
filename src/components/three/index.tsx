@@ -3,14 +3,26 @@ import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Stars, useAnimations, useGLTF, useTexture } from "@react-three/drei";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { SRGBColorSpace, Vector3, type Group, type Mesh, type MeshStandardMaterial, type Object3D } from "three";
-import { BootGear, Headgear, ShoulderGear, patternTexture } from "./Gear";
+import { AdditiveBlending, CanvasTexture, Quaternion, SRGBColorSpace, Vector3, type Group, type Mesh, type MeshStandardMaterial, type Object3D } from "three";
+import { BackpackGear, BootGear, Headgear, PatchGear, ShoulderGear, patternTexture } from "./Gear";
 import { useUIStore } from "@/stores";
+import { asset } from "@/lib/asset";
+import { create } from "zustand";
+
+/** True once an astronaut model has actually been shown, so screens can swap a poster image for the live 3D one. */
+export const useAstronautReady = create<{ ready: boolean; set: () => void }>((set) => ({ ready: false, set: () => set({ ready: true }) }));
 
 /** Error boundary: 3D must never block navigation. */
-class Boundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
+class Boundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean; tries: number }> {
+  state = { failed: false, tries: 0 };
+  private timer: ReturnType<typeof setTimeout> | null = null;
   static getDerivedStateFromError() { return { failed: true }; }
+  /** A dropped connection while a big model downloads must not leave a permanent hole: forget the failed request and try again a few times. */
+  componentDidCatch() {
+    if (this.state.tries >= 4) return;
+    this.timer = setTimeout(() => { useGLTF.clear(ASTRONAUT_URL); this.setState((st) => ({ failed: false, tries: st.tries + 1 })); }, 2500 * (this.state.tries + 1));
+  }
+  componentWillUnmount() { if (this.timer) clearTimeout(this.timer); }
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
@@ -61,18 +73,18 @@ function Lights({ preset }: { preset: LightPreset }) {
 
 /* ---------- Astronaut (rigged GLB, recolourable skins) ---------- */
 export interface AstronautLook {
-  suit: string; skin?: string; helmet?: string; accent?: string; pack?: string;
+  suit: string; skin?: string; helmet?: string; accent?: string; pack?: string; packKind?: string; packAccent?: string; patchKind?: string; patchColor?: string; patchAccent?: string;
   /** Cosmetic ids + colours (see data/mock cosmetics): pattern decal, headgear, shoulder gear, boots. */
   pattern?: string; patternColor?: string; headgear?: string; headgearColor?: string;
   shoulder?: string; shoulderColor?: string; boots?: string; bootsColor?: string;
   pose?: "idle" | "wave" | "ready" | "celebrate";
 }
-export const ASTRONAUT_URL = "/models/astronaut.glb";
+export const ASTRONAUT_URL = asset("/models/astronaut.glb");
 const POSE_CLIP = { idle: "idle", wave: "wave", ready: "floating", celebrate: "moon_walk" } as const;
 const MODEL_HEIGHT = 3.1165; // native height of the GLB in its own units
 const TARGET_HEIGHT = 2.4; // world units, feet resting on y=-0.25
 
-export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = [0, 0, 0], scale = 1, rotationY = 0, pattern, patternColor, headgear, headgearColor, shoulder, shoulderColor, boots, bootsColor }:
+export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = [0, 0, 0], scale = 1, rotationY = 0, pattern, patternColor, headgear, headgearColor, shoulder, shoulderColor, boots, bootsColor, pack, packKind, packAccent, patchKind, patchColor, patchAccent }:
   AstronautLook & { position?: [number, number, number]; scale?: number; rotationY?: number }) {
   const { scene, animations } = useGLTF(ASTRONAUT_URL);
   // Per-instance clone so skins and animation state never leak between crew members.
@@ -89,6 +101,8 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
   const offset: [number, number, number] = [0, -0.25, 0.08 * k];
   const root = useRef<Group>(null);
   const { actions } = useAnimations(animations, root);
+  const markReady = useAstronautReady((st) => st.set);
+  useEffect(() => { markReady(); }, [markReady]);
   const reduced = useUIStore((s) => s.reducedMotion);
 
   // Skin: tint the suit materials; the near-black visor takes the helmet colour.
@@ -109,18 +123,25 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
   // Accessories follow their bones (position only) so they stay attached through every animation clip.
   const bones = useMemo(() => {
     const by: Record<string, Object3D | undefined> = {};
-    const want: [string, RegExp][] = [["head", /^head\d/], ["lSh", /^L_Clevicle/], ["rSh", /^R_Clevicle/], ["lFoot", /^L_Ankle/], ["rFoot", /^R_Ankle/]];
+    const want: [string, RegExp][] = [["head", /^head\d/], ["lSh", /^L_Clevicle/], ["rSh", /^R_Clevicle/], ["lFoot", /^L_Ankle/], ["rFoot", /^R_Ankle/], ["pack", /^bagPack\.?\d/], ["chest", /^Spine_3/]];
     model.traverse((o) => { for (const [k, re] of want) if (re.test(o.name)) by[k] = o; });
     return by;
   }, [model]);
-  const headG = useRef<Group>(null), lShG = useRef<Group>(null), rShG = useRef<Group>(null), lFootG = useRef<Group>(null), rFootG = useRef<Group>(null);
+  const headG = useRef<Group>(null), lShG = useRef<Group>(null), rShG = useRef<Group>(null), lFootG = useRef<Group>(null), rFootG = useRef<Group>(null), packG = useRef<Group>(null), chestG = useRef<Group>(null);
   const tmp = useMemo(() => new Vector3(), []);
+  // Chest patch and back-pack add-ons also follow the bone's ROTATION (relative to the first frame), so a leaning or turning torso carries them along instead of swallowing them.
+  const tracks = useMemo(() => ({ q0: new Map<string, Quaternion>(), q: new Quaternion(), rq: new Quaternion() }), []);
   useFrame(() => {
     const r = root.current; if (!r) return;
-    const pairs: [string, Group | null][] = [["head", headG.current], ["lSh", lShG.current], ["rSh", rShG.current], ["lFoot", lFootG.current], ["rFoot", rFootG.current]];
+    const pairs: [string, Group | null][] = [["head", headG.current], ["lSh", lShG.current], ["rSh", rShG.current], ["lFoot", lFootG.current], ["rFoot", rFootG.current], ["pack", packG.current], ["chest", chestG.current]];
     for (const [key, g] of pairs) {
       const b = bones[key]; if (!b || !g) continue;
       b.getWorldPosition(tmp); r.worldToLocal(tmp); g.position.copy(tmp);
+      if (key === "chest" || key === "pack") {
+        b.getWorldQuaternion(tracks.q); r.getWorldQuaternion(tracks.rq).invert(); tracks.q.premultiply(tracks.rq);
+        const q0 = tracks.q0.get(key) ?? tracks.q0.set(key, tracks.q.clone()).get(key)!;
+        g.quaternion.copy(tracks.q).multiply(q0.clone().invert());
+      }
     }
   });
 
@@ -137,11 +158,14 @@ export function Astronaut({ suit, helmet = "#4fc3f7", pose = "idle", position = 
       <primitive object={model} scale={k} position={offset} />
       {headgear && <group ref={headG}><Headgear kind={headgear} color={headgearColor ?? "#ffc857"} /></group>}
       {shoulder && <><group ref={lShG}><ShoulderGear kind={shoulder} color={shoulderColor ?? "#9fb3c8"} side={1} /></group><group ref={rShG}><ShoulderGear kind={shoulder} color={shoulderColor ?? "#9fb3c8"} side={-1} /></group></>}
+      {packKind && packKind !== "pack-std" && <group ref={packG}><BackpackGear kind={packKind} color={pack ?? "#9fb3c8"} accent={packAccent ?? "#ffc857"} /></group>}
+      {patchKind && <group ref={chestG}><group position={[0.18, 0.06, 0.21]} rotation={[0, 0.2, 0]}><PatchGear kind={patchKind} color={patchColor ?? "#0b3d91"} accent={patchAccent ?? "#ff8c42"} /></group></group>}
       {boots && <><group ref={lFootG}><BootGear kind={boots} color={bootsColor ?? "#4fc3f7"} /></group><group ref={rFootG}><BootGear kind={boots} color={bootsColor ?? "#4fc3f7"} /></group></>}
     </group>
   );
 }
-useGLTF.preload(ASTRONAUT_URL);
+/** Only screens that actually show the astronaut ask for it; the Launch Control and Moon views never download the model. */
+export const preloadAstronaut = () => useGLTF.preload(ASTRONAUT_URL);
 
 export function CrewLineup({ crew, pose = "idle" }: { crew: (AstronautLook | null)[]; pose?: AstronautLook["pose"] }) {
   const n = crew.length;
@@ -155,8 +179,9 @@ export function CrewLineup({ crew, pose = "idle" }: { crew: (AstronautLook | nul
 }
 
 /* ---------- Bodies ---------- */
-export type BodyKind = "earth" | "moon" | "mars" | "deepspace" | "telescope";
+export type BodyKind = "earth" | "moon" | "mars" | "sun" | "deepspace" | "telescope";
 const bodyStyle: Record<BodyKind, { color: string; emissive: string }> = {
+  sun: { color: "#ffd27a", emissive: "#ff9b2e" },
   earth: { color: "#1f6fd1", emissive: "#0b3d91" },
   moon: { color: "#b7bcc6", emissive: "#2a2d33" },
   mars: { color: "#c2562e", emissive: "#4a1a0c" },
@@ -166,7 +191,7 @@ const bodyStyle: Record<BodyKind, { color: string; emissive: string }> = {
 type P3 = [number, number, number];
 /** Real Earth: NASA Blue Marble map + drifting cloud layer + atmosphere rim. */
 function TexturedEarth({ radius }: { radius: number }) {
-  const [map, clouds] = useTexture(["/textures/earth.jpg", "/textures/earth_clouds.png"], (t) => { (Array.isArray(t) ? t[0] : t).colorSpace = SRGBColorSpace; });
+  const [map, clouds] = useTexture([asset("/textures/earth.jpg"), asset("/textures/earth_clouds.png")], (t) => { (Array.isArray(t) ? t[0] : t).colorSpace = SRGBColorSpace; });
   const cl = useRef<Group>(null);
   const reduced = useUIStore((st) => st.reducedMotion);
   useFrame((_, d) => { if (cl.current && !reduced) cl.current.rotation.y += d * 0.02; });
@@ -178,8 +203,38 @@ function TexturedEarth({ radius }: { radius: number }) {
     </>
   );
 }
+/** Procedural canvas texture: soft noise blotches between two colours (no image files). */
+function blotchTexture(base: string, dark: string, light: string, seed: number, polar = false): CanvasTexture | null {
+  if (typeof document === "undefined") return null;
+  const c = document.createElement("canvas"); c.width = 512; c.height = 256; const g = c.getContext("2d"); if (!g) return null;
+  g.fillStyle = base; g.fillRect(0, 0, 512, 256);
+  let a = seed >>> 0; const rnd = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  for (let i = 0; i < 160; i++) { const x = rnd() * 512, y = rnd() * 256, r = 8 + rnd() * 46, gr = g.createRadialGradient(x, y, 0, x, y, r); const col = rnd() < 0.55 ? dark : light; gr.addColorStop(0, col + "99"); gr.addColorStop(1, col + "00"); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  if (polar) for (const y of [0, 256]) { const gr = g.createLinearGradient(0, y, 0, y ? 226 : 30); gr.addColorStop(0, "rgba(255,255,255,.9)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, y ? 226 : 0, 512, 30); }
+  const t = new CanvasTexture(c); t.colorSpace = SRGBColorSpace; return t;
+}
+function TexturedMars({ radius }: { radius: number }) {
+  const map = useMemo(() => blotchTexture("#b5532f", "#6e2f1c", "#e0955c", 11, true), []);
+  return <mesh><sphereGeometry args={[radius, 48, 48]} /><meshStandardMaterial map={map} roughness={1} /></mesh>;
+}
+/** The Sun: bright granulated surface plus a soft glow (additive sprite) so it reads as a star, not a yellow dot. */
+function SunBody({ radius }: { radius: number }) {
+  const map = useMemo(() => blotchTexture("#ffb938", "#ff7a14", "#fff2b0", 5), []);
+  const glow = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"); if (!g) return null;
+    const gr = g.createRadialGradient(128, 128, 0, 128, 128, 128); gr.addColorStop(0, "rgba(255,225,150,1)"); gr.addColorStop(0.25, "rgba(255,170,60,.55)"); gr.addColorStop(0.6, "rgba(255,120,20,.14)"); gr.addColorStop(1, "rgba(255,100,0,0)");
+    g.fillStyle = gr; g.fillRect(0, 0, 256, 256); const t = new CanvasTexture(c); t.colorSpace = SRGBColorSpace; return t;
+  }, []);
+  return (
+    <group>
+      <mesh><sphereGeometry args={[radius, 48, 48]} /><meshBasicMaterial map={map} color="#ffffff" /></mesh>
+      <sprite scale={[radius * 6, radius * 6, 1]}><spriteMaterial map={glow} transparent depthWrite={false} blending={AdditiveBlending} /></sprite>
+    </group>
+  );
+}
 function TexturedMoon({ radius }: { radius: number }) {
-  const map = useTexture("/textures/moon.jpg", (t) => { (Array.isArray(t) ? t[0] : t).colorSpace = SRGBColorSpace; });
+  const map = useTexture(asset("/textures/moon.jpg"), (t) => { (Array.isArray(t) ? t[0] : t).colorSpace = SRGBColorSpace; });
   return <mesh><sphereGeometry args={[radius, 48, 48]} /><meshStandardMaterial map={map} roughness={1} /></mesh>;
 }
 export function PlanetModel({ kind, radius = 1.5, position = [0, 0, 0] }: { kind: BodyKind; radius?: number; position?: P3 }) {
@@ -189,7 +244,7 @@ export function PlanetModel({ kind, radius = 1.5, position = [0, 0, 0] }: { kind
   const st = bodyStyle[kind];
   return (
     <group ref={ref} position={position}>
-      {kind === "earth" ? <TexturedEarth radius={radius} /> : kind === "moon" ? <TexturedMoon radius={radius} />
+      {kind === "earth" ? <TexturedEarth radius={radius} /> : kind === "moon" ? <TexturedMoon radius={radius} /> : kind === "mars" ? <TexturedMars radius={radius} /> : kind === "sun" ? <SunBody radius={radius} />
         : <mesh><sphereGeometry args={[radius, 48, 48]} /><meshStandardMaterial color={st.color} emissive={st.emissive} emissiveIntensity={0.5} roughness={0.9} /></mesh>}
     </group>
   );
